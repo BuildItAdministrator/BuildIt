@@ -1,382 +1,202 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Build It!++ DayZ Map</title>
-
-    <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    >
-
-    <style>
-        html, body, #map {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-        }
-
-        body {
-            background: #111;
-            font-family: Arial, Helvetica, sans-serif;
-        }
-
-        #coordinateBox {
-            position: absolute;
-            left: 50%;
-            bottom: 18px;
-            transform: translateX(-50%);
-            z-index: 1000;
-            background: rgba(15, 15, 15, 0.88);
-            color: #fff;
-            border: 1px solid rgba(255,255,255,0.22);
-            border-radius: 8px;
-            padding: 8px 12px;
-            font-size: 14px;
-            font-weight: 700;
-            pointer-events: none;
-            white-space: nowrap;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.35);
-        }
-
-        #statusBox {
-            position: absolute;
-            top: 12px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            background: rgba(15, 15, 15, 0.86);
-            color: #fff;
-            border: 1px solid rgba(255,255,255,0.18);
-            border-radius: 8px;
-            padding: 7px 10px;
-            font-size: 12px;
-            pointer-events: none;
-        }
-
-        .place-label {
-            background: transparent;
-            border: 0;
-        }
-
-        .place-label-inner {
-            display: inline-block;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            white-space: nowrap;
-            text-shadow:
-                -1px -1px 0 rgba(0,0,0,.95),
-                 1px -1px 0 rgba(0,0,0,.95),
-                -1px  1px 0 rgba(0,0,0,.95),
-                 1px  1px 0 rgba(0,0,0,.95),
-                 0 2px 3px rgba(0,0,0,.9);
-            pointer-events: none;
-            user-select: none;
-        }
-
-        .place-original {
-            color: #fff;
-            font-weight: 800;
-            font-size: 13px;
-            line-height: 1.05;
-        }
-
-        .place-western {
-            color: #f2f2f2;
-            font-weight: 600;
-            font-size: 11px;
-            line-height: 1.05;
-            margin-top: 2px;
-            opacity: .96;
-        }
-
-        .place-type-capital .place-original,
-        .place-type-city .place-original {
-            font-size: 16px;
-        }
-
-        .place-type-village .place-original,
-        .place-type-town .place-original {
-            font-size: 13px;
-        }
-
-        .place-type-military .place-original,
-        .place-type-base .place-original,
-        .place-type-airfield .place-original {
-            color: #ffd7d7;
-        }
-
-        .place-type-water .place-original,
-        .place-type-lake .place-original,
-        .place-type-pond .place-original,
-        .place-type-river .place-original {
-            color: #d9efff;
-        }
-
-        .leaflet-control-attribution {
-            font-size: 10px;
-        }
-
-        @media (max-width: 600px) {
-            #coordinateBox {
-                bottom: 10px;
-                font-size: 12px;
-                padding: 7px 9px;
-            }
-
-            .place-original {
-                font-size: 11px;
-            }
-
-            .place-western {
-                font-size: 9px;
-            }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build It!++ DayZ Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+html,body,#map{width:100%;height:100%;margin:0}
+body{background:#111;font-family:Arial,Helvetica,sans-serif}
+#coords,#status{
+ position:absolute;z-index:1000;background:rgba(15,15,15,.9);color:#fff;
+ border:1px solid rgba(255,255,255,.22);border-radius:8px;padding:8px 12px;
+ pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.35)
+}
+#coords{left:50%;bottom:16px;transform:translateX(-50%);font-weight:700}
+#status{left:50%;top:12px;transform:translateX(-50%);font-size:12px}
+.place-label{background:transparent;border:0}
+.place-wrap{
+ transform:translate(-50%,-50%);text-align:center;white-space:nowrap;
+ text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,
+ 1px 1px 0 #000,0 2px 3px #000;pointer-events:none;user-select:none
+}
+.cyr{color:#fff;font-weight:800;line-height:1.05;font-size:13px}
+.lat{color:#eee;font-weight:700;line-height:1.05;font-size:10px;margin-top:2px}
+.type-capital .cyr,.type-city .cyr{font-size:17px}
+.type-capital .lat,.type-city .lat{font-size:12px}
+.type-town .cyr{font-size:15px}.type-town .lat{font-size:11px}
+.type-village .cyr{font-size:13px}
+.type-military .cyr,.type-base .cyr,.type-airfield .cyr{color:#ffdada}
+.type-water .cyr,.type-lake .cyr,.type-pond .cyr,.type-river .cyr,
+.type-bay .cyr,.type-sea .cyr{color:#d9efff;font-style:italic}
+@media(max-width:600px){
+ #coords{font-size:12px;padding:7px 9px}
+ .cyr{font-size:11px}.lat{font-size:9px}
+}
+</style>
 </head>
-
 <body>
-
 <div id="map"></div>
-<div id="statusBox">Locatienamen laden…</div>
-<div id="coordinateBox">X: ---- &nbsp;&nbsp; Z: ----</div>
+<div id="status">Alle Chernarus-locatienamen laden…</div>
+<div id="coords">X: ---- &nbsp;&nbsp; Z: ----</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-    const MAP_SIZE = 15360;
-    const XAM_UNITS = 256;
-    const METERS_PER_XAM_UNIT = MAP_SIZE / XAM_UNITS; // 60
+const MAP_SIZE=15360;
+const XAM_SPACE=256;
+const SCALE=MAP_SIZE/XAM_SPACE;
 
-    const map = L.map('map', {
-        crs: L.CRS.Simple,
-        minZoom: 0,
-        maxZoom: 7,
-        zoomSnap: 0.25,
-        zoomDelta: 0.5,
-        wheelPxPerZoomLevel: 80,
-        attributionControl: true
-    });
+const map=L.map('map',{
+  crs:L.CRS.Simple,minZoom:0,maxZoom:7,
+  zoomSnap:.25,zoomDelta:.5,wheelPxPerZoomLevel:80
+});
 
-    L.tileLayer(
-        'https://static.xam.nu/dayz/maps/chernarusplus/1.27/satellite/{z}/{x}/{y}.webp',
-        {
-            tileSize: 256,
-            minZoom: 0,
-            maxZoom: 7,
-            maxNativeZoom: 7,
-            noWrap: true,
-            attribution: 'Map imagery: XAM / DayZ'
-        }
-    ).addTo(map);
+L.tileLayer(
+ 'https://static.xam.nu/dayz/maps/chernarusplus/1.27/satellite/{z}/{x}/{y}.webp',
+ {tileSize:256,minZoom:0,maxZoom:7,maxNativeZoom:7,noWrap:true}
+).addTo(map);
 
-    // XAM's map coordinate space is 256 x 256.
-    // Y runs from -256 (south) to 0 (north).
-    const worldBounds = L.latLngBounds(
-        L.latLng(-256, 0),
-        L.latLng(0, 256)
-    );
+const bounds=L.latLngBounds([[-256,0],[0,256]]);
+map.setMaxBounds(bounds.pad(.05));
+map.fitBounds(bounds);
 
-    map.setMaxBounds(worldBounds.pad(0.05));
-    map.fitBounds(worldBounds);
+const coords=document.getElementById('coords');
+const status=document.getElementById('status');
 
-    const coordinateBox = document.getElementById('coordinateBox');
-    const statusBox = document.getElementById('statusBox');
+function leafletToGame(ll){
+ return {x:Math.round(ll.lng*SCALE),z:Math.round((ll.lat+256)*SCALE)};
+}
+function gameToLeaflet(x,z){return [z/SCALE-256,x/SCALE]}
 
-    function xamToGame(latlng) {
-        const x = latlng.lng * METERS_PER_XAM_UNIT;
-        const z = (256 + latlng.lat) * METERS_PER_XAM_UNIT;
+map.on('mousemove',e=>{
+ if(e.latlng.lng<0||e.latlng.lng>256||e.latlng.lat<-256||e.latlng.lat>0){
+   coords.innerHTML='X: ---- &nbsp;&nbsp; Z: ----'; return;
+ }
+ const p=leafletToGame(e.latlng);
+ coords.innerHTML=`X: ${p.x.toLocaleString('nl-NL')} &nbsp;&nbsp; Z: ${p.z.toLocaleString('nl-NL')}`;
+});
+map.getContainer().addEventListener('mouseleave',()=>{
+ coords.innerHTML='X: ---- &nbsp;&nbsp; Z: ----';
+});
 
-        return {
-            x: Math.max(0, Math.min(MAP_SIZE, x)),
-            z: Math.max(0, Math.min(MAP_SIZE, z))
-        };
-    }
+function cap(s){
+ return String(s||'').trim().replace(/(^|[\s\-–—])([A-Za-zА-Яа-яЁё])/g,
+   (m,p,c)=>p+c.toLocaleUpperCase());
+}
+function esc(s){
+ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;')
+ .replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;");
+}
+function hasCyr(s){return /[\u0400-\u04FF]/.test(s||'')}
 
-    map.on('mousemove', function (event) {
-        const pos = xamToGame(event.latlng);
+// Practical Russian/Chernarussian-style transliteration for DayZ labels.
+function translit(s){
+ const multi=[
+  ['Щ','Shch'],['щ','shch'],['Ж','Zh'],['ж','zh'],['Х','Kh'],['х','kh'],
+  ['Ц','Ts'],['ц','ts'],['Ч','Ch'],['ч','ch'],['Ш','Sh'],['ш','sh'],
+  ['Ю','Yu'],['ю','yu'],['Я','Ya'],['я','ya'],['Ё','Yo'],['ё','yo']
+ ];
+ for(const [a,b] of multi) s=s.split(a).join(b);
+ const m={
+  'А':'A','а':'a','Б':'B','б':'b','В':'V','в':'v','Г':'G','г':'g',
+  'Д':'D','д':'d','Е':'E','е':'e','З':'Z','з':'z','И':'I','и':'i',
+  'Й':'Y','й':'y','К':'K','к':'k','Л':'L','л':'l','М':'M','м':'m',
+  'Н':'N','н':'n','О':'O','о':'o','П':'P','п':'p','Р':'R','р':'r',
+  'С':'S','с':'s','Т':'T','т':'t','У':'U','у':'u','Ф':'F','ф':'f',
+  'Ы':'Y','ы':'y','Э':'E','э':'e','Ь':'','ь':'','Ъ':'','ъ':''
+ };
+ return cap([...String(s)].map(c=>m[c]??c).join(''));
+}
 
-        if (
-            event.latlng.lng < 0 ||
-            event.latlng.lng > 256 ||
-            event.latlng.lat < -256 ||
-            event.latlng.lat > 0
-        ) {
-            coordinateBox.innerHTML = 'X: ---- &nbsp;&nbsp; Z: ----';
-            return;
-        }
+function normType(t){
+ return String(t||'location').toLowerCase().replace(/[^a-z0-9_-]/g,'');
+}
 
-        coordinateBox.innerHTML =
-            `X: ${Math.round(pos.x).toLocaleString('nl-NL')} &nbsp;&nbsp; ` +
-            `Z: ${Math.round(pos.z).toLocaleString('nl-NL')}`;
-    });
+function addLabel(x,z,original,type,latinOverride=''){
+ if(!Number.isFinite(x)||!Number.isFinite(z)||!original) return false;
+ const cyr=cap(original);
+ const latin=cap(latinOverride || (hasCyr(cyr)?translit(cyr):cyr));
+ const typ=normType(type);
+ const html=`<div class="place-wrap type-${esc(typ)}">
+   <div class="cyr">${esc(cyr)}</div>
+   ${latin.toLocaleLowerCase()!==cyr.toLocaleLowerCase()?`<div class="lat">${esc(latin)}</div>`:''}
+ </div>`;
+ const icon=L.divIcon({className:'place-label',html,iconSize:[0,0],iconAnchor:[0,0]});
+ L.marker(gameToLeaflet(x,z),{icon,interactive:false,keyboard:false}).addTo(labels);
+ return true;
+}
 
-    map.getContainer().addEventListener('mouseleave', function () {
-        coordinateBox.innerHTML = 'X: ---- &nbsp;&nbsp; Z: ----';
-    });
+const labels=L.layerGroup().addTo(map);
 
-    function hasCyrillic(text) {
-        return /[\u0400-\u04FF]/.test(text || '');
-    }
+// Inverse of DZMap's documented GameToMetricZ transform.
+function metricZToGame(lon,lat){
+ const x=((lon+180)/360)*MAP_SIZE;
+ const latRad=lat*Math.PI/180;
+ const mercatorY=Math.log(Math.tan(Math.PI/4+latRad/2));
+ const z=((mercatorY+Math.PI)/(2*Math.PI))*MAP_SIZE;
+ return {x,z};
+}
 
-    function capitalizeWords(text) {
-        if (!text) return '';
+async function loadFromDZMap(){
+ const url='https://dzmap.woozymasta.ru/maps/chernarusplus/locations.geojson';
+ const r=await fetch(url,{cache:'no-cache'});
+ if(!r.ok) throw new Error(`DZMap HTTP ${r.status}`);
+ const gj=await r.json();
+ if(!Array.isArray(gj.features)) throw new Error('Geen GeoJSON features');
+ let n=0;
+ for(const f of gj.features){
+   if(f?.geometry?.type!=='Point') continue;
+   const [lon,lat]=f.geometry.coordinates||[];
+   const p=metricZToGame(Number(lon),Number(lat));
+   const name=f?.properties?.name||'';
+   const type=f?.properties?.type||'location';
+   if(addLabel(p.x,p.z,name,type)) n++;
+ }
+ return n;
+}
 
-        return text
-            .trim()
-            .split(/\s+/)
-            .map(word => {
-                if (!word) return word;
+async function loadFromXAM(){
+ const url='https://static.xam.nu/dayz/json/chernarusplus/1.28-2.json';
+ const r=await fetch(url,{cache:'no-cache'});
+ if(!r.ok) throw new Error(`XAM HTTP ${r.status}`);
+ const d=await r.json();
+ const locs=d?.markers?.locations;
+ if(!Array.isArray(locs)) throw new Error('Geen XAM locations');
+ let n=0;
+ for(const l of locs){
+   if(!Array.isArray(l.p)||l.p.length<2) continue;
+   const xamY=Number(l.p[0]), xamX=Number(l.p[1]);
+   const x=(xamX*MAP_SIZE)/256;
+   const z=((256+xamY)*MAP_SIZE)/256;
+   const names=Array.isArray(l.s)?l.s.filter(Boolean):[];
+   const original=names.find(hasCyr)||names[0]||'';
+   const latin=names.find(v=>!hasCyr(v))||'';
+   if(addLabel(x,z,original,l.w||'location',latin)) n++;
+ }
+ return n;
+}
 
-                // Keep punctuation at the beginning, capitalise the first actual letter.
-                return word.replace(
-                    /([A-Za-zÀ-ÖØ-öø-ÿĀ-žА-Яа-яЁё])/,
-                    letter => letter.toLocaleUpperCase()
-                );
-            })
-            .join(' ');
-    }
-
-    function escapeHtml(text) {
-        return String(text)
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-            .replaceAll("'", '&#039;');
-    }
-
-    function selectNames(names) {
-        const cleaned = (Array.isArray(names) ? names : [])
-            .filter(Boolean)
-            .map(value => String(value).trim())
-            .filter(Boolean);
-
-        if (!cleaned.length) {
-            return { original: '', western: '' };
-        }
-
-        const cyrillic = cleaned.find(hasCyrillic);
-        const latin = cleaned.find(name => !hasCyrillic(name));
-
-        // If XAM provides both scripts, show the Cyrillic/native form first
-        // and the Latin/western transliteration beneath it.
-        if (cyrillic && latin) {
-            return {
-                original: capitalizeWords(cyrillic),
-                western: capitalizeWords(latin)
-            };
-        }
-
-        // If only one script is available, do not invent a translation.
-        return {
-            original: capitalizeWords(cleaned[0]),
-            western: ''
-        };
-    }
-
-    function normaliseType(type) {
-        return String(type || 'location')
-            .toLowerCase()
-            .replace(/[^a-z0-9_-]/g, '');
-    }
-
-    function createLabel(location) {
-        if (!location || !Array.isArray(location.p) || location.p.length < 2) {
-            return null;
-        }
-
-        // XAM JSON:
-        // p[0] = map Y, p[1] = map X
-        const y = Number(location.p[0]);
-        const x = Number(location.p[1]);
-
-        if (!Number.isFinite(x) || !Number.isFinite(y)) {
-            return null;
-        }
-
-        const names = selectNames(location.s);
-        if (!names.original) {
-            return null;
-        }
-
-        const type = normaliseType(location.w);
-
-        const westernLine =
-            names.western &&
-            names.western.toLocaleLowerCase() !== names.original.toLocaleLowerCase()
-                ? `<div class="place-western">${escapeHtml(names.western)}</div>`
-                : '';
-
-        const html = `
-            <div class="place-label-inner place-type-${escapeHtml(type)}">
-                <div class="place-original">${escapeHtml(names.original)}</div>
-                ${westernLine}
-            </div>
-        `;
-
-        const icon = L.divIcon({
-            className: 'place-label',
-            html,
-            iconSize: [0, 0],
-            iconAnchor: [0, 0]
-        });
-
-        return L.marker([y, x], {
-            icon,
-            interactive: false,
-            keyboard: false
-        });
-    }
-
-    const labelLayer = L.layerGroup().addTo(map);
-
-    async function loadLocationNames() {
-        // Current XAM location dataset referenced by the DZMap project.
-        const locationUrl =
-            'https://static.xam.nu/dayz/json/chernarusplus/1.28-2.json';
-
-        try {
-            const response = await fetch(locationUrl, { cache: 'no-cache' });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const data = await response.json();
-            const locations = data?.markers?.locations;
-
-            if (!Array.isArray(locations)) {
-                throw new Error('Onverwacht XAM-dataformaat');
-            }
-
-            let count = 0;
-
-            for (const location of locations) {
-                const marker = createLabel(location);
-                if (marker) {
-                    marker.addTo(labelLayer);
-                    count++;
-                }
-            }
-
-            statusBox.textContent = `${count} locatienamen geladen`;
-
-            setTimeout(() => {
-                statusBox.style.display = 'none';
-            }, 2500);
-
-        } catch (error) {
-            console.error('Kon XAM-locatienamen niet laden:', error);
-            statusBox.textContent =
-                'Locatienamen konden niet geladen worden — kaart blijft bruikbaar.';
-            statusBox.style.background = 'rgba(90, 20, 20, 0.92)';
-        }
-    }
-
-    loadLocationNames();
+(async()=>{
+ let count=0, source='';
+ try{
+   count=await loadFromDZMap();
+   source='DZMap/XAM';
+ }catch(e1){
+   console.warn('DZMap mislukt, XAM fallback:',e1);
+   try{
+     count=await loadFromXAM();
+     source='XAM';
+   }catch(e2){
+     console.error('Alle locatiedata mislukt:',e2);
+     status.textContent='Locatiedata kon niet worden geladen.';
+     status.style.background='rgba(100,20,20,.92)';
+     return;
+   }
+ }
+ status.textContent=`${count} benoemde locaties geladen · ${source}`;
+ setTimeout(()=>status.style.display='none',3000);
+})();
 </script>
-
 </body>
 </html>
