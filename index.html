@@ -1,12 +1,57 @@
 <!DOCTYPE html>
-<html lang="nl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Build It!++ Chernarus Map</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><style>html,body,#map{width:100%;height:100%;margin:0;background:#111}.coord{background:rgba(20,20,20,.86);color:#fff;padding:6px 9px;border-radius:4px;font:13px system-ui,sans-serif}</style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
-const SIZE=15360,TILE=512,MAX_NATIVE_ZOOM=5;
-const ChernarusCRS=L.extend({},L.CRS.Simple,{transformation:new L.Transformation(TILE/SIZE,0,-TILE/SIZE,TILE)});
-const bounds=L.latLngBounds([0,0],[SIZE,SIZE]);
-const map=L.map('map',{crs:ChernarusCRS,minZoom:0,maxZoom:8,zoomSnap:.25,zoomDelta:.5,wheelPxPerZoomLevel:90,maxBounds:bounds,maxBoundsViscosity:1});
-L.tileLayer('tiles/{z}/{x}/{y}.webp',{tileSize:TILE,minZoom:0,maxNativeZoom:MAX_NATIVE_ZOOM,maxZoom:8,noWrap:true,bounds}).addTo(map);
-map.fitBounds(bounds);
-const coord=L.control({position:'bottomleft'});coord.onAdd=()=>{const d=L.DomUtil.create('div','coord');d.innerHTML='X: – &nbsp; Y: –';coord._div=d;return d};coord.addTo(map);
-map.on('mousemove',e=>{const x=Math.max(0,Math.min(SIZE,e.latlng.lng)),y=Math.max(0,Math.min(SIZE,e.latlng.lat));coord._div.innerHTML=`X: ${Math.round(x)} &nbsp; Y: ${Math.round(y)}`});
-map.on('click',e=>{const x=Math.round(e.latlng.lng),y=Math.round(e.latlng.lat);L.popup().setLatLng(e.latlng).setContent(`<b>DayZ coordinates</b><br>X: ${x}<br>Y: ${y}`).openOn(map)});
-</script></body></html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Build It!++ DayZ Map</title>
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+    <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            background: #111;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    const map = L.map('map', {
+        crs: L.CRS.Simple,
+        minZoom: 0,
+        maxZoom: 7,
+        zoomSnap: 0.25,
+        zoomDelta: 0.5,
+        wheelPxPerZoomLevel: 80
+    });
+
+    L.tileLayer(
+        'https://static.xam.nu/dayz/maps/chernarusplus/1.27/satellite/{z}/{x}/{y}.webp',
+        {
+            tileSize: 256,
+            minZoom: 0,
+            maxZoom: 7,
+            maxNativeZoom: 7,
+            noWrap: true
+        }
+    ).addTo(map);
+
+    map.setView([-8, 8], 4);
+</script>
+
+</body>
+</html>
