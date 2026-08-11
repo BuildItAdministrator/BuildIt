@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Build It!++ Interactive DayZ Map</title>
+    <title>Build It!++ DayZ Map</title>
 
     <link
         rel="stylesheet"
@@ -14,9 +14,9 @@
     <style>
         html, body {
             margin: 0;
-            padding: 0;
             width: 100%;
             height: 100%;
+            background: #111;
         }
 
         #map {
@@ -28,27 +28,37 @@
 
 <body>
 
-    <div id="map"></div>
+<div id="map"></div>
 
-    <script
-        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
-    </script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <script>
-        const map = L.map('map').setView([51.5, 5.5], 10);
+<script>
+    const map = L.map('map', {
+        crs: L.CRS.Simple,
+        minZoom: 0,
+        maxZoom: 7
+    });
 
-        L.tileLayer(
-            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            {
-                maxZoom: 19,
-                attribution: '&copy; OpenStreetMap'
-            }
-        ).addTo(map);
+    const mapSize = 15360;
 
-        L.marker([51.5, 5.5])
-            .addTo(map)
-            .bindPopup('Build It!++ test marker');
-    </script>
+    const southWest = map.unproject([0, mapSize], map.getMaxZoom());
+    const northEast = map.unproject([mapSize, 0], map.getMaxZoom());
+
+    const bounds = new L.LatLngBounds(southWest, northEast);
+
+    L.tileLayer(
+        'https://static.xam.nu/dayz/maps/chernarusplus/1.27/topographic/{z}/{x}/{y}.webp',
+        {
+            minZoom: 0,
+            maxZoom: 7,
+            noWrap: true,
+            bounds: bounds
+        }
+    ).addTo(map);
+
+    map.fitBounds(bounds);
+    map.setMaxBounds(bounds);
+</script>
 
 </body>
 </html>
