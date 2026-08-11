@@ -30,6 +30,29 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
 .type-military .cyr,.type-base .cyr,.type-airfield .cyr{color:#ffdada}
 .type-water .cyr,.type-lake .cyr,.type-pond .cyr,.type-river .cyr,
 .type-bay .cyr,.type-sea .cyr{color:#d9efff;font-style:italic}
+
+#filterToggle{
+ position:absolute;top:12px;left:12px;z-index:1100;
+ background:rgba(15,15,15,.92);color:#fff;
+ border:1px solid rgba(255,255,255,.25);border-radius:8px;
+ padding:9px 12px;font-weight:700;cursor:pointer;
+ box-shadow:0 2px 10px rgba(0,0,0,.35)
+}
+#filterPanel{
+ position:absolute;top:58px;left:12px;z-index:1100;
+ min-width:210px;background:rgba(15,15,15,.94);color:#fff;
+ border:1px solid rgba(255,255,255,.22);border-radius:10px;
+ padding:12px;box-shadow:0 2px 12px rgba(0,0,0,.45)
+}
+#filterPanel.hidden{display:none}
+.filter-title{font-weight:800;margin-bottom:10px}
+.filter-row{
+ display:flex;align-items:center;gap:9px;
+ padding:7px 2px;cursor:pointer;user-select:none
+}
+.filter-row input{width:17px;height:17px;cursor:pointer}
+.filter-note{font-size:11px;color:#bbb;margin-top:8px}
+
 @media(max-width:600px){
  #coords{font-size:12px;padding:7px 9px}
  .cyr{font-size:11px}.lat{font-size:9px}
@@ -38,6 +61,17 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
 </head>
 <body>
 <div id="map"></div>
+
+<button id="filterToggle" type="button">☰ Filters</button>
+<div id="filterPanel" class="hidden">
+  <div class="filter-title">Kaartfilters</div>
+  <label class="filter-row">
+    <input id="filterPlaceNames" type="checkbox" checked>
+    <span>Plaatsnamen</span>
+  </label>
+  <div class="filter-note">Meer filtercategorieën kunnen hier later bij.</div>
+</div>
+
 <div id="status">Chernarus-locatienamen laden…</div>
 <div id="coords">X: ---- &nbsp;&nbsp; Z: ----</div>
 
@@ -64,6 +98,23 @@ map.fitBounds(bounds);
 const coords=document.getElementById('coords');
 const status=document.getElementById('status');
 const labels=L.layerGroup().addTo(map);
+
+const filterToggle=document.getElementById('filterToggle');
+const filterPanel=document.getElementById('filterPanel');
+const filterPlaceNames=document.getElementById('filterPlaceNames');
+
+filterToggle.addEventListener('click',()=>{
+  filterPanel.classList.toggle('hidden');
+});
+
+filterPlaceNames.addEventListener('change',()=>{
+  if(filterPlaceNames.checked){
+    if(!map.hasLayer(labels)) labels.addTo(map);
+  }else{
+    if(map.hasLayer(labels)) map.removeLayer(labels);
+  }
+});
+
 
 function leafletToGame(ll){
  return {x:Math.round(ll.lng*SCALE),z:Math.round((ll.lat+256)*SCALE)};
