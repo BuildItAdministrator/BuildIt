@@ -9,7 +9,7 @@
 html,body,#map{width:100%;height:100%;margin:0}
 body{background:#111;font-family:Arial,Helvetica,sans-serif}
 #coords,#status{
- position:absolute;z-index:1000;background:rgba(15,15,15,.9);color:#fff;
+ position:absolute;z-index:1000;background:rgba(15,15,15,.90);color:#fff;
  border:1px solid rgba(255,255,255,.22);border-radius:8px;padding:8px 12px;
  pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.35)
 }
@@ -38,7 +38,7 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
 </head>
 <body>
 <div id="map"></div>
-<div id="status">Alle Chernarus-locatienamen laden…</div>
+<div id="status">Chernarus-locatienamen laden…</div>
 <div id="coords">X: ---- &nbsp;&nbsp; Z: ----</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -63,6 +63,7 @@ map.fitBounds(bounds);
 
 const coords=document.getElementById('coords');
 const status=document.getElementById('status');
+const labels=L.layerGroup().addTo(map);
 
 function leafletToGame(ll){
  return {x:Math.round(ll.lng*SCALE),z:Math.round((ll.lat+256)*SCALE)};
@@ -88,16 +89,17 @@ function esc(s){
  return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;')
  .replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;");
 }
-function hasCyr(s){return /[\u0400-\u04FF]/.test(s||'')}
+function hasCyr(s){return /[\u0400-\u04FF]/.test(String(s||''))}
+function normType(t){return String(t||'location').toLowerCase().replace(/[^a-z0-9_-]/g,'')}
 
-// Practical Russian/Chernarussian-style transliteration for DayZ labels.
-function translit(s){
- const multi=[
+function cyrToLatin(input){
+ let s=String(input||'');
+ const combos=[
   ['Щ','Shch'],['щ','shch'],['Ж','Zh'],['ж','zh'],['Х','Kh'],['х','kh'],
   ['Ц','Ts'],['ц','ts'],['Ч','Ch'],['ч','ch'],['Ш','Sh'],['ш','sh'],
   ['Ю','Yu'],['ю','yu'],['Я','Ya'],['я','ya'],['Ё','Yo'],['ё','yo']
  ];
- for(const [a,b] of multi) s=s.split(a).join(b);
+ for(const [a,b] of combos) s=s.split(a).join(b);
  const m={
   'А':'A','а':'a','Б':'B','б':'b','В':'V','в':'v','Г':'G','г':'g',
   'Д':'D','д':'d','Е':'E','е':'e','З':'Z','з':'z','И':'I','и':'i',
@@ -106,30 +108,122 @@ function translit(s){
   'С':'S','с':'s','Т':'T','т':'t','У':'U','у':'u','Ф':'F','ф':'f',
   'Ы':'Y','ы':'y','Э':'E','э':'e','Ь':'','ь':'','Ъ':'','ъ':''
  };
- return cap([...String(s)].map(c=>m[c]??c).join(''));
+ return cap([...s].map(c=>m[c]??c).join(''));
 }
 
-function normType(t){
- return String(t||'location').toLowerCase().replace(/[^a-z0-9_-]/g,'');
+// Fallback only. Normally the raw XAM data supplies both variants.
+// This makes sure a second Cyrillic line still exists if a fallback source
+// happens to contain only the Latin spelling.
+function latinToCyr(input){
+ let s=String(input||'').toLowerCase();
+
+ const known={
+  'chernogorsk':'Черногорск',
+  'elektrozavodsk':'Электрозаводск',
+  'elektro':'Электро',
+  'berezino':'Березино',
+  'zelenogorsk':'Зеленогорск',
+  'krasnostav':'Красностав',
+  'stary sobor':'Старый Собор',
+  'novy sobor':'Новый Собор',
+  'svetloyarsk':'Светлоярск',
+  'solnichniy':'Солнечный',
+  'solnichniy factory':'Солнечный Завод',
+  'balota':'Балота',
+  'kamenka':'Каменка',
+  'kamyshovo':'Камышово',
+  'novodmitrovsk':'Новодмитровск',
+  'severograd':'Североград',
+  'gorka':'Горка',
+  'vybor':'Выбор',
+  'pustoshka':'Пустошка',
+  'pavlovo':'Павлово',
+  'komarovo':'Комарово'
+ };
+ if(known[s]) return known[s];
+
+ const combos=[
+   ['shch','щ'],['zh','ж'],['kh','х'],['ts','ц'],['ch','ч'],['sh','ш'],
+   ['yu','ю'],['ya','я'],['yo','ё']
+ ];
+ for(const [a,b] of combos) s=s.split(a).join(b);
+
+ const m={
+  'a':'а','b':'б','c':'к','d':'д','e':'е','f':'ф','g':'г','h':'х',
+  'i':'и','j':'й','k':'к','l':'л','m':'м','n':'н','o':'о','p':'п',
+  'q':'к','r':'р','s':'с','t':'т','u':'у','v':'в','w':'в','x':'кс',
+  'y':'ы','z':'з'
+ };
+ let out='';
+ for(const c of s) out+=m[c]??c;
+ return cap(out);
 }
 
-function addLabel(x,z,original,type,latinOverride=''){
- if(!Number.isFinite(x)||!Number.isFinite(z)||!original) return false;
- const cyr=cap(original);
- const latin=cap(latinOverride || (hasCyr(cyr)?translit(cyr):cyr));
+function namePair(names){
+ const arr=(Array.isArray(names)?names:[names])
+   .filter(Boolean).map(v=>String(v).trim()).filter(Boolean);
+
+ let cyr=arr.find(hasCyr)||'';
+ let lat=arr.find(v=>!hasCyr(v))||'';
+
+ if(cyr && !lat) lat=cyrToLatin(cyr);
+ if(lat && !cyr) cyr=latinToCyr(lat);
+
+ return {cyr:cap(cyr),lat:cap(lat)};
+}
+
+function addLabel(x,z,names,type){
+ if(!Number.isFinite(x)||!Number.isFinite(z)) return false;
+
+ const pair=namePair(names);
+ if(!pair.cyr && !pair.lat) return false;
+
  const typ=normType(type);
  const html=`<div class="place-wrap type-${esc(typ)}">
-   <div class="cyr">${esc(cyr)}</div>
-   ${latin.toLocaleLowerCase()!==cyr.toLocaleLowerCase()?`<div class="lat">${esc(latin)}</div>`:''}
+   <div class="cyr">${esc(pair.cyr)}</div>
+   <div class="lat">${esc(pair.lat)}</div>
  </div>`;
- const icon=L.divIcon({className:'place-label',html,iconSize:[0,0],iconAnchor:[0,0]});
- L.marker(gameToLeaflet(x,z),{icon,interactive:false,keyboard:false}).addTo(labels);
+
+ const icon=L.divIcon({
+   className:'place-label',html,iconSize:[0,0],iconAnchor:[0,0]
+ });
+
+ L.marker(gameToLeaflet(x,z),{
+   icon,interactive:false,keyboard:false
+ }).addTo(labels);
+
  return true;
 }
 
-const labels=L.layerGroup().addTo(map);
+// RAW XAM FIRST:
+// unlike the normalized DZMap GeoJSON, XAM's location records contain
+// the complete "s" names array, so we can use Cyrillic + Latin together.
+async function loadRawXAM(){
+ const url='https://static.xam.nu/dayz/json/chernarusplus/1.28-2.json';
+ const r=await fetch(url,{cache:'no-cache'});
+ if(!r.ok) throw new Error(`XAM HTTP ${r.status}`);
 
-// Inverse of DZMap's documented GameToMetricZ transform.
+ const d=await r.json();
+ const locs=d?.markers?.locations;
+ if(!Array.isArray(locs)) throw new Error('Geen XAM locations-array');
+
+ let n=0;
+ for(const l of locs){
+   if(!Array.isArray(l.p)||l.p.length<2) continue;
+
+   const xamY=Number(l.p[0]);
+   const xamX=Number(l.p[1]);
+   const x=(xamX*MAP_SIZE)/256;
+   const z=((256+xamY)*MAP_SIZE)/256;
+
+   if(addLabel(x,z,l.s||[],l.w||'location')) n++;
+ }
+ return n;
+}
+
+// Fallback through DZMap if a browser blocks direct XAM JSON.
+// DZMap currently keeps only one XAM name; namePair() reconstructs
+// the missing second script so there are still always two lines.
 function metricZToGame(lon,lat){
  const x=((lon+180)/360)*MAP_SIZE;
  const latRad=lat*Math.PI/180;
@@ -138,12 +232,14 @@ function metricZToGame(lon,lat){
  return {x,z};
 }
 
-async function loadFromDZMap(){
+async function loadDZMapFallback(){
  const url='https://dzmap.woozymasta.ru/maps/chernarusplus/locations.geojson';
  const r=await fetch(url,{cache:'no-cache'});
  if(!r.ok) throw new Error(`DZMap HTTP ${r.status}`);
+
  const gj=await r.json();
- if(!Array.isArray(gj.features)) throw new Error('Geen GeoJSON features');
+ if(!Array.isArray(gj.features)) throw new Error('Geen GeoJSON-features');
+
  let n=0;
  for(const f of gj.features){
    if(f?.geometry?.type!=='Point') continue;
@@ -151,51 +247,34 @@ async function loadFromDZMap(){
    const p=metricZToGame(Number(lon),Number(lat));
    const name=f?.properties?.name||'';
    const type=f?.properties?.type||'location';
-   if(addLabel(p.x,p.z,name,type)) n++;
- }
- return n;
-}
 
-async function loadFromXAM(){
- const url='https://static.xam.nu/dayz/json/chernarusplus/1.28-2.json';
- const r=await fetch(url,{cache:'no-cache'});
- if(!r.ok) throw new Error(`XAM HTTP ${r.status}`);
- const d=await r.json();
- const locs=d?.markers?.locations;
- if(!Array.isArray(locs)) throw new Error('Geen XAM locations');
- let n=0;
- for(const l of locs){
-   if(!Array.isArray(l.p)||l.p.length<2) continue;
-   const xamY=Number(l.p[0]), xamX=Number(l.p[1]);
-   const x=(xamX*MAP_SIZE)/256;
-   const z=((256+xamY)*MAP_SIZE)/256;
-   const names=Array.isArray(l.s)?l.s.filter(Boolean):[];
-   const original=names.find(hasCyr)||names[0]||'';
-   const latin=names.find(v=>!hasCyr(v))||'';
-   if(addLabel(x,z,original,l.w||'location',latin)) n++;
+   if(addLabel(p.x,p.z,[name],type)) n++;
  }
  return n;
 }
 
 (async()=>{
- let count=0, source='';
+ labels.clearLayers();
+
  try{
-   count=await loadFromDZMap();
-   source='DZMap/XAM';
- }catch(e1){
-   console.warn('DZMap mislukt, XAM fallback:',e1);
-   try{
-     count=await loadFromXAM();
-     source='XAM';
-   }catch(e2){
-     console.error('Alle locatiedata mislukt:',e2);
-     status.textContent='Locatiedata kon niet worden geladen.';
-     status.style.background='rgba(100,20,20,.92)';
-     return;
-   }
+   const count=await loadRawXAM();
+   status.textContent=`${count} locaties geladen · Cyrillisch + Latijn · XAM`;
+   setTimeout(()=>status.style.display='none',3000);
+   return;
+ }catch(e){
+   console.warn('Directe XAM-locatiedata geblokkeerd, fallback:',e);
  }
- status.textContent=`${count} benoemde locaties geladen · ${source}`;
- setTimeout(()=>status.style.display='none',3000);
+
+ try{
+   labels.clearLayers();
+   const count=await loadDZMapFallback();
+   status.textContent=`${count} locaties geladen · Cyrillisch + Latijn · fallback`;
+   setTimeout(()=>status.style.display='none',3000);
+ }catch(e){
+   console.error(e);
+   status.textContent='Locatienamen konden niet worden geladen.';
+   status.style.background='rgba(100,20,20,.92)';
+ }
 })();
 </script>
 </body>
