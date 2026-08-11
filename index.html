@@ -1,10 +1,54 @@
 <!DOCTYPE html>
-<html>
+<html lang="nl">
 <head>
-    <title>Build It!++ DayZ Map</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Build It!++ Interactive DayZ Map</title>
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+    </style>
 </head>
+
 <body>
-    <h1>Build It!++ Interactive DayZ Map</h1>
-    <p>De website werkt!</p>
+
+    <div id="map"></div>
+
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+    </script>
+
+    <script>
+        const map = L.map('map').setView([51.5, 5.5], 10);
+
+        L.tileLayer(
+            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap'
+            }
+        ).addTo(map);
+
+        L.marker([51.5, 5.5])
+            .addTo(map)
+            .bindPopup('Build It!++ test marker');
+    </script>
+
 </body>
 </html>
