@@ -19,6 +19,119 @@
 
         body {
             background: #111;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        #coordinateBox {
+            position: absolute;
+            left: 50%;
+            bottom: 18px;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(15, 15, 15, 0.88);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.22);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 14px;
+            font-weight: 700;
+            pointer-events: none;
+            white-space: nowrap;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+        }
+
+        #statusBox {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(15, 15, 15, 0.86);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 8px;
+            padding: 7px 10px;
+            font-size: 12px;
+            pointer-events: none;
+        }
+
+        .place-label {
+            background: transparent;
+            border: 0;
+        }
+
+        .place-label-inner {
+            display: inline-block;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            white-space: nowrap;
+            text-shadow:
+                -1px -1px 0 rgba(0,0,0,.95),
+                 1px -1px 0 rgba(0,0,0,.95),
+                -1px  1px 0 rgba(0,0,0,.95),
+                 1px  1px 0 rgba(0,0,0,.95),
+                 0 2px 3px rgba(0,0,0,.9);
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .place-original {
+            color: #fff;
+            font-weight: 800;
+            font-size: 13px;
+            line-height: 1.05;
+        }
+
+        .place-western {
+            color: #f2f2f2;
+            font-weight: 600;
+            font-size: 11px;
+            line-height: 1.05;
+            margin-top: 2px;
+            opacity: .96;
+        }
+
+        .place-type-capital .place-original,
+        .place-type-city .place-original {
+            font-size: 16px;
+        }
+
+        .place-type-village .place-original,
+        .place-type-town .place-original {
+            font-size: 13px;
+        }
+
+        .place-type-military .place-original,
+        .place-type-base .place-original,
+        .place-type-airfield .place-original {
+            color: #ffd7d7;
+        }
+
+        .place-type-water .place-original,
+        .place-type-lake .place-original,
+        .place-type-pond .place-original,
+        .place-type-river .place-original {
+            color: #d9efff;
+        }
+
+        .leaflet-control-attribution {
+            font-size: 10px;
+        }
+
+        @media (max-width: 600px) {
+            #coordinateBox {
+                bottom: 10px;
+                font-size: 12px;
+                padding: 7px 9px;
+            }
+
+            .place-original {
+                font-size: 11px;
+            }
+
+            .place-western {
+                font-size: 9px;
+            }
         }
     </style>
 </head>
@@ -26,17 +139,24 @@
 <body>
 
 <div id="map"></div>
+<div id="statusBox">Locatienamen laden…</div>
+<div id="coordinateBox">X: ---- &nbsp;&nbsp; Z: ----</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
+    const MAP_SIZE = 15360;
+    const XAM_UNITS = 256;
+    const METERS_PER_XAM_UNIT = MAP_SIZE / XAM_UNITS; // 60
+
     const map = L.map('map', {
         crs: L.CRS.Simple,
         minZoom: 0,
         maxZoom: 7,
         zoomSnap: 0.25,
         zoomDelta: 0.5,
-        wheelPxPerZoomLevel: 80
+        wheelPxPerZoomLevel: 80,
+        attributionControl: true
     });
 
     L.tileLayer(
@@ -46,11 +166,216 @@
             minZoom: 0,
             maxZoom: 7,
             maxNativeZoom: 7,
-            noWrap: true
+            noWrap: true,
+            attribution: 'Map imagery: XAM / DayZ'
         }
     ).addTo(map);
 
-    map.setView([-8, 8], 4);
+    // XAM's map coordinate space is 256 x 256.
+    // Y runs from -256 (south) to 0 (north).
+    const worldBounds = L.latLngBounds(
+        L.latLng(-256, 0),
+        L.latLng(0, 256)
+    );
+
+    map.setMaxBounds(worldBounds.pad(0.05));
+    map.fitBounds(worldBounds);
+
+    const coordinateBox = document.getElementById('coordinateBox');
+    const statusBox = document.getElementById('statusBox');
+
+    function xamToGame(latlng) {
+        const x = latlng.lng * METERS_PER_XAM_UNIT;
+        const z = (256 + latlng.lat) * METERS_PER_XAM_UNIT;
+
+        return {
+            x: Math.max(0, Math.min(MAP_SIZE, x)),
+            z: Math.max(0, Math.min(MAP_SIZE, z))
+        };
+    }
+
+    map.on('mousemove', function (event) {
+        const pos = xamToGame(event.latlng);
+
+        if (
+            event.latlng.lng < 0 ||
+            event.latlng.lng > 256 ||
+            event.latlng.lat < -256 ||
+            event.latlng.lat > 0
+        ) {
+            coordinateBox.innerHTML = 'X: ---- &nbsp;&nbsp; Z: ----';
+            return;
+        }
+
+        coordinateBox.innerHTML =
+            `X: ${Math.round(pos.x).toLocaleString('nl-NL')} &nbsp;&nbsp; ` +
+            `Z: ${Math.round(pos.z).toLocaleString('nl-NL')}`;
+    });
+
+    map.getContainer().addEventListener('mouseleave', function () {
+        coordinateBox.innerHTML = 'X: ---- &nbsp;&nbsp; Z: ----';
+    });
+
+    function hasCyrillic(text) {
+        return /[\u0400-\u04FF]/.test(text || '');
+    }
+
+    function capitalizeWords(text) {
+        if (!text) return '';
+
+        return text
+            .trim()
+            .split(/\s+/)
+            .map(word => {
+                if (!word) return word;
+
+                // Keep punctuation at the beginning, capitalise the first actual letter.
+                return word.replace(
+                    /([A-Za-zÀ-ÖØ-öø-ÿĀ-žА-Яа-яЁё])/,
+                    letter => letter.toLocaleUpperCase()
+                );
+            })
+            .join(' ');
+    }
+
+    function escapeHtml(text) {
+        return String(text)
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function selectNames(names) {
+        const cleaned = (Array.isArray(names) ? names : [])
+            .filter(Boolean)
+            .map(value => String(value).trim())
+            .filter(Boolean);
+
+        if (!cleaned.length) {
+            return { original: '', western: '' };
+        }
+
+        const cyrillic = cleaned.find(hasCyrillic);
+        const latin = cleaned.find(name => !hasCyrillic(name));
+
+        // If XAM provides both scripts, show the Cyrillic/native form first
+        // and the Latin/western transliteration beneath it.
+        if (cyrillic && latin) {
+            return {
+                original: capitalizeWords(cyrillic),
+                western: capitalizeWords(latin)
+            };
+        }
+
+        // If only one script is available, do not invent a translation.
+        return {
+            original: capitalizeWords(cleaned[0]),
+            western: ''
+        };
+    }
+
+    function normaliseType(type) {
+        return String(type || 'location')
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]/g, '');
+    }
+
+    function createLabel(location) {
+        if (!location || !Array.isArray(location.p) || location.p.length < 2) {
+            return null;
+        }
+
+        // XAM JSON:
+        // p[0] = map Y, p[1] = map X
+        const y = Number(location.p[0]);
+        const x = Number(location.p[1]);
+
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+            return null;
+        }
+
+        const names = selectNames(location.s);
+        if (!names.original) {
+            return null;
+        }
+
+        const type = normaliseType(location.w);
+
+        const westernLine =
+            names.western &&
+            names.western.toLocaleLowerCase() !== names.original.toLocaleLowerCase()
+                ? `<div class="place-western">${escapeHtml(names.western)}</div>`
+                : '';
+
+        const html = `
+            <div class="place-label-inner place-type-${escapeHtml(type)}">
+                <div class="place-original">${escapeHtml(names.original)}</div>
+                ${westernLine}
+            </div>
+        `;
+
+        const icon = L.divIcon({
+            className: 'place-label',
+            html,
+            iconSize: [0, 0],
+            iconAnchor: [0, 0]
+        });
+
+        return L.marker([y, x], {
+            icon,
+            interactive: false,
+            keyboard: false
+        });
+    }
+
+    const labelLayer = L.layerGroup().addTo(map);
+
+    async function loadLocationNames() {
+        // Current XAM location dataset referenced by the DZMap project.
+        const locationUrl =
+            'https://static.xam.nu/dayz/json/chernarusplus/1.28-2.json';
+
+        try {
+            const response = await fetch(locationUrl, { cache: 'no-cache' });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            const locations = data?.markers?.locations;
+
+            if (!Array.isArray(locations)) {
+                throw new Error('Onverwacht XAM-dataformaat');
+            }
+
+            let count = 0;
+
+            for (const location of locations) {
+                const marker = createLabel(location);
+                if (marker) {
+                    marker.addTo(labelLayer);
+                    count++;
+                }
+            }
+
+            statusBox.textContent = `${count} locatienamen geladen`;
+
+            setTimeout(() => {
+                statusBox.style.display = 'none';
+            }, 2500);
+
+        } catch (error) {
+            console.error('Kon XAM-locatienamen niet laden:', error);
+            statusBox.textContent =
+                'Locatienamen konden niet geladen worden — kaart blijft bruikbaar.';
+            statusBox.style.background = 'rgba(90, 20, 20, 0.92)';
+        }
+    }
+
+    loadLocationNames();
 </script>
 
 </body>
