@@ -121,6 +121,28 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
  border-radius:10px;padding:12px;box-shadow:0 2px 14px rgba(0,0,0,.55)
 }
 #logPanel.hidden{display:none}
+
+.log-auto{
+ margin-top:10px;padding:9px;border-radius:8px;
+ background:#191919;border:1px solid rgba(255,255,255,.16)
+}
+.log-auto-title{font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#aaa;margin-bottom:7px}
+.log-auto-grid{display:grid;grid-template-columns:1fr;gap:6px}
+.log-auto input[type="url"],.log-auto input[type="password"]{
+ box-sizing:border-box;width:100%;padding:7px 8px;background:#111;color:#fff;
+ border:1px solid rgba(255,255,255,.2);border-radius:7px;outline:none;font-size:11px
+}
+.log-auto-row{display:flex;gap:7px;align-items:center}
+.log-auto-row .log-btn{flex:1}
+.log-auto-status{
+ margin-top:7px;padding:7px;border-radius:7px;background:#101010;
+ border:1px solid rgba(255,255,255,.1);font-size:11px;line-height:1.4;color:#bbb
+}
+.log-auto-status.ok{color:#8ee89a;border-color:rgba(110,212,123,.35)}
+.log-auto-status.err{color:#ff8c8c;border-color:rgba(255,90,90,.35)}
+.log-auto-check{display:flex;align-items:center;gap:6px;font-size:11px;color:#ddd}
+.log-divider{height:1px;background:rgba(255,255,255,.11);margin:11px 0}
+
 .log-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .log-title{font-weight:900}
 .log-close{width:28px;height:28px;border-radius:7px;cursor:pointer;border:1px solid rgba(255,255,255,.18);background:#222;color:#fff;font-size:18px}
@@ -170,6 +192,24 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
     <div class="log-title">Server Log Viewer</div>
     <button id="logClose" class="log-close" type="button" title="Close">×</button>
   </div>
+  <div class="log-auto">
+    <div class="log-auto-title">Automatic Nitrado Sync</div>
+    <div class="log-auto-grid">
+      <input id="nitradoWorkerUrl" type="url" placeholder="Cloudflare Worker URL">
+      <input id="nitradoAccessKey" type="password" placeholder="Map access key">
+      <div class="log-auto-row">
+        <button id="nitradoSyncNow" class="log-btn" type="button">Sync Now</button>
+        <button id="nitradoTest" class="log-btn" type="button">Test Connection</button>
+      </div>
+      <label class="log-auto-check">
+        <input id="nitradoAutoSync" type="checkbox" checked>
+        <span>Auto-sync every 60 seconds</span>
+      </label>
+      <div id="nitradoSyncStatus" class="log-auto-status">Not connected.</div>
+    </div>
+  </div>
+  <div class="log-divider"></div>
+  <div class="log-subtitle" style="margin-top:0">Manual fallback</div>
   <label class="log-upload">
     Import Nitrado / DayZ log files
     <input id="logFileInput" type="file" multiple accept=".ADM,.adm,.log,.txt,text/plain">
@@ -559,6 +599,14 @@ const logClear=document.getElementById('logClear');
 const logSelectAllPlayers=document.getElementById('logSelectAllPlayers');
 const logPlayerSearch=document.getElementById('logPlayerSearch');
 
+const nitradoWorkerUrl=document.getElementById('nitradoWorkerUrl');
+const nitradoAccessKey=document.getElementById('nitradoAccessKey');
+const nitradoSyncNow=document.getElementById('nitradoSyncNow');
+const nitradoTest=document.getElementById('nitradoTest');
+const nitradoAutoSync=document.getElementById('nitradoAutoSync');
+const nitradoSyncStatus=document.getElementById('nitradoSyncStatus');
+
+
 const logEventLayer=L.layerGroup().addTo(map);
 const logLinkLayer=L.layerGroup().addTo(map);
 const logCanvas=L.canvas({padding:.5});
@@ -606,6 +654,157 @@ function initLogActionFilters(){
   }
 }
 initLogActionFilters();
+
+
+const NITRADO_CONFIG_KEY='buildit_nitrado_sync_v1';
+let nitradoPollTimer=null;
+let nitradoSyncBusy=false;
+
+function normalizeWorkerUrl(value){
+  return String(value||'').trim().replace(/\/+$/,'');
+}
+
+function setNitradoStatus(message,state=''){
+  nitradoSyncStatus.textContent=message;
+  nitradoSyncStatus.classList.remove('ok','err');
+  if(state) nitradoSyncStatus.classList.add(state);
+}
+
+function loadNitradoConfig(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(NITRADO_CONFIG_KEY)||'{}');
+    nitradoWorkerUrl.value=saved.workerUrl||'';
+    nitradoAccessKey.value=saved.accessKey||'';
+    nitradoAutoSync.checked=saved.autoSync!==false;
+  }catch(_){}
+  restartNitradoPolling();
+}
+
+function saveNitradoConfig(){
+  const config={
+    workerUrl:normalizeWorkerUrl(nitradoWorkerUrl.value),
+    accessKey:nitradoAccessKey.value.trim(),
+    autoSync:nitradoAutoSync.checked
+  };
+  localStorage.setItem(NITRADO_CONFIG_KEY,JSON.stringify(config));
+  restartNitradoPolling();
+}
+
+function nitradoHeaders(){
+  const key=nitradoAccessKey.value.trim();
+  return key?{'Authorization':`Bearer ${key}`}:{};
+}
+
+async function nitradoRequest(path){
+  const base=normalizeWorkerUrl(nitradoWorkerUrl.value);
+  if(!base) throw new Error('Enter the Cloudflare Worker URL first.');
+  const res=await fetch(base+path,{
+    method:'GET',
+    headers:nitradoHeaders(),
+    cache:'no-store'
+  });
+  let data=null;
+  try{data=await res.json()}catch(_){}
+  if(!res.ok){
+    const detail=data?.error||data?.message||`${res.status} ${res.statusText}`;
+    throw new Error(detail);
+  }
+  return data;
+}
+
+function resetLogDataOnly(){
+  importedLogFiles=[];
+  logEvents=[];
+  logPlayersState.clear();
+  logMarkerByEvent.clear();
+  logEventSeq=0;
+  logEventLayer.clearLayers();
+  logLinkLayer.clearLayers();
+}
+
+function loadRemoteLogPayload(payload){
+  resetLogDataOnly();
+
+  const files=Array.isArray(payload?.files)?payload.files:[];
+  for(const file of files){
+    const text=String(file?.text||'');
+    const name=String(file?.name||'Nitrado.ADM');
+    const parsed=parseDayZAdm(text,name);
+    importedLogFiles.push({
+      name,
+      size:Number(file?.size)||new Blob([text]).size,
+      events:parsed.length,
+      remote:true,
+      truncated:!!file?.truncated
+    });
+    logEvents.push(...parsed);
+    rememberPlayersFromEvents(parsed);
+  }
+
+  logToggle.classList.toggle('has-data',logEvents.length>0);
+  renderLogSummary();
+  renderLogPlayers();
+  renderLogMap();
+  renderLogActivity();
+}
+
+async function testNitradoConnection(){
+  saveNitradoConfig();
+  setNitradoStatus('Testing connection…');
+  try{
+    const data=await nitradoRequest('/api/status');
+    const server=data?.serverName||data?.game||`service ${data?.serviceId||''}`;
+    const count=Number(data?.admLogCount)||0;
+    setNitradoStatus(`Connected to ${server}. ${count} ADM log file${count===1?'':'s'} detected.`,'ok');
+  }catch(err){
+    setNitradoStatus(`Connection failed: ${err.message}`,'err');
+  }
+}
+
+async function syncNitradoLogs({quiet=false}={}){
+  if(nitradoSyncBusy) return;
+  if(!normalizeWorkerUrl(nitradoWorkerUrl.value) || !nitradoAccessKey.value.trim()){
+    if(!quiet) setNitradoStatus('Enter the Worker URL and access key first.','err');
+    return;
+  }
+
+  nitradoSyncBusy=true;
+  if(!quiet) setNitradoStatus('Downloading latest Nitrado logs…');
+
+  try{
+    const data=await nitradoRequest('/api/logs');
+    loadRemoteLogPayload(data);
+    const when=new Date(data?.fetchedAt||Date.now()).toLocaleTimeString('en-GB');
+    const fileCount=Array.isArray(data?.files)?data.files.length:0;
+    const suffix=data?.warning?` ${data.warning}`:'';
+    setNitradoStatus(`Synced ${fileCount} log file${fileCount===1?'':'s'} at ${when}. ${logEvents.length} actions loaded.${suffix}`,'ok');
+  }catch(err){
+    if(!quiet || !logEvents.length) setNitradoStatus(`Sync failed: ${err.message}`,'err');
+  }finally{
+    nitradoSyncBusy=false;
+  }
+}
+
+function restartNitradoPolling(){
+  if(nitradoPollTimer){
+    clearInterval(nitradoPollTimer);
+    nitradoPollTimer=null;
+  }
+  if(nitradoAutoSync.checked){
+    nitradoPollTimer=setInterval(()=>syncNitradoLogs({quiet:true}),60000);
+  }
+}
+
+nitradoSyncNow.addEventListener('click',()=>{
+  saveNitradoConfig();
+  syncNitradoLogs();
+});
+nitradoTest.addEventListener('click',testNitradoConnection);
+nitradoAutoSync.addEventListener('change',saveNitradoConfig);
+nitradoWorkerUrl.addEventListener('change',saveNitradoConfig);
+nitradoAccessKey.addEventListener('change',saveNitradoConfig);
+
+loadNitradoConfig();
 
 logToggle.addEventListener('click',()=>logPanel.classList.toggle('hidden'));
 logClose.addEventListener('click',()=>logPanel.classList.add('hidden'));
