@@ -938,10 +938,13 @@ function classifyDayZLog(body,players){
   if(lower.includes(' hit by ')) return 'hit';
   if(lower.includes(' is unconscious')) return 'unconscious';
   if(lower.includes('regained consciousness')) return 'conscious';
-  if(lower.includes(' placed ')) return 'placement';
-  if(lower.includes(' dismantled ')) return 'dismantle';
-  if(lower.includes(' destroyed ')) return 'destroy';
-  if(lower.includes(' built ')) return 'build';
+  // DayZ console ADM logs do not always place a space between the closing
+  // player ')' and the action word, e.g. ')Built wall_base_down ...'.
+  // Word-boundary matching catches both ')Built' and ' Built'.
+  if(/\bplaced\b/i.test(body)) return 'placement';
+  if(/\bdismantled\b/i.test(body)) return 'dismantle';
+  if(/\bdestroyed\b/i.test(body)) return 'destroy';
+  if(/\bbuilt\b/i.test(body)) return 'build';
   if(players.length && players[0].x!==null && /^player\s+"/i.test(body)) return 'position';
   return 'other';
 }
