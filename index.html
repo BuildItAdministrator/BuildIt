@@ -889,6 +889,7 @@ const DEFAULT_NITRADO_WORKER_URL='https://buildit-nitrado-logs.davaydresnikov.wo
 let nitradoPollTimer=null;
 let nitradoSyncBusy=false;
 let nitradoServerList=[];
+let nitradoWorkerMode='unknown'; // 'legacy' = original single-server Worker, 'multi' = /api/servers Worker
 
 function normalizeWorkerUrl(value){
   return String(value||'').trim().replace(/\/+$/,'');
@@ -935,7 +936,7 @@ async function nitradoRequest(path,{withServer=false,method='GET',body=null}={})
   if(!base) throw new Error('Enter the Cloudflare Worker URL first.');
 
   let requestPath=path;
-  if(withServer){
+  if(withServer && nitradoWorkerMode!=='legacy'){
     const serverId=nitradoServer.value;
     if(!serverId) throw new Error('Select a server first.');
     requestPath += `${requestPath.includes('?')?'&':'?'}server=${encodeURIComponent(serverId)}`;
@@ -999,7 +1000,22 @@ async function loadNitradoServers({quiet=false}={}){
   }
   if(!quiet) setNitradoStatus('Loading accessible servers…');
   const data=await nitradoRequest('/api/servers');
-  populateNitradoServers(data?.servers||[]);
+
+  // Backward compatibility: the original single-server Worker has no /api/servers
+  // route and returns its normal bridge info object instead. Treat that as one
+  // accessible default server, and do not add ?server=... to status/log requests.
+  if(Array.isArray(data?.servers)){
+    nitradoWorkerMode='multi';
+    populateNitradoServers(data.servers);
+  }else if(data?.ok && Array.isArray(data?.endpoints) &&
+           data.endpoints.includes('/api/status') && data.endpoints.includes('/api/logs')){
+    nitradoWorkerMode='legacy';
+    populateNitradoServers([{id:'default',name:'Default Server'}]);
+  }else{
+    nitradoWorkerMode='unknown';
+    populateNitradoServers([]);
+  }
+
   if(!nitradoServer.value) throw new Error('No server is available for this access key.');
   return data;
 }
@@ -1059,6 +1075,9 @@ async function testNitradoFileWriteAccess(){
 
   try{
     if(!nitradoServer.value) await loadNitradoServers({quiet:true});
+    if(nitradoWorkerMode==='legacy'){
+      throw new Error('Your current Worker is the original log-only version. Log sync works, but the file-write test requires the upgraded Worker.');
+    }
     const data=await nitradoRequest('/api/file-write-test',{withServer:true,method:'POST'});
     const server=data?.serverName||data?.configuredName||nitradoServer.options[nitradoServer.selectedIndex]?.text||'server';
 
