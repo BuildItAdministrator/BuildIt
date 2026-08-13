@@ -98,6 +98,11 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
 
 
 .filter-title{font-weight:800;margin-bottom:10px}
+.filter-toolbar{display:flex;gap:7px;margin-bottom:9px}
+.filter-toolbar button{
+ flex:1;border:1px solid rgba(255,255,255,.18);background:#242424;color:#fff;
+ border-radius:7px;padding:7px 8px;cursor:pointer;font-weight:800;font-size:11px
+}
 .filter-row{
  display:flex;align-items:center;gap:9px;
  padding:7px 2px;cursor:pointer;user-select:none
@@ -155,8 +160,23 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
 .log-btn{flex:1;border:1px solid rgba(255,255,255,.18);background:#242424;color:#fff;border-radius:7px;padding:7px 8px;cursor:pointer;font-weight:700;font-size:11px}
 .log-subtitle{margin-top:12px;margin-bottom:6px;font-size:11px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;color:#aaa}
 .log-actions{display:grid;grid-template-columns:1fr 1fr;gap:4px 7px}
-.log-check{display:flex;align-items:center;gap:6px;font-size:11px;padding:4px 1px;cursor:pointer}
-.log-check input{width:15px;height:15px}
+.log-action-group{grid-column:1/-1;margin-top:5px;padding-top:6px;border-top:1px solid rgba(255,255,255,.09);font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#8f8f8f}
+.log-action-group:first-child{margin-top:0;padding-top:0;border-top:0}
+.log-check{display:flex;align-items:center;gap:6px;font-size:11px;padding:4px 1px;cursor:pointer;min-width:0}
+.log-check input{width:15px;height:15px;flex:0 0 auto}
+.log-action-swatch{width:21px;height:21px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.55);box-shadow:0 1px 3px rgba(0,0,0,.45);font-size:12px;line-height:1;flex:0 0 auto}
+.log-action-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.log-action-count{margin-left:auto;color:#999;font-size:10px;flex:0 0 auto}
+.log-position-mode{margin-top:8px;padding:8px;border-radius:8px;background:#191919;border:1px solid rgba(255,255,255,.12)}
+.log-position-mode label{display:flex;align-items:center;gap:7px;font-size:11px;cursor:pointer}
+.log-position-mode input{width:16px;height:16px}
+.log-action-icon{background:transparent!important;border:0!important}
+.log-action-marker-badge{
+ width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+ transform:translate(-50%,-50%);border-radius:8px;
+ border:2px solid rgba(255,255,255,.92);box-shadow:0 1px 6px rgba(0,0,0,.72);
+ font-size:15px;line-height:1;font-weight:900
+}
 #logPlayerSearch{box-sizing:border-box;width:100%;padding:7px 8px;background:#1e1e1e;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:7px;outline:none}
 #logPlayers{margin-top:5px;max-height:150px;overflow:auto;border:1px solid rgba(255,255,255,.12);border-radius:7px;padding:4px 7px}
 .log-player-row{display:flex;align-items:center;gap:7px;padding:4px 0;font-size:11px}
@@ -220,7 +240,17 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
     <button id="logSelectAllPlayers" class="log-btn" type="button">All Players</button>
     <button id="logClear" class="log-btn" type="button">Clear Logs</button>
   </div>
-  <div class="log-subtitle">Actions</div>
+  <div class="log-subtitle">Admin Log Filters</div>
+  <div class="log-toolbar">
+    <button id="logAllActionsOn" class="log-btn" type="button">All Actions On</button>
+    <button id="logAllActionsOff" class="log-btn" type="button">All Actions Off</button>
+  </div>
+  <div class="log-position-mode">
+    <label>
+      <input id="logLatestPositionsOnly" type="checkbox" checked>
+      <span>Map: show latest position only per player</span>
+    </label>
+  </div>
   <div id="logActions" class="log-actions"></div>
   <div class="log-subtitle">Players</div>
   <input id="logPlayerSearch" type="search" placeholder="Search player name…">
@@ -232,6 +262,10 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
 <button id="filterToggle" type="button">☰ Filters</button>
 <div id="filterPanel" class="hidden">
   <div class="filter-title">Map Filters</div>
+  <div class="filter-toolbar">
+    <button id="filterAllOn" type="button">All On</button>
+    <button id="filterAllOff" type="button">All Off</button>
+  </div>
 
   <div class="filter-section-title">Map</div>
   <label class="filter-row">
@@ -311,7 +345,7 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
     <span class="filter-count">21</span>
   </label>
 
-  <div class="filter-note">Each spawn category can be switched on or off separately. Base footprints appear when zoomed in.</div>
+  <div class="filter-note">Use All On / All Off for the full map filter set, or switch categories separately. Base footprints appear when zoomed in.</div>
 </div>
 
 <div id="status">Loading Chernarus location names…</div>
@@ -350,6 +384,18 @@ const filterToggle=document.getElementById('filterToggle');
 const filterPanel=document.getElementById('filterPanel');
 const filterPlaceNames=document.getElementById('filterPlaceNames');
 const filterCustomBases=document.getElementById('filterCustomBases');
+const filterAllOn=document.getElementById('filterAllOn');
+const filterAllOff=document.getElementById('filterAllOff');
+
+function setAllMapFilters(enabled){
+  for(const input of filterPanel.querySelectorAll('input[type="checkbox"]')){
+    if(input.checked===enabled) continue;
+    input.checked=enabled;
+    input.dispatchEvent(new Event('change'));
+  }
+}
+filterAllOn.addEventListener('click',()=>setAllMapFilters(true));
+filterAllOff.addEventListener('click',()=>setAllMapFilters(false));
 
 filterToggle.addEventListener('click',()=>{
   filterPanel.classList.toggle('hidden');
@@ -598,6 +644,9 @@ const logActivity=document.getElementById('logActivity');
 const logClear=document.getElementById('logClear');
 const logSelectAllPlayers=document.getElementById('logSelectAllPlayers');
 const logPlayerSearch=document.getElementById('logPlayerSearch');
+const logAllActionsOn=document.getElementById('logAllActionsOn');
+const logAllActionsOff=document.getElementById('logAllActionsOff');
+const logLatestPositionsOnly=document.getElementById('logLatestPositionsOnly');
 
 const nitradoWorkerUrl=document.getElementById('nitradoWorkerUrl');
 const nitradoAccessKey=document.getElementById('nitradoAccessKey');
@@ -612,24 +661,26 @@ const logLinkLayer=L.layerGroup().addTo(map);
 const logCanvas=L.canvas({padding:.5});
 
 const LOG_ACTION_META={
-  position:{icon:'📍',label:'Position',color:'#8fd3ff'},
-  hit:{icon:'🎯',label:'Hits',color:'#ff9b4a'},
-  kill:{icon:'☠️',label:'Kills',color:'#ff4d4d'},
-  death:{icon:'💀',label:'Deaths',color:'#d66cff'},
-  suicide:{icon:'💀',label:'Suicides',color:'#d66cff'},
-  bleedout:{icon:'🩸',label:'Bled Out',color:'#d64242'},
-  unconscious:{icon:'💤',label:'Unconscious',color:'#a98cff'},
-  conscious:{icon:'✅',label:'Regained',color:'#6ed47b'},
-  placement:{icon:'📦',label:'Placement',color:'#5bb7ff'},
-  build:{icon:'🔨',label:'Build',color:'#78c66a'},
-  dismantle:{icon:'🧰',label:'Dismantle',color:'#e7b85a'},
-  destroy:{icon:'💥',label:'Destroy',color:'#ff6b6b'},
-  connect:{icon:'➕',label:'Connect',color:'#6ed47b'},
-  disconnect:{icon:'➖',label:'Disconnect',color:'#aaa'},
-  chat:{icon:'💬',label:'Chat',color:'#70c9ff'},
-  report:{icon:'⚠️',label:'Reports',color:'#ffd166'},
-  other:{icon:'•',label:'Other',color:'#bbb'}
+  position:{icon:'📍',label:'Position',color:'#2d9cff',group:'Movement'},
+  hit:{icon:'🎯',label:'Hit',color:'#ff8a2b',group:'Combat'},
+  kill:{icon:'☠',label:'Kill',color:'#e53935',group:'Combat'},
+  death:{icon:'💀',label:'Death',color:'#8e5bd9',group:'Combat'},
+  suicide:{icon:'⚰',label:'Suicide',color:'#c4459b',group:'Combat'},
+  bleedout:{icon:'🩸',label:'Bled Out',color:'#b71c1c',group:'Combat'},
+  unconscious:{icon:'Z',label:'Unconscious',color:'#6f56c9',group:'Combat'},
+  conscious:{icon:'✓',label:'Regained',color:'#2ea44f',group:'Combat'},
+  placement:{icon:'📦',label:'Placement',color:'#00a6d6',group:'Building'},
+  build:{icon:'🔨',label:'Build',color:'#43a047',group:'Building'},
+  dismantle:{icon:'🔧',label:'Dismantle',color:'#f0a629',group:'Building'},
+  destroy:{icon:'✹',label:'Destroy',color:'#f44336',group:'Building'},
+  connect:{icon:'+',label:'Connect',color:'#3bb273',group:'Connection & Comms'},
+  disconnect:{icon:'−',label:'Disconnect',color:'#777',group:'Connection & Comms'},
+  chat:{icon:'💬',label:'Chat',color:'#1976d2',group:'Connection & Comms'},
+  report:{icon:'!',label:'Report',color:'#e0a800',group:'Connection & Comms'},
+  other:{icon:'•',label:'Other',color:'#777',group:'Other'}
 };
+
+const LOG_ACTION_GROUPS=['Movement','Combat','Building','Connection & Comms','Other'];
 
 let importedLogFiles=[];
 let logEvents=[];
@@ -641,18 +692,44 @@ for(const key of Object.keys(LOG_ACTION_META)) logActionState.set(key,true);
 
 function initLogActionFilters(){
   logActions.innerHTML='';
-  for(const [key,meta] of Object.entries(LOG_ACTION_META)){
-    const label=document.createElement('label');
-    label.className='log-check';
-    label.innerHTML=`<input type="checkbox" data-log-action="${key}" checked><span>${meta.icon} ${meta.label}</span>`;
-    const input=label.querySelector('input');
-    input.addEventListener('change',()=>{
-      logActionState.set(key,input.checked);
-      renderLogMap(); renderLogActivity();
-    });
-    logActions.appendChild(label);
+  for(const group of LOG_ACTION_GROUPS){
+    const heading=document.createElement('div');
+    heading.className='log-action-group';
+    heading.textContent=group;
+    logActions.appendChild(heading);
+    for(const [key,meta] of Object.entries(LOG_ACTION_META).filter(([,m])=>m.group===group)){
+      const label=document.createElement('label');
+      label.className='log-check';
+      label.innerHTML=`<input type="checkbox" data-log-action="${key}" checked>`+
+        `<span class="log-action-swatch" style="background:${meta.color}">${meta.icon}</span>`+
+        `<span class="log-action-label">${meta.label}</span>`+
+        `<span class="log-action-count" data-log-action-count="${key}">0</span>`;
+      const input=label.querySelector('input');
+      input.addEventListener('change',()=>{
+        logActionState.set(key,input.checked);
+        renderLogMap(); renderLogActivity();
+      });
+      logActions.appendChild(label);
+    }
   }
 }
+function updateLogActionCounts(){
+  const counts={};
+  for(const key of Object.keys(LOG_ACTION_META)) counts[key]=0;
+  for(const ev of logEvents) counts[ev.type]=(counts[ev.type]||0)+1;
+  for(const [key,count] of Object.entries(counts)){
+    const el=logActions.querySelector(`[data-log-action-count="${key}"]`);
+    if(el) el.textContent=String(count);
+  }
+}
+function setAllLogActions(enabled){
+  for(const [key] of Object.entries(LOG_ACTION_META)) logActionState.set(key,enabled);
+  for(const input of logActions.querySelectorAll('input[data-log-action]')) input.checked=enabled;
+  renderLogMap(); renderLogActivity();
+}
+logAllActionsOn.addEventListener('click',()=>setAllLogActions(true));
+logAllActionsOff.addEventListener('click',()=>setAllLogActions(false));
+logLatestPositionsOnly.addEventListener('change',renderLogMap);
 initLogActionFilters();
 
 
@@ -742,6 +819,7 @@ function loadRemoteLogPayload(payload){
   }
 
   logToggle.classList.toggle('has-data',logEvents.length>0);
+  updateLogActionCounts();
   renderLogSummary();
   renderLogPlayers();
   renderLogMap();
@@ -914,12 +992,14 @@ async function importLogFiles(files){
     }catch(err){ console.warn('Could not read log file',file.name,err); }
   }
   logToggle.classList.toggle('has-data',logEvents.length>0);
+  updateLogActionCounts();
   renderLogSummary(); renderLogPlayers(); renderLogMap(); renderLogActivity();
   logPanel.classList.remove('hidden');
 }
 function clearLogViewer(){
   importedLogFiles=[];logEvents=[];logPlayersState.clear();logMarkerByEvent.clear();logEventSeq=0;
   logEventLayer.clearLayers();logLinkLayer.clearLayers();logToggle.classList.remove('has-data');
+  updateLogActionCounts();
   logPlayerSearch.value='';renderLogSummary();renderLogPlayers();renderLogActivity();
 }
 function isPlayerEnabledForEvent(ev){
@@ -945,22 +1025,48 @@ function renderLogPlayers(){
     logPlayers.appendChild(row);
   }
 }
-function logMarkerStyle(type){
+function logActionDivIcon(type){
   const meta=LOG_ACTION_META[type]||LOG_ACTION_META.other;
-  return {renderer:logCanvas,radius:type==='kill'||type==='death'?6:4,weight:2,color:'#111',opacity:.95,fillColor:meta.color,fillOpacity:.95};
+  return L.divIcon({
+    className:'log-action-icon',
+    html:`<div class="log-action-marker-badge" style="background:${meta.color}" title="${logEscape(meta.label)}">${meta.icon}</div>`,
+    iconSize:[0,0],iconAnchor:[0,0],popupAnchor:[0,-16],tooltipAnchor:[0,-16]
+  });
+}
+function logPlayerKey(ev){
+  const p=ev?.primary;
+  return String(p?.id||p?.name||'').trim().toLowerCase();
+}
+function compareLogEventRecency(a,b){
+  const fileCmp=String(a.file||'').localeCompare(String(b.file||''));
+  if(fileCmp!==0) return fileCmp;
+  return Number(a.line||0)-Number(b.line||0);
+}
+function latestPositionEventIds(){
+  const latest=new Map();
+  for(const ev of logEvents){
+    if(ev.type!=='position'||!Number.isFinite(ev.x)||!Number.isFinite(ev.z)) continue;
+    const key=logPlayerKey(ev);
+    if(!key) continue;
+    const previous=latest.get(key);
+    if(!previous||compareLogEventRecency(ev,previous)>0) latest.set(key,ev);
+  }
+  return new Set([...latest.values()].map(ev=>ev.id));
 }
 function renderLogMap(){
   logEventLayer.clearLayers();logLinkLayer.clearLayers();logMarkerByEvent.clear();
+  const latestPositions=logLatestPositionsOnly.checked?latestPositionEventIds():null;
   for(const ev of logEvents){
     if(!eventVisible(ev)||!Number.isFinite(ev.x)||!Number.isFinite(ev.z)) continue;
+    if(ev.type==='position'&&latestPositions&&!latestPositions.has(ev.id)) continue;
     if(ev.x<0||ev.z<0||ev.x>MAP_SIZE||ev.z>MAP_SIZE) continue;
     const meta=LOG_ACTION_META[ev.type]||LOG_ACTION_META.other;
-    const marker=L.circleMarker(gameToLeaflet(ev.x,ev.z),logMarkerStyle(ev.type));
+    const marker=L.marker(gameToLeaflet(ev.x,ev.z),{icon:logActionDivIcon(ev.type),keyboard:false,riseOnHover:true});
     const primary=ev.primary?.name||'Unknown player';
     const second=ev.source?.name?`<div class="log-marker-popup-row"><b>Other player:</b> ${logEscape(ev.source.name)}</div>`:'';
     const altitude=Number.isFinite(ev.y)?`<div class="log-marker-popup-row"><b>Y:</b> ${ev.y.toFixed(2)}</div>`:'';
     marker.bindPopup(
-      `<div class="log-marker-popup-title">${meta.icon} ${logEscape(meta.label)} · ${logEscape(primary)}</div>`+
+      `<div class="log-marker-popup-title"><span style="display:inline-block;padding:2px 5px;border-radius:4px;background:${meta.color};margin-right:4px">${meta.icon}</span> ${logEscape(meta.label)} · ${logEscape(primary)}</div>`+
       `<div class="log-marker-popup-row"><b>Time:</b> ${logEscape(ev.time||'—')}</div>`+
       `<div class="log-marker-popup-row"><b>X:</b> ${ev.x.toFixed(2)} &nbsp; <b>Z:</b> ${ev.z.toFixed(2)}</div>`+
       altitude+second+
@@ -970,7 +1076,7 @@ function renderLogMap(){
     marker.bindTooltip(`${meta.icon} ${primary} · ${meta.label}`,{sticky:true,opacity:.95});
     marker.addTo(logEventLayer);logMarkerByEvent.set(ev.id,marker);
     if((ev.type==='hit'||ev.type==='kill')&&ev.source&&Number.isFinite(ev.source.x)&&Number.isFinite(ev.source.z)&&ev.source.x>=0&&ev.source.z>=0&&ev.source.x<=MAP_SIZE&&ev.source.z<=MAP_SIZE){
-      L.polyline([gameToLeaflet(ev.source.x,ev.source.z),gameToLeaflet(ev.x,ev.z)],{weight:1,opacity:.45,dashArray:'4 5',color:meta.color,interactive:false}).addTo(logLinkLayer);
+      L.polyline([gameToLeaflet(ev.source.x,ev.source.z),gameToLeaflet(ev.x,ev.z)],{weight:1,opacity:.48,dashArray:'4 5',color:meta.color,interactive:false}).addTo(logLinkLayer);
     }
   }
 }
