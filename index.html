@@ -133,7 +133,7 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
 }
 .log-auto-title{font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#aaa;margin-bottom:7px}
 .log-auto-grid{display:grid;grid-template-columns:1fr;gap:6px}
-.log-auto input[type="url"],.log-auto input[type="password"]{
+.log-auto input[type="url"],.log-auto input[type="password"],.log-auto select{
  box-sizing:border-box;width:100%;padding:7px 8px;background:#111;color:#fff;
  border:1px solid rgba(255,255,255,.2);border-radius:7px;outline:none;font-size:11px
 }
@@ -196,6 +196,16 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
 .log-marker-popup-title{font-weight:900;margin-bottom:4px}
 .log-marker-popup-row{font-size:12px;line-height:1.4}
 
+.log-file-test{
+  margin-top:10px;padding:10px;border-radius:9px;
+  background:#151515;border:1px solid rgba(255,255,255,.14)
+}
+.log-file-test-title{font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+.log-file-test-help{margin-top:5px;color:#aaa;font-size:10px;line-height:1.45}
+.log-file-test-status{margin-top:7px;padding:7px 8px;border-radius:7px;background:#101010;border:1px solid rgba(255,255,255,.1);font-size:10px;line-height:1.4;color:#bbb;word-break:break-word}
+.log-file-test-status.ok{color:#a9f3bf;border-color:rgba(78,210,120,.45)}
+.log-file-test-status.err{color:#ffb1b1;border-color:rgba(255,87,87,.45)}
+
 @media(max-width:600px){
  #coords{font-size:12px;padding:7px 9px}
  .cyr{font-size:11px}.lat{font-size:9px}
@@ -217,6 +227,9 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
     <div class="log-auto-grid">
       <input id="nitradoWorkerUrl" type="url" placeholder="Cloudflare Worker URL">
       <input id="nitradoAccessKey" type="password" placeholder="Map access key">
+      <select id="nitradoServer" disabled>
+        <option value="">Server - test connection first</option>
+      </select>
       <div class="log-auto-row">
         <button id="nitradoSyncNow" class="log-btn" type="button">Sync Now</button>
         <button id="nitradoTest" class="log-btn" type="button">Test Connection</button>
@@ -227,6 +240,16 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
       </label>
       <div id="nitradoSyncStatus" class="log-auto-status">Not connected.</div>
     </div>
+  </div>
+  <div class="log-file-test">
+    <div class="log-file-test-title">Server File Access Test</div>
+    <div class="log-file-test-help">
+      Safe provider test: creates a harmless text file on the selected Nitrado server,
+      reads it back to verify write access, then tries to delete it automatically.
+      It does not edit events.xml, cfgeventspawns.xml or any live DayZ configuration.
+    </div>
+    <button id="nitradoFileWriteTest" class="log-btn" type="button" style="width:100%;margin-top:8px">Test File Write</button>
+    <div id="nitradoFileWriteStatus" class="log-file-test-status">Not tested. Provider/master access key required.</div>
   </div>
   <div class="log-divider"></div>
   <div class="log-subtitle" style="margin-top:0">Manual fallback</div>
@@ -650,6 +673,7 @@ const logLatestPositionsOnly=document.getElementById('logLatestPositionsOnly');
 
 const nitradoWorkerUrl=document.getElementById('nitradoWorkerUrl');
 const nitradoAccessKey=document.getElementById('nitradoAccessKey');
+const nitradoServer=document.getElementById('nitradoServer');
 const nitradoSyncNow=document.getElementById('nitradoSyncNow');
 const nitradoTest=document.getElementById('nitradoTest');
 const nitradoAutoSync=document.getElementById('nitradoAutoSync');
@@ -734,8 +758,10 @@ initLogActionFilters();
 
 
 const NITRADO_CONFIG_KEY='buildit_nitrado_sync_v1';
+const DEFAULT_NITRADO_WORKER_URL='https://buildit-nitrado-logs.davaydresnikov.workers.dev';
 let nitradoPollTimer=null;
 let nitradoSyncBusy=false;
+let nitradoServerList=[];
 
 function normalizeWorkerUrl(value){
   return String(value||'').trim().replace(/\/+$/,'');
@@ -748,19 +774,24 @@ function setNitradoStatus(message,state=''){
 }
 
 function loadNitradoConfig(){
-  try{
-    const saved=JSON.parse(localStorage.getItem(NITRADO_CONFIG_KEY)||'{}');
-    nitradoWorkerUrl.value=saved.workerUrl||'';
-    nitradoAccessKey.value=saved.accessKey||'';
-    nitradoAutoSync.checked=saved.autoSync!==false;
-  }catch(_){}
+  let saved={};
+  try{saved=JSON.parse(localStorage.getItem(NITRADO_CONFIG_KEY)||'{}')}catch(_){}
+  nitradoWorkerUrl.value=saved.workerUrl||DEFAULT_NITRADO_WORKER_URL;
+  nitradoAccessKey.value=saved.accessKey||'';
+  nitradoAutoSync.checked=saved.autoSync!==false;
+  nitradoServer.dataset.savedId=saved.serverId||'';
   restartNitradoPolling();
+
+  if(normalizeWorkerUrl(nitradoWorkerUrl.value) && nitradoAccessKey.value.trim()){
+    setTimeout(()=>loadNitradoServers({quiet:true}).catch(()=>{}),0);
+  }
 }
 
 function saveNitradoConfig(){
   const config={
     workerUrl:normalizeWorkerUrl(nitradoWorkerUrl.value),
     accessKey:nitradoAccessKey.value.trim(),
+    serverId:nitradoServer.value||nitradoServer.dataset.savedId||'',
     autoSync:nitradoAutoSync.checked
   };
   localStorage.setItem(NITRADO_CONFIG_KEY,JSON.stringify(config));
@@ -769,23 +800,80 @@ function saveNitradoConfig(){
 
 function nitradoHeaders(){
   const key=nitradoAccessKey.value.trim();
-  return key?{'Authorization':`Bearer ${key}`}:{};
+  return key?{'Authorization':`Bearer ${key}`}:{ };
 }
 
-async function nitradoRequest(path){
+async function nitradoRequest(path,{withServer=false,method='GET',body=null}={}){
   const base=normalizeWorkerUrl(nitradoWorkerUrl.value);
   if(!base) throw new Error('Enter the Cloudflare Worker URL first.');
-  const res=await fetch(base+path,{
-    method:'GET',
-    headers:nitradoHeaders(),
+
+  let requestPath=path;
+  if(withServer){
+    const serverId=nitradoServer.value;
+    if(!serverId) throw new Error('Select a server first.');
+    requestPath += `${requestPath.includes('?')?'&':'?'}server=${encodeURIComponent(serverId)}`;
+  }
+
+  const headers=nitradoHeaders();
+  const options={
+    method,
+    headers,
     cache:'no-store'
-  });
+  };
+  if(body!==null){
+    headers['Content-Type']='application/json';
+    options.body=typeof body==='string'?body:JSON.stringify(body);
+  }
+
+  const res=await fetch(base+requestPath,options);
   let data=null;
   try{data=await res.json()}catch(_){}
   if(!res.ok){
     const detail=data?.error||data?.message||`${res.status} ${res.statusText}`;
     throw new Error(detail);
   }
+  return data;
+}
+
+function populateNitradoServers(servers){
+  const clean=(Array.isArray(servers)?servers:[])
+    .filter(x=>x&&x.id)
+    .map(x=>({id:String(x.id),name:String(x.name||x.id)}));
+  nitradoServerList=clean;
+
+  const preferred=nitradoServer.value||nitradoServer.dataset.savedId||'';
+  nitradoServer.innerHTML='';
+
+  if(!clean.length){
+    const option=document.createElement('option');
+    option.value='';option.textContent='No accessible servers';
+    nitradoServer.appendChild(option);
+    nitradoServer.disabled=true;
+    return;
+  }
+
+  for(const server of clean){
+    const option=document.createElement('option');
+    option.value=server.id;
+    option.textContent=server.name;
+    nitradoServer.appendChild(option);
+  }
+
+  const selected=clean.some(x=>x.id===preferred)?preferred:clean[0].id;
+  nitradoServer.value=selected;
+  nitradoServer.dataset.savedId=selected;
+  nitradoServer.disabled=false;
+  saveNitradoConfig();
+}
+
+async function loadNitradoServers({quiet=false}={}){
+  if(!normalizeWorkerUrl(nitradoWorkerUrl.value) || !nitradoAccessKey.value.trim()){
+    throw new Error('Enter the Worker URL and access key first.');
+  }
+  if(!quiet) setNitradoStatus('Loading accessible servers…');
+  const data=await nitradoRequest('/api/servers');
+  populateNitradoServers(data?.servers||[]);
+  if(!nitradoServer.value) throw new Error('No server is available for this access key.');
   return data;
 }
 
@@ -826,12 +914,50 @@ function loadRemoteLogPayload(payload){
   renderLogActivity();
 }
 
+function setFileWriteStatus(message,state=''){
+  nitradoFileWriteStatus.textContent=message;
+  nitradoFileWriteStatus.classList.remove('ok','err');
+  if(state) nitradoFileWriteStatus.classList.add(state);
+}
+
+async function testNitradoFileWriteAccess(){
+  saveNitradoConfig();
+  if(!normalizeWorkerUrl(nitradoWorkerUrl.value) || !nitradoAccessKey.value.trim()){
+    setFileWriteStatus('Enter the Worker URL and provider/master access key first.','err');
+    return;
+  }
+
+  nitradoFileWriteTest.disabled=true;
+  setFileWriteStatus('Testing Nitrado file write, read-back and cleanup…');
+
+  try{
+    if(!nitradoServer.value) await loadNitradoServers({quiet:true});
+    const data=await nitradoRequest('/api/file-write-test',{withServer:true,method:'POST'});
+    const server=data?.serverName||data?.configuredName||nitradoServer.options[nitradoServer.selectedIndex]?.text||'server';
+
+    if(data?.verified){
+      if(data?.cleanup){
+        setFileWriteStatus(`SUCCESS — ${server}: file upload and read-back verified; test file deleted automatically. Your current Nitrado token can write server files.`,'ok');
+      }else{
+        setFileWriteStatus(`WRITE ACCESS VERIFIED — ${server}: upload/read-back worked, but cleanup failed. Harmless test file may remain at ${data?.filePath||'the server root'}. ${data?.warning||''}`,'err');
+      }
+    }else{
+      setFileWriteStatus('The Worker returned success but did not confirm read-back verification.','err');
+    }
+  }catch(err){
+    setFileWriteStatus(`File write test failed: ${err.message}`,'err');
+  }finally{
+    nitradoFileWriteTest.disabled=false;
+  }
+}
+
 async function testNitradoConnection(){
   saveNitradoConfig();
   setNitradoStatus('Testing connection…');
   try{
-    const data=await nitradoRequest('/api/status');
-    const server=data?.serverName||data?.game||`service ${data?.serviceId||''}`;
+    await loadNitradoServers({quiet:true});
+    const data=await nitradoRequest('/api/status',{withServer:true});
+    const server=data?.serverName||data?.configuredName||data?.game||`service ${data?.serviceId||''}`;
     const count=Number(data?.admLogCount)||0;
     setNitradoStatus(`Connected to ${server}. ${count} ADM log file${count===1?'':'s'} detected.`,'ok');
   }catch(err){
@@ -850,12 +976,14 @@ async function syncNitradoLogs({quiet=false}={}){
   if(!quiet) setNitradoStatus('Downloading latest Nitrado logs…');
 
   try{
-    const data=await nitradoRequest('/api/logs');
+    if(!nitradoServer.value) await loadNitradoServers({quiet:true});
+    const data=await nitradoRequest('/api/logs',{withServer:true});
     loadRemoteLogPayload(data);
     const when=new Date(data?.fetchedAt||Date.now()).toLocaleTimeString('en-GB');
     const fileCount=Array.isArray(data?.files)?data.files.length:0;
+    const server=data?.serverName||data?.configuredName||nitradoServer.options[nitradoServer.selectedIndex]?.text||'server';
     const suffix=data?.warning?` ${data.warning}`:'';
-    setNitradoStatus(`Synced ${fileCount} log file${fileCount===1?'':'s'} at ${when}. ${logEvents.length} actions loaded.${suffix}`,'ok');
+    setNitradoStatus(`Synced ${fileCount} log file${fileCount===1?'':'s'} from ${server} at ${when}. ${logEvents.length} actions loaded.${suffix}`,'ok');
   }catch(err){
     if(!quiet || !logEvents.length) setNitradoStatus(`Sync failed: ${err.message}`,'err');
   }finally{
@@ -878,9 +1006,28 @@ nitradoSyncNow.addEventListener('click',()=>{
   syncNitradoLogs();
 });
 nitradoTest.addEventListener('click',testNitradoConnection);
+nitradoFileWriteTest.addEventListener('click',testNitradoFileWriteAccess);
 nitradoAutoSync.addEventListener('change',saveNitradoConfig);
-nitradoWorkerUrl.addEventListener('change',saveNitradoConfig);
-nitradoAccessKey.addEventListener('change',saveNitradoConfig);
+nitradoWorkerUrl.addEventListener('change',()=>{
+  nitradoServer.innerHTML='<option value="">Server - test connection first</option>';
+  nitradoServer.disabled=true;
+  nitradoServer.dataset.savedId='';
+  saveNitradoConfig();
+});
+nitradoAccessKey.addEventListener('change',()=>{
+  nitradoServer.innerHTML='<option value="">Server - test connection first</option>';
+  nitradoServer.disabled=true;
+  nitradoServer.dataset.savedId='';
+  saveNitradoConfig();
+});
+nitradoServer.addEventListener('change',()=>{
+  nitradoServer.dataset.savedId=nitradoServer.value;
+  saveNitradoConfig();
+  if(nitradoServer.value){
+    const label=nitradoServer.options[nitradoServer.selectedIndex]?.text||nitradoServer.value;
+    setNitradoStatus(`${label} selected. Click Sync Now to load its logs.`);
+  }
+});
 
 loadNitradoConfig();
 
