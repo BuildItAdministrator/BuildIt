@@ -31,19 +31,46 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
 .type-water .cyr,.type-lake .cyr,.type-pond .cyr,.type-river .cyr,
 .type-bay .cyr,.type-sea .cyr{color:#d9efff;font-style:italic}
 
+#placeSearchBox{
+ position:absolute;top:12px;right:12px;z-index:1120;width:270px;
+ box-sizing:border-box
+}
+#placeSearchInput{
+ width:100%;box-sizing:border-box;background:rgba(15,15,15,.94);color:#fff;
+ border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:10px 36px 10px 11px;
+ outline:none;font-size:13px;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,.35)
+}
+#placeSearchInput::placeholder{color:#aaa;font-weight:600}
+#placeSearchInput:focus{border-color:rgba(255,255,255,.55)}
+#placeSearchInput:disabled{opacity:.7;cursor:wait}
+#placeSearchResults{
+ position:absolute;top:44px;right:0;width:100%;max-height:300px;overflow-y:auto;
+ background:rgba(15,15,15,.98);border:1px solid rgba(255,255,255,.22);border-radius:9px;
+ box-shadow:0 4px 16px rgba(0,0,0,.55);padding:5px;box-sizing:border-box
+}
+#placeSearchResults.hidden{display:none}
+.place-search-result{
+ display:block;width:100%;text-align:left;border:0;background:transparent;color:#fff;
+ border-radius:6px;padding:8px 9px;cursor:pointer
+}
+.place-search-result:hover,.place-search-result.active{background:#2a2a2a}
+.place-search-cyr{font-size:13px;font-weight:800;line-height:1.2}
+.place-search-lat{font-size:11px;color:#bbb;margin-top:2px;line-height:1.2}
+.place-search-empty{padding:9px;color:#aaa;font-size:11px}
+
 #filterToggle{
- position:absolute;top:12px;right:12px;left:auto;z-index:1100;
+ position:absolute;top:62px;right:12px;left:auto;z-index:1100;
  background:rgba(15,15,15,.92);color:#fff;
  border:1px solid rgba(255,255,255,.25);border-radius:8px;
  padding:9px 12px;font-weight:700;cursor:pointer;
  box-shadow:0 2px 10px rgba(0,0,0,.35)
 }
 #filterPanel{
- position:absolute;top:58px;right:12px;left:auto;z-index:1100;
+ position:absolute;top:108px;right:12px;left:auto;z-index:1100;
  min-width:210px;background:rgba(15,15,15,.94);color:#fff;
  border:1px solid rgba(255,255,255,.22);border-radius:10px;
  padding:12px;box-shadow:0 2px 12px rgba(0,0,0,.45);
- max-height:calc(100vh - 82px);overflow-y:auto
+ max-height:calc(100vh - 132px);overflow-y:auto
 }
 #filterPanel.hidden{display:none}
 
@@ -210,9 +237,47 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
  #coords{font-size:12px;padding:7px 9px}
  .cyr{font-size:11px}.lat{font-size:9px}
 }
+
+/* BuildIt access gate */
+#accessGate{
+ position:fixed;inset:0;z-index:50000;display:flex;align-items:center;justify-content:center;
+ background:radial-gradient(circle at center,#242424 0,#101010 58%,#080808 100%);
+ color:#fff;padding:22px;box-sizing:border-box
+}
+#accessGate.hidden{display:none}
+.access-card{
+ width:min(390px,100%);background:rgba(18,18,18,.98);border:1px solid rgba(255,255,255,.22);
+ border-radius:14px;padding:24px;box-sizing:border-box;box-shadow:0 18px 60px rgba(0,0,0,.65);text-align:center
+}
+.access-title{font-size:22px;font-weight:900;letter-spacing:.02em;margin-bottom:6px}
+.access-subtitle{font-size:12px;color:#aaa;line-height:1.45;margin-bottom:18px}
+#accessPassword{
+ width:100%;box-sizing:border-box;background:#0d0d0d;color:#fff;border:1px solid rgba(255,255,255,.28);
+ border-radius:8px;padding:12px;font-size:14px;outline:none;margin-bottom:10px
+}
+#accessPassword:focus{border-color:rgba(255,255,255,.7)}
+#accessSubmit{
+ width:100%;border:1px solid rgba(255,255,255,.35);border-radius:8px;padding:11px 14px;
+ background:#272727;color:#fff;font-weight:800;cursor:pointer
+}
+#accessSubmit:hover{background:#333}
+#accessError{min-height:17px;margin-top:10px;font-size:12px;color:#ff7777;font-weight:700}
+.access-note{margin-top:14px;font-size:10px;color:#666;line-height:1.4}
+
 </style>
 </head>
 <body>
+<div id="accessGate" role="dialog" aria-modal="true" aria-labelledby="accessTitle">
+  <form id="accessForm" class="access-card">
+    <div id="accessTitle" class="access-title">Build It!++ DayZ Map</div>
+    <div class="access-subtitle">Enter the access password to use the map.</div>
+    <input id="accessPassword" type="password" placeholder="Access password" autocomplete="current-password" autofocus>
+    <button id="accessSubmit" type="submit">Unlock Map</button>
+    <div id="accessError" aria-live="polite"></div>
+    <div class="access-note">Access remains unlocked for this browser tab until it is closed.</div>
+  </form>
+</div>
+
 <div id="map"></div>
 
 
@@ -280,6 +345,11 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
   <div id="logPlayers"><div class="log-empty">Import a log file first.</div></div>
   <div class="log-subtitle">Activity</div>
   <div id="logActivity"><div class="log-empty">No activity loaded.</div></div>
+</div>
+
+<div id="placeSearchBox">
+  <input id="placeSearchInput" type="search" placeholder="Loading places…" autocomplete="off" spellcheck="false" disabled>
+  <div id="placeSearchResults" class="hidden"></div>
 </div>
 
 <button id="filterToggle" type="button">☰ Filters</button>
@@ -376,6 +446,59 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+
+// BuildIt client-side access gate.
+// Note: this protects normal use of the UI, but GitHub Pages itself remains a public static host.
+(function(){
+  const PASSWORD_SHA256 = '8ea4cd84b72fd62968f0fb34e7fb87d427d3c62c49dc552f0880c5cd50712f8e';
+  const gate = document.getElementById('accessGate');
+  const form = document.getElementById('accessForm');
+  const input = document.getElementById('accessPassword');
+  const error = document.getElementById('accessError');
+  const SESSION_KEY = 'buildit_access_ok_v1';
+
+  function bytesToHex(buffer){
+    return Array.from(new Uint8Array(buffer)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+
+  async function sha256(value){
+    const data = new TextEncoder().encode(value);
+    return bytesToHex(await crypto.subtle.digest('SHA-256', data));
+  }
+
+  function unlock(){
+    sessionStorage.setItem(SESSION_KEY,'1');
+    gate.classList.add('hidden');
+    document.body.classList.remove('access-locked');
+    setTimeout(()=>window.dispatchEvent(new Event('resize')),50);
+  }
+
+  if(sessionStorage.getItem(SESSION_KEY)==='1'){
+    unlock();
+  }else{
+    document.body.classList.add('access-locked');
+    setTimeout(()=>input.focus(),50);
+  }
+
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    error.textContent='';
+    const supplied=input.value;
+    try{
+      const digest=await sha256(supplied);
+      if(digest===PASSWORD_SHA256){
+        input.value='';
+        unlock();
+      }else{
+        error.textContent='Incorrect password.';
+        input.select();
+      }
+    }catch(err){
+      error.textContent='Password check failed in this browser.';
+    }
+  });
+})();
+
 const MAP_SIZE=15360;
 const XAM_SPACE=256;
 const SCALE=MAP_SIZE/XAM_SPACE;
@@ -397,6 +520,10 @@ map.fitBounds(bounds);
 const coords=document.getElementById('coords');
 const status=document.getElementById('status');
 const labels=L.layerGroup().addTo(map);
+const placeSearchInput=document.getElementById('placeSearchInput');
+const placeSearchResults=document.getElementById('placeSearchResults');
+const placeSearchIndex=[];
+let placeSearchHighlight=null;
 
 // Each spawn category has its own independent Leaflet layer.
 const spawnLayers={};
@@ -1258,6 +1385,83 @@ function esc(s){
 function hasCyr(s){return /[\u0400-\u04FF]/.test(String(s||''))}
 function normType(t){return String(t||'location').toLowerCase().replace(/[^a-z0-9_-]/g,'')}
 
+function normalizePlaceSearch(value){
+ return String(value||'')
+   .toLocaleLowerCase()
+   .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+   .replace(/\s+/g,' ').trim();
+}
+
+function hidePlaceSearchResults(){
+ placeSearchResults.classList.add('hidden');
+ placeSearchResults.innerHTML='';
+}
+
+function focusPlace(place){
+ const ll=gameToLeaflet(place.x,place.z);
+ map.setView(ll,Math.max(map.getZoom(),6),{animate:true});
+ placeSearchInput.value=place.lat||place.cyr;
+ hidePlaceSearchResults();
+ placeSearchInput.blur();
+
+ if(placeSearchHighlight && map.hasLayer(placeSearchHighlight)) map.removeLayer(placeSearchHighlight);
+ placeSearchHighlight=L.circleMarker(ll,{radius:11,weight:3,fillOpacity:.08,interactive:false}).addTo(map);
+ setTimeout(()=>{
+   if(placeSearchHighlight && map.hasLayer(placeSearchHighlight)) map.removeLayer(placeSearchHighlight);
+   placeSearchHighlight=null;
+ },2200);
+}
+
+function getPlaceMatches(query){
+ const q=normalizePlaceSearch(query);
+ if(!q) return [];
+ return placeSearchIndex
+   .filter(p=>p.search.includes(q))
+   .sort((a,b)=>{
+     const aStart=a.search.startsWith(q)?0:1;
+     const bStart=b.search.startsWith(q)?0:1;
+     if(aStart!==bStart) return aStart-bStart;
+     return (a.lat||a.cyr).localeCompare(b.lat||b.cyr);
+   })
+   .slice(0,10);
+}
+
+function renderPlaceSearchResults(){
+ const q=placeSearchInput.value.trim();
+ if(!q){hidePlaceSearchResults();return}
+
+ const matches=getPlaceMatches(q);
+ placeSearchResults.innerHTML='';
+ placeSearchResults.classList.remove('hidden');
+
+ if(!matches.length){
+   placeSearchResults.innerHTML='<div class="place-search-empty">No matching place found.</div>';
+   return;
+ }
+
+ for(const place of matches){
+   const btn=document.createElement('button');
+   btn.type='button';
+   btn.className='place-search-result';
+   btn.innerHTML=`<div class="place-search-cyr">${esc(place.cyr)}</div><div class="place-search-lat">${esc(place.lat)}</div>`;
+   btn.addEventListener('click',()=>focusPlace(place));
+   placeSearchResults.appendChild(btn);
+ }
+}
+
+placeSearchInput.addEventListener('input',renderPlaceSearchResults);
+placeSearchInput.addEventListener('focus',()=>{if(placeSearchInput.value.trim())renderPlaceSearchResults()});
+placeSearchInput.addEventListener('keydown',e=>{
+ if(e.key==='Escape'){hidePlaceSearchResults();placeSearchInput.blur();return}
+ if(e.key==='Enter'){
+   const first=getPlaceMatches(placeSearchInput.value)[0];
+   if(first){e.preventDefault();focusPlace(first)}
+ }
+});
+document.addEventListener('pointerdown',e=>{
+ if(!document.getElementById('placeSearchBox').contains(e.target)) hidePlaceSearchResults();
+});
+
 function cyrToLatin(input){
  let s=String(input||'');
  const combos=[
@@ -1345,6 +1549,10 @@ function addLabel(x,z,names,type){
  if(!pair.cyr && !pair.lat) return false;
 
  const typ=normType(type);
+ placeSearchIndex.push({
+   x,z,cyr:pair.cyr,lat:pair.lat,type:typ,
+   search:normalizePlaceSearch(`${pair.cyr} ${pair.lat}`)
+ });
  const html=`<div class="place-wrap type-${esc(typ)}">
    <div class="cyr">${esc(pair.cyr)}</div>
    <div class="lat">${esc(pair.lat)}</div>
@@ -1421,10 +1629,13 @@ async function loadDZMapFallback(){
 
 (async()=>{
  labels.clearLayers();
+ placeSearchIndex.length=0;
 
  try{
    const count=await loadRawXAM();
    status.textContent=`${count} locations loaded · Cyrillic + Latin · XAM`;
+   placeSearchInput.disabled=false;
+   placeSearchInput.placeholder='Search place…';
    setTimeout(()=>status.style.display='none',3000);
    return;
  }catch(e){
@@ -1433,12 +1644,17 @@ async function loadDZMapFallback(){
 
  try{
    labels.clearLayers();
+   placeSearchIndex.length=0;
    const count=await loadDZMapFallback();
    status.textContent=`${count} locations loaded · Cyrillic + Latin · fallback`;
+   placeSearchInput.disabled=false;
+   placeSearchInput.placeholder='Search place…';
    setTimeout(()=>status.style.display='none',3000);
  }catch(e){
    console.error(e);
    status.textContent='Location names could not be loaded.';
+   placeSearchInput.disabled=true;
+   placeSearchInput.placeholder='Place search unavailable';
    status.style.background='rgba(100,20,20,.92)';
  }
 })();
