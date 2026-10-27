@@ -371,74 +371,74 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
     <span>Place Names</span>
   </label>
   <label class="filter-row">
-    <input id="filterCustomBases" type="checkbox" checked>
+    <input id="filterCustomBases" type="checkbox">
     <span>🏠 Custom Bases</span>
     <span class="filter-count">9</span>
   </label>
 
   <div class="filter-section-title">Spawns</div>
   <label class="filter-row">
-    <input id="filterSpawn_car" type="checkbox" checked>
+    <input id="filterSpawn_car" type="checkbox">
     <span>🚗 Cars</span>
     <span class="filter-count">285</span>
   </label>
   <label class="filter-row">
-    <input id="filterSpawn_truck" type="checkbox" checked>
+    <input id="filterSpawn_truck" type="checkbox">
     <span>🚚 Trucks</span>
     <span class="filter-count">131</span>
   </label>
   <label class="filter-row">
-    <input id="filterSpawn_offroad" type="checkbox" checked>
+    <input id="filterSpawn_offroad" type="checkbox">
     <span>🛻 Humvees / 4x4</span>
     <span class="filter-count">40</span>
   </label>
   <label class="filter-row">
-    <input id="filterSpawn_heli" type="checkbox" checked>
+    <input id="filterSpawn_heli" type="checkbox">
     <span>🚁 Helicopter Crashes</span>
     <span class="filter-count">95</span>
   </label>
   <label class="filter-row">
-    <input id="filterSpawn_boat" type="checkbox" checked>
+    <input id="filterSpawn_boat" type="checkbox">
     <span>🚤 Boats</span>
     <span class="filter-count">72</span>
   </label>
   <label class="filter-row">
-    <input id="filterSpawn_train" type="checkbox" checked>
+    <input id="filterSpawn_train" type="checkbox">
     <span>🚂 Trains</span>
     <span class="filter-count">21</span>
   </label>
   <label class="filter-row">
-    <input id="filterSpawn_police" type="checkbox" checked>
+    <input id="filterSpawn_police" type="checkbox">
     <span>🚓 Police Events</span>
     <span class="filter-count">340</span>
   </label>
   <label class="filter-row">
-    <input id="filterSpawn_convoy" type="checkbox" checked>
+    <input id="filterSpawn_convoy" type="checkbox">
     <span>🪖 Military Convoys</span>
     <span class="filter-count">23</span>
   </label>
   <label class="filter-row">
-    <input id="filterSpawn_planks" type="checkbox" checked>
+    <input id="filterSpawn_planks" type="checkbox">
     <span>🪵 Plank Spawns</span>
     <span class="filter-count">295</span>
   </label>
   <label class="filter-row">
-    <input id="filterSpawn_aircrate" type="checkbox" checked>
+    <input id="filterSpawn_aircrate" type="checkbox">
     <span>📦 Airplane Crates</span>
     <span class="filter-count">28</span>
   </label>
   <label class="filter-row">
-    <input id="filterSpawn_bonfire" type="checkbox" checked>
+    <input id="filterSpawn_bonfire" type="checkbox">
     <span>🔥 Bonfires</span>
     <span class="filter-count">63</span>
   </label>
   <label class="filter-row">
-    <input id="filterSpawn_tree" type="checkbox" checked>
+    <input id="filterSpawn_tree" type="checkbox">
     <span>🎄 Christmas Trees</span>
     <span class="filter-count">13</span>
   </label>
   <label class="filter-row">
-    <input id="filterSpawn_santa" type="checkbox" checked>
+    <input id="filterSpawn_santa" type="checkbox">
     <span>🎅 Santa Crashes</span>
     <span class="filter-count">21</span>
   </label>
@@ -708,11 +708,13 @@ function setupSpawnFilters(){
   for(const [key,cat] of Object.entries(SPAWN_CATEGORIES)){
     if(key==='generic') continue;
 
-    const layer=L.layerGroup().addTo(map);
+    // Create the spawn layer but attach it only if its filter is enabled.
+    const layer=L.layerGroup();
     spawnLayers[key]=layer;
 
     const input=document.getElementById(cat.filterId);
     if(!input) continue;
+    if(input.checked) layer.addTo(map);
 
     input.addEventListener('change',()=>{
       if(input.checked){
@@ -1684,6 +1686,7 @@ async function loadDZMapFallback(){
 })();
 </script>
 <script src="./event-manager.js"></script>
+<script src="./ui-layout.js"></script>
 <script>
 (function(){
   "use strict";
