@@ -1,5 +1,6 @@
 /* Build It!++ live DayZ PS custom bases, read-only Nitrado sync.
- * The Cloudflare Worker exposes GET /api/files/list and GET /api/files/read.
+ * Cloudflare Worker endpoints: /api/files/list, /api/files/read (small),
+ * and /api/files/custom-content (streamed read-only custom JSON).
  * No file is changed on the live DayZ server. Does not cache raw server JSON.
  */
 (function () {
@@ -22,7 +23,8 @@
   const status=section.querySelector('#customBasesSyncStatus');
   button.style.cssText='width:100%;padding:8px 10px;border-radius:7px;font-size:11px;cursor:pointer;';
   status.style.cssText='line-height:1.5;overflow-wrap:anywhere;';
-  const MAX_READ_BYTES=512*1024; // Current Cloudflare Worker read endpoint limit.
+  const MAX_EDITOR_READ_BYTES=512*1024; // Unchanged File Manager edit/download safety limit.
+  const MAX_CUSTOM_READ_BYTES=20*1024*1024; // Streamed, read-only custom spawner JSON.
   const MAX_JSON_FILES=200;
   const MAX_DIRECTORY_SCANS=60;
   const MIN_REFRESH_MS=5*60*1000;
@@ -60,6 +62,45 @@
     const result=await nitradoRequest(route);
     if(!Array.isArray(result?.entries))throw new Error('Invalid directory listing from Nitrado.');
     return result;
+  }
+
+  // Small JSON retains compatibility with the existing Worker. Larger object
+  // spawner JSON uses the new streamed, read-only endpoint.
+  async function readObjectSpawnerFile(item){
+    const query='?file='+encodeURIComponent(item.path);
+    if(item.size>0 && item.size<=MAX_EDITOR_READ_BYTES){
+      const response=await nitradoRequest('/api/files/read'+query);
+      if(response?.path!==item.path||typeof response.content!=='string')
+        throw new Error('Invalid file response');
+      return response.content;
+    }
+    const base=normalizeWorkerUrl(document.getElementById('nitradoWorkerUrl').value);
+    if(!base)throw new Error('Missing Nitrado Worker URL');
+    const url=base+'/api/files/custom-content'+query;
+    const response=await fetch(url,{headers:nitradoHeaders(),cache:'no-store'});
+    if(!response.ok){
+      // Nitrado sometimes omits file sizes in directory metadata.
+      if(item.size===0 && (response.status===404 || response.status===405)){
+        const fallback=await nitradoRequest('/api/files/read'+query);
+        if(fallback?.path!==item.path||typeof fallback.content!=='string')
+          throw new Error('Invalid file response');
+        return fallback.content;
+      }
+      if(response.status===404 || response.status===405){
+        throw new Error('Deploy the large-custom-file Worker upgrade (stream endpoint missing)');
+      }
+      let detail='';
+      try{
+        const error=await response.json();
+        detail=String(error?.error||error?.message||'').slice(0,160);
+      }catch(_){}
+      throw new Error('Large custom file HTTP '+response.status+(detail?': '+detail:''));
+    }
+    const claimed=Number(response.headers.get('content-length')||0);
+    if(claimed>MAX_CUSTOM_READ_BYTES)throw new Error('Exceeds 20 MB map limit');
+    const text=await response.text();
+    if(new Blob([text]).size>MAX_CUSTOM_READ_BYTES)throw new Error('Exceeds 20 MB map limit');
+    return text;
   }
 
   function isLoadout(path){
@@ -238,14 +279,13 @@
       for(let i=0;i<scan.files.length;i++){
         const item=scan.files[i];
         display('Reading custom object files: '+(i+1)+'/'+scan.files.length+' ('+item.name+')');
-        if(item.size>MAX_READ_BYTES){
-          failures.push(item.name+' (exceeds the current Worker 512 KB read limit)');
+        if(item.size>MAX_CUSTOM_READ_BYTES){
+          failures.push(item.name+' (exceeds 20 MB map limit)');
           continue;
         }
         try{
-          const response=await nitradoRequest('/api/files/read?file='+encodeURIComponent(item.path));
-          if(response?.path!==item.path||typeof response.content!=='string')throw new Error('Invalid file response');
-          const parsed=basesForFile(item.path,response.content);
+          const text=await readObjectSpawnerFile(item);
+          const parsed=basesForFile(item.path,text);
           if(parsed.type==='spawner'){
             mappedFiles++;
             bases.push(...parsed.bases);
@@ -269,7 +309,7 @@
         '. Other formats skipped: '+(scan.skippedOthers+skips.length)+
         '. Source: '+folder.split('/').slice(-2).join('/')+'.'+
         (failures.length?' COULD NOT LOAD: '+failures.join('; ')+
-        '. These files are NOT shown; larger files need a Worker update.':'');
+        '. These files are NOT shown.':'');
       display(message,failures.length>0);
     }catch(error){
       display('Custom Bases sync failed: '+String(error.message||error)+
