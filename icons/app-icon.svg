@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Build It plus DayZ map">
+  <rect width="512" height="512" rx="100" fill="#132a34"/>
+  <rect x="42" y="42" width="428" height="428" rx="94" fill="#152e39" stroke="#2e6171" stroke-width="10"/>
+  <path d="M111 162 L196 140 L270 163 L351 131 L401 161" fill="none" stroke="#61bfbd" stroke-width="18" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M118 369 L196 348 L272 371 L390 340" fill="none" stroke="#447789" stroke-width="14" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="256" cy="247" r="65" fill="#d4f8e5"/>
+  <circle cx="256" cy="247" r="34" fill="#15404a"/>
+  <path d="M256 225 V269 M235 247 H277" stroke="#61bfbd" stroke-linecap="square" stroke-width="15"/>
+</svg>
