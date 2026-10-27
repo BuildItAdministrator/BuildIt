@@ -104,3 +104,26 @@ test('Event Manager panel fits phone viewport', async ({page}) => {
   expect(box.x).toBeGreaterThanOrEqual(0);
   expect(box.x+box.width).toBeLessThanOrEqual(viewport.width+1);
 });
+
+test('Nitrado File Manager downloads files and requires a separate write key', async ({page})=>{
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const url=new URL(route.request().url());
+    const path='/games/ni123/noftp/dayzps_missions/dayzOffline.chernarusplus/db/types.xml';
+    const init={status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'}};
+    let response={ok:true};
+    if(url.pathname==='/api/files/list')response={ok:true,root:'/games/ni123/noftp',dir:'/games/ni123/noftp',entries:[{name:'dayzps_missions',type:'directory',path:'/games/ni123/noftp/dayzps_missions'},{name:'db',type:'directory',path:'/games/ni123/noftp/db'}]};
+    if(url.pathname==='/api/files/read')response={ok:true,path,content:'<types/>',sha256:'a'.repeat(64)};
+    if(url.pathname==='/api/files/write')response={ok:true,backupPath:path+'.backup',verified:true};
+    await route.fulfill({...init,body:JSON.stringify(response)});
+  });
+  await page.locator('#logToggle').click();
+  await expect(page.locator('#fileManager')).toBeVisible();
+  await page.locator('#nitradoWorkerUrl').fill('https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').fill('fake_read_key_for_browser_test');
+  await page.locator('#fmBrowse').click();
+  await expect(page.locator('#fmStatus')).toContainText('Folder loaded');
+  await expect(page.locator('.fm-entry').first()).toContainText('dayzps_missions');
+  await page.locator('#fmBack').isDisabled();
+  await expect(page.locator('#nitradoWriteKey')).toHaveAttribute('type','password');
+  await expect(page.locator('#fmFileBox')).toBeHidden();
+});
