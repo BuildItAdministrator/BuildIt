@@ -11,11 +11,13 @@
   panel.innerHTML=[
     '<div class="log-divider"></div>',
     '<div class="log-auto-title">Nitrado File Manager</div>',
-    '<p class="fm-note">Browse and download XML, JSON and TXT files. Uploading overwrites only an existing file after a verified server-side backup. Files over 512 KB are not supported.</p>',
+    '<p class="fm-note">DayZ PS5 mission files are usually in dayzps_missions/dayzOffline.chernarusplus, not dayzps/config. Search both Nitrado file roots below. Opening folders never changes your server.</p>',
+    '<p class="fm-note">Download or edit XML, JSON and TXT files up to 512 KB. Uploads require a verified backup.</p>',
     '<label class="fm-label" for="nitradoWriteKey">Separate file-write key (MAP_WRITE_KEY)</label>',
     '<input id="nitradoWriteKey" type="password" autocomplete="off" placeholder="Enter Cloudflare file-write key">',
     '<p class="fm-note">This key stays in this tab only. It is not saved in browser storage.</p>',
-    '<div class="fm-row"><button id="fmBrowse" type="button" class="log-btn">Browse server files</button><button id="fmBack" type="button" class="log-btn" disabled>Parent folder</button></div>',
+    '<div class="fm-row"><button id="fmFindMission" type="button" class="log-btn">Find Chernarus mission</button></div>',
+    '<div class="fm-row"><button id="fmBrowse" type="button" class="log-btn">NoFTP root</button><button id="fmFtpRoot" type="button" class="log-btn">FTP root</button><button id="fmBack" type="button" class="log-btn" disabled>Parent</button></div>',
     '<div id="fmCurrentDir" class="fm-path" aria-label="Current directory"></div>',
     '<div id="fmEntries" class="fm-entries"></div>',
     '<div id="fmFileBox" hidden>',
@@ -48,7 +50,7 @@
   document.head.appendChild(style);
   const $=id=>document.getElementById(id);
   const entries=$('fmEntries'), editor=$('fmEditor'), box=$('fmFileBox');
-  let root='',dir='',selected='',sourceDigest='',running=false;
+  let root='',dir='',currentRoot='',storageRoots=[],selected='',sourceDigest='',running=false;
   const state=(message,error=false)=>{
     $('fmStatus').textContent=message;
     $('fmStatus').style.color=error?'#ffadad':'#a8d6e4';
@@ -62,24 +64,48 @@
     finally{
       running=false;
       controls.forEach(b=>b.disabled=false);
-      $('fmBack').disabled=!dir || dir===root;
+      $('fmBack').disabled=!dir || dir===currentRoot;
       $('fmSave').disabled=!selected;
       $('fmDownload').disabled=!selected;
     }
   }
-  function withinRoot(p){return typeof p==='string'&&p.startsWith(root+'/')&&!p.includes('/../')&&!p.includes('/./')}
+  function discoverRoots(serverRoot){
+    const match=String(serverRoot||'').match(/^\/games\/([a-zA-Z0-9_-]{1,100})\/(noftp|ftproot)$/);
+    if(!match) throw new Error('The Worker returned an unfamiliar Nitrado root. Check the Worker setup.');
+    const base='/games/'+match[1];
+    return [base+'/ftproot',base+'/noftp'];
+  }
+  function allowedServerPath(path){
+    return typeof path==='string'&&!path.includes('//')&&!path.includes('/../')&&!path.includes('/./')
+      &&storageRoots.some(r=>path===r||path.startsWith(r+'/'));
+  }
+  async function listDirectory(path=''){
+    const response=await nitradoRequest('/api/files/list'+(path?'?dir='+encodeURIComponent(path):''));
+    const serverRoot=String(response.root||root);
+    const nextRoots=discoverRoots(serverRoot);
+    const target=String(response.dir||path||serverRoot);
+    if(!nextRoots.some(r=>target===r||target.startsWith(r+'/'))||
+       target.includes('/../')||target.includes('/./')||target.includes('//')){
+      throw new Error('Unexpected server directory path.');
+    }
+    if(!Array.isArray(response.entries))throw new Error('Nitrado returned no file listing.');
+    root=serverRoot;
+    storageRoots=nextRoots;
+    return {target,items:response.entries};
+  }
   async function browse(path=''){
     state('Loading server directory…');
-    const requestPath='/api/files/list'+(path?'?dir='+encodeURIComponent(path):'');
-    const response=await nitradoRequest(requestPath);
-    root=String(response.root||root);
-    dir=String(response.dir||path||root);
-    if(!root||!(dir===root||withinRoot(dir)))throw new Error('Unexpected server path.');
+    const {target,items}=await listDirectory(path);
+    dir=target;
+    currentRoot=storageRoots.find(r=>target===r||target.startsWith(r+'/'))||'';
     $('fmCurrentDir').textContent=dir;
     entries.replaceChildren();
-    for(const item of response.entries||[]){
-      const folder=['dir','directory','folder'].includes(item.type);
-      if(!withinRoot(item.path))continue;
+    selected='';
+    sourceDigest='';
+    box.hidden=true;
+    for(const item of items){
+      const folder=['dir','directory','folder'].includes(String(item.type).toLowerCase());
+      if(!allowedServerPath(item.path)||!item.path.startsWith(dir+'/'))continue;
       const button=document.createElement('button');
       button.type='button';
       button.className='fm-entry';
@@ -88,7 +114,43 @@
       entries.appendChild(button);
     }
     if(!entries.childElementCount)entries.textContent='No supported files or subfolders in this directory.';
-    state('Folder loaded. Select a file to open or download.');
+    const isSettings=dir.endsWith('/dayzps')||dir.endsWith('/dayzps/config');
+    state(isSettings
+      ? 'This folder contains server settings, not Chernarus mission XMLs. Select Find Chernarus mission, or FTP root.'
+      : 'Folder loaded. Select a file to open or download.');
+  }
+  async function findMission(){
+    state('Looking for dayzps_missions/dayzOffline.chernarusplus in both Nitrado roots…');
+    if(!root){
+      const response=await listDirectory();
+      if(!response.target)throw new Error('Unable to identify the server file roots.');
+    }
+    const suffixes=[
+      '/dayzps_missions/dayzOffline.chernarusplus',
+      '/mpmissions/dayzOffline.chernarusplus'
+    ];
+    const checked=[];
+    for(const fileRoot of storageRoots){
+      for(const suffix of suffixes){
+        const candidate=fileRoot+suffix;
+        try{
+          const {items}=await listDirectory(candidate);
+          const isMission=items.some(item=>{
+            const name=String(item.name||'').toLowerCase();
+            return name==='db'||name==='env'||name==='cfggameplay.json'||
+              name==='cfgspawnabletypes.xml'||name==='cfgeventspawns.xml';
+          });
+          if(isMission){
+            await browse(candidate);
+            state('Chernarus mission found: '+candidate+'\nOpen db for events.xml, types.xml and messages.xml.');
+            return;
+          }
+          checked.push(candidate+' (mission files absent)');
+        }catch(error){checked.push(candidate+' ('+String(error.message||'unavailable').slice(0,110)+')');}
+      }
+    }
+    // Even when direct probing is blocked, the user can inspect each root by hand.
+    state('Chernarus mission not found automatically in NoFTP or FTP root. Try FTP root and look for dayzps_missions. If it is also missing there, compare with Nitrado Tools > Filebrowser. No files were changed.',true);
   }
   async function openFile(path){
     state('Downloading selected file…');
@@ -109,11 +171,19 @@
       if(parsed.querySelector('parsererror'))throw new Error('XML is not well-formed. Upload cancelled.');
     }
   }
-  $('fmBrowse').addEventListener('click',()=>perform(()=>browse()));
+  $('fmBrowse').addEventListener('click',()=>perform(async()=>{
+    if(!root)await browse();
+    else await browse(storageRoots[1]);
+  }));
+  $('fmFtpRoot').addEventListener('click',()=>perform(async()=>{
+    if(!root)await listDirectory();
+    await browse(storageRoots[0]);
+  }));
+  $('fmFindMission').addEventListener('click',()=>perform(findMission));
   $('fmBack').addEventListener('click',()=>perform(()=>{
-    if(!root||dir===root)return Promise.resolve();
+    if(!currentRoot||dir===currentRoot)return Promise.resolve();
     const parent=dir.substring(0,dir.lastIndexOf('/'));
-    return browse(parent.length<root.length?root:parent);
+    return browse(parent.length<currentRoot.length?currentRoot:parent);
   }));
   $('fmDownload').addEventListener('click',()=>{
     if(!selected)return;
