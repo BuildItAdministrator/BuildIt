@@ -127,3 +127,46 @@ test('Nitrado File Manager downloads files and requires a separate write key', a
   await expect(page.locator('#nitradoWriteKey')).toHaveAttribute('type','password');
   await expect(page.locator('#fmFileBox')).toBeHidden();
 });
+
+test('small theme button switches light/dark appearance and remembers choice', async ({page}) => {
+  const button = page.locator('#builditThemeToggle');
+  await expect(button).toBeVisible();
+  await expect(button).toHaveAccessibleName('Switch to light mode');
+  await expect(page.locator('html')).toHaveAttribute('data-buildit-theme', 'dark');
+  const before = await page.locator('#filterToggle').evaluate(el=>getComputedStyle(el).backgroundColor);
+  await button.click();
+  await expect(page.locator('html')).toHaveAttribute('data-buildit-theme', 'light');
+  await expect(button).toHaveAccessibleName('Switch to dark mode');
+  await expect(button).toHaveAttribute('aria-pressed','true');
+  const after = await page.locator('#filterToggle').evaluate(el=>getComputedStyle(el).backgroundColor);
+  expect(after).not.toBe(before);
+  await page.locator('#filterToggle').click();
+  await expect(page.locator('#filterPanel')).toBeVisible();
+  await expect(page.locator('#filterPanel')).toHaveCSS('color', 'rgb(27, 51, 69)');
+  await page.reload({waitUntil:'domcontentloaded'});
+  await expect(page.locator('html')).toHaveAttribute('data-buildit-theme','light');
+  await expect(page.locator('#builditThemeToggle')).toHaveAccessibleName('Switch to dark mode');
+  await page.locator('#builditThemeToggle').click();
+  await expect(page.locator('html')).toHaveAttribute('data-buildit-theme','dark');
+  expect(await page.evaluate(()=>localStorage.getItem('buildit_theme_v1'))).toBe('dark');
+});
+
+test('theme button fits upper right without covering place search on mobile', async ({page}) => {
+  const toggle=page.locator('#builditThemeToggle');
+  await expect(toggle).toBeVisible();
+  const button=await toggle.boundingBox();
+  const input=await page.locator('#placeSearchInput').boundingBox();
+  const container=await page.locator('#placeSearchBox').boundingBox();
+  const view=page.viewportSize();
+  expect(button.width).toBeLessThanOrEqual(44);
+  expect(button.height).toBeLessThanOrEqual(44);
+  expect(button.x).toBeGreaterThanOrEqual(input.x+input.width+3);
+  expect(button.x+button.width).toBeLessThanOrEqual(view.width);
+  expect(button.y).toBeGreaterThanOrEqual(0);
+  expect(button.y).toBeLessThan(container.y+4);
+  await toggle.click();
+  await page.locator('#placeSearchInput').fill('Berezino');
+  await expect(page.locator('#placeSearchResults')).toBeVisible();
+  const result=await page.locator('#placeSearchResults').boundingBox();
+  expect(result.x+result.width).toBeLessThanOrEqual(button.x);
+});
