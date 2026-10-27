@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#132a34">
+<script>
+/* Restore appearance before the page is drawn to avoid a theme flash. */
+try {
+  document.documentElement.dataset.builditTheme =
+    localStorage.getItem('buildit_theme_v1') === 'light' ? 'light' : 'dark';
+} catch (_) {
+  document.documentElement.dataset.builditTheme = 'dark';
+}
+</script>
+
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -273,6 +283,7 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
 .access-note{margin-top:14px;font-size:10px;color:#666;line-height:1.4}
 
 </style>
+<link rel="stylesheet" href="./theme.css">
 </head>
 <body>
 <div id="accessGate" role="dialog" aria-modal="true" aria-labelledby="accessTitle">
@@ -1657,6 +1668,7 @@ try {
 <script src="./event-manager.js"></script>
 <script src="./ui-layout.js"></script>
 <script src="./file-manager.js"></script>
+<script src="./theme.js"></script>
 <script>
 (function(){
   "use strict";
