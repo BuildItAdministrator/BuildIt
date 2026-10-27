@@ -71,6 +71,13 @@
     '<input id="biFiles" type="file" accept=".xml" multiple>',
     '<div class="biSmall">Select db/events.xml, cfgeventspawns.xml, cfgspawnabletypes.xml and optionally db/types.xml. Existing entries are kept during export. Files remain in your browser.</div>',
     '<div id="biImportStatus" class="biSmall">No server files imported yet.</div>',
+    '<div class="biDivider"></div><h4>Deploy vehicle events to Nitrado</h4>',
+    '<div class="biSmall">Uses your live events.xml and cfgeventspawns.xml. No manual files needed. Before uploading, stop DayZ in Nitrado and review the planned changes. Vehicles use your existing cfgspawnabletypes.xml attachment rules.</div>',
+    '<button type="button" id="biLoadServer" style="width:100%">1. Load live Nitrado XML files</button>',
+    '<button type="button" id="biPreviewServer" style="width:100%;margin-top:6px" disabled>2. Preview vehicle changes</button>',
+    '<div id="biServerPreview" class="biSmall" role="status" aria-live="polite">Not connected to live XML files yet.</div>',
+    '<label style="font-weight:400"><input type="checkbox" id="biServerStopped"> I stopped the DayZ server and reviewed these changes.</label>',
+    '<button type="button" id="biUploadServer" style="width:100%;margin-top:6px" disabled>3. Backup &amp; upload to Nitrado</button>',
     '<div class="biRow" style="margin-top:10px"><button type="button" id="biExportEvents">events.xml</button><button type="button" id="biExportPositions">cfgeventspawns.xml</button></div>',
     '<button type="button" id="biExportCargo" style="width:100%;margin-top:7px">cfgspawnabletypes.xml (loot)</button>',
     '<div class="biWarn" style="margin-top:8px">Without imported source files, exports contain additions ONLY, not complete Nitrado configuration files. Never upload these additions as replacements. Back up and validate changes before uploading; a server restart is generally required.</div>',
@@ -318,6 +325,172 @@
     const xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + new XMLSerializer().serializeToString(doc);
     return {filename: original ? filename : 'BuildIt_ADD_ONLY_' + filename,xml,complete:!!original};
   }
+  // Nitrado deployment: vehicle events only. Client previews are never treated as
+  // replacements unless BOTH matching complete server files were loaded first.
+  // Each POST goes through the Worker with MAP_WRITE_KEY + checksum and backup.
+  const eventDeploy = {
+    mission:'', paths:{}, signatures:{}, staged:null, loading:false, sending:false
+  };
+  const deploySummary = $('biServerPreview');
+  const deployLoad = $('biLoadServer');
+  const deployPreview = $('biPreviewServer');
+  const deployUpload = $('biUploadServer');
+  function setDeploy(text, error=false){
+    deploySummary.textContent=text;
+    deploySummary.style.color=error?'#ffafaf':'';
+  }
+  function deploymentSnapshot(){
+    return JSON.stringify(drafts.map(d=>({
+      name:d.name,kind:d.kind,x:d.x,z:d.z,a:d.a,vehicle:d.vehicle,container:d.container,items:d.items
+    })));
+  }
+  async function serverXmlRead(path){
+    const data=await nitradoRequest('/api/files/read?file='+encodeURIComponent(path));
+    if(data?.path!==path||typeof data.content!=='string'||!/^[a-f0-9]{64}$/.test(data.sha256||''))
+      throw new Error('Worker returned incomplete file content or checksum for '+path.split('/').pop());
+    if(new TextEncoder().encode(data.content).byteLength>512*1024)
+      throw new Error(path.split('/').pop()+' is over the 512 KB editable file limit.');
+    return data;
+  }
+  async function discoverServerMission(){
+    const initial=await nitradoRequest('/api/files/list');
+    const match=String(initial?.root||'').match(/^\/games\/([A-Za-z0-9_-]{1,100})\/(?:noftp|ftproot)$/);
+    if(!match)throw new Error('Unexpected Nitrado file root. Check Logs → Nitrado File Manager.');
+    const base='/games/'+match[1];
+    for(const root of [base+'/ftproot',base+'/noftp']){
+      for(const mission of ['dayzps_missions/dayzOffline.chernarusplus','mpmissions/dayzOffline.chernarusplus']){
+        const path=root+'/'+mission;
+        try {
+          const list=await nitradoRequest('/api/files/list?dir='+encodeURIComponent(path));
+          if(list?.dir===path&&Array.isArray(list.entries)&&
+            list.entries.some(item=>item.name==='db')){
+            return path;
+          }
+        } catch(_){}
+      }
+    }
+    throw new Error('Chernarus mission directory not found. Verify the FTP/NoFTP root in the File Manager.');
+  }
+  function vehicleDrafts(){
+    if(!drafts.length)throw new Error('Save an event draft before attempting to deploy.');
+    if(drafts.some(d=>d.kind!=='vehicle'))
+      throw new Error('Automated deployment currently supports vehicle drafts only. Download and inspect XML for loot containers.');
+    return drafts;
+  }
+  function clearStaged(){
+    eventDeploy.staged=null;
+    deployUpload.disabled=true;
+    $('biServerStopped').checked=false;
+  }
+  deployLoad.addEventListener('click',async()=>{
+    if(eventDeploy.loading||eventDeploy.sending)return;
+    eventDeploy.loading=true;deployLoad.disabled=true;
+    clearStaged();deployPreview.disabled=true;
+    setDeploy('Finding mission and downloading complete live XML files…');
+    try{
+      if(typeof nitradoRequest!=='function')throw new Error('Nitrado connection is unavailable. Set up Logs → Automatic Nitrado Sync first.');
+      const mission=await discoverServerMission();
+      const paths={
+        'events.xml':mission+'/db/events.xml',
+        'cfgeventspawns.xml':mission+'/cfgeventspawns.xml'
+      };
+      const [events,positions]=await Promise.all([
+        serverXmlRead(paths['events.xml']),serverXmlRead(paths['cfgeventspawns.xml'])
+      ]);
+      parseXML(events.content,'events');parseXML(positions.content,'eventposdef');
+      files['events.xml']=events.content;
+      files['cfgeventspawns.xml']=positions.content;
+      eventDeploy.mission=mission;
+      eventDeploy.paths=paths;
+      eventDeploy.signatures={'events.xml':events.sha256,'cfgeventspawns.xml':positions.sha256};
+      addCatalog(parseXML(events.content,'events'),'events');
+      catalogStatus();updateChoices('vehicle');
+      $('biImportStatus').textContent='Loaded complete events.xml and cfgeventspawns.xml from Nitrado.';
+      deployPreview.disabled=false;
+      setDeploy('Live XML loaded from '+mission+'. Save a vehicle draft, then click Preview vehicle changes.');
+    }catch(e){setDeploy('Could not load live Nitrado XML: '+e.message,true);}
+    finally{eventDeploy.loading=false;deployLoad.disabled=false;}
+  });
+  deployPreview.addEventListener('click',()=>{
+    clearStaged();
+    try{
+      const selected=vehicleDrafts();
+      if(!eventDeploy.mission)throw new Error('Load live Nitrado XML files first.');
+      // The existing composer verifies duplicates and preserves the rest of the XML.
+      const events=buildOutput('events'), positions=buildOutput('positions');
+      if(!events.complete||!positions.complete)
+        throw new Error('Incomplete Nitrado XML; refusing an additions-only replacement.');
+      if(new TextEncoder().encode(events.xml).byteLength>512*1024||
+         new TextEncoder().encode(positions.xml).byteLength>512*1024)
+        throw new Error('Generated XML exceeds the 512 KB write limit. No upload attempted.');
+      eventDeploy.staged={
+        xml:{'events.xml':events.xml,'cfgeventspawns.xml':positions.xml},
+        snapshot:deploymentSnapshot()
+      };
+      const previewNames=selected.map(d=>d.name+' → '+d.vehicle+
+        ' (X '+d.x+', Z '+d.z+', rotation '+d.a+'°)').join('\n');
+      setDeploy('READY FOR REVIEW — no server files changed.\n'+
+        'Add '+selected.length+' vehicle event(s):\n'+previewNames+
+        '\n\nWill back up and replace these live files:\n'+
+        eventDeploy.paths['events.xml']+'\n'+eventDeploy.paths['cfgeventspawns.xml']+
+        '\n\nIMPORTANT: both writes must succeed. If the second fails, the first may already be updated; use the displayed backup path to restore it.');
+      deployUpload.disabled=false;
+    }catch(e){setDeploy('Preview failed: '+e.message,true);}
+  });
+  deployUpload.addEventListener('click',async()=>{
+    if(eventDeploy.sending)return;
+    const staged=eventDeploy.staged;
+    if(!staged){setDeploy('Preview the changes first.',true);return;}
+    if(staged.snapshot!==deploymentSnapshot()){
+      clearStaged();setDeploy('Drafts changed since preview. Preview again before uploading.',true);return;
+    }
+    if(!$('biServerStopped').checked){
+      setDeploy('Stop your DayZ server and check the confirmation box before uploading.',true);return;
+    }
+    if(!window.confirm('Upload '+drafts.length+' vehicle event(s) to your LIVE server?\n'+
+      'This will back up and overwrite events.xml and cfgeventspawns.xml.\n'+
+      'Nitrado must grant file-write permission. Continue?'))return;
+    eventDeploy.sending=true;deployUpload.disabled=true;deployLoad.disabled=true;deployPreview.disabled=true;
+    const results=[],changes=['events.xml','cfgeventspawns.xml'];
+    try{
+      // Preflight read both so stale files cannot overwrite other administrators' updates.
+      for(const name of changes){
+        const latest=await serverXmlRead(eventDeploy.paths[name]);
+        if(latest.sha256!==eventDeploy.signatures[name])
+          throw new Error(name+' changed on Nitrado since loading. Reload both files and preview again. No uploads started.');
+      }
+      for(const name of changes){
+        setDeploy('Creating verified backup and uploading '+name+' ('+(results.length+1)+'/2)…');
+        const result=await nitradoRequest('/api/files/write',{
+          method:'POST',writeKey:true,
+          body:{
+            path:eventDeploy.paths[name],content:staged.xml[name],
+            expectedSha256:eventDeploy.signatures[name],confirm:true
+          }
+        });
+        if(!result?.verified||!result?.backupPath)throw new Error(name+' was not verified by the Worker.');
+        results.push({name,backup:result.backupPath});
+      }
+      setDeploy('UPLOAD VERIFIED — '+drafts.length+' vehicle event(s), both files updated.\n'+
+        results.map(r=>r.name+' backup: '+r.backup).join('\n')+
+        '\nStart the DayZ server to load the new economy event configuration.');
+      clearStaged();
+      // A new deployment can only be prepared after fetching the new server originals.
+      eventDeploy.mission='';
+      deployPreview.disabled=true;
+    }catch(e){
+      setDeploy('UPLOAD FAILED: '+e.message+'\n'+
+        (results.length?'ALREADY UPLOADED: '+results.map(r=>r.name+' (backup '+r.backup+')').join(', ')+
+          '. Restore these files from their backups before retrying.':
+          'No file upload was verified. Check write permissions or directory settings.')+
+        '\nNo automatic rollback was attempted.',true);
+      clearStaged();
+      eventDeploy.mission=''; // force reload after ambiguous partial failure
+    }finally{
+      eventDeploy.sending=false;deployLoad.disabled=false;
+    }
+  });
+
   function downloadXML(data) {
     const url=URL.createObjectURL(new Blob([data.xml],{type:'application/xml;charset=utf-8'}));
     const a=document.createElement('a'); a.href=url; a.download=data.filename;
