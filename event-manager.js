@@ -51,53 +51,53 @@
   panel.id = 'biPanel'; panel.hidden = true;
   panel.innerHTML = [
     '<div class="biRow"><h3 style="flex:1">Event Manager</h3><button type="button" id="biClose">✕</button></div>',
-    '<div class="biSmall">Selecteer een locatie op de kaart en stel een vehicle of lootdrop samen. Concepten blijven lokaal in deze browser.</div>',
-    '<div class="biRow"><button type="button" id="biPick">📍 Kies op kaart</button><span id="biPoint" class="biPoint">Nog geen locatie</span></div>',
-    '<label for="biName">Unieke eventnaam</label><input id="biName" value="BuildIt_Event1" maxlength="90">',
-    '<div class="biRow"><div><label for="biKind">Type</label><select id="biKind"><option value="vehicle">Voertuig / motor</option><option value="loot">Lootdrop in container</option></select></div>',
-    '<div><label for="biAngle">Rotatie (°)</label><input id="biAngle" type="number" min="0" max="359.99" step="0.01" value="0"></div></div>',
-    '<div id="biVehicleSection"><label for="biVehicleSearch">Voertuig zoeken (naam of classname)</label><input id="biVehicleSearch" type="search" autocomplete="off" placeholder="Motorbike, Sedan, Truck ..."><div id="biVehicleMatches" class="biMatches"></div>',
-    '<p class="biSmall">Onderdelen en hun spawnkans blijven bepaald door je bestaande cfgspawnabletypes.xml.</p></div>',
+    '<div class="biSmall">Select a location on the map, then configure a vehicle or loot drop. Drafts stay in this browser.</div>',
+    '<div class="biRow"><button type="button" id="biPick">📍 Pick on map</button><span id="biPoint" class="biPoint">No location selected</span></div>',
+    '<label for="biName">Unique event name</label><input id="biName" value="BuildIt_Event1" maxlength="90">',
+    '<div class="biRow"><div><label for="biKind">Type</label><select id="biKind"><option value="vehicle">Vehicle / motorcycle</option><option value="loot">Loot drop in container</option></select></div>',
+    '<div><label for="biAngle">Rotation (°)</label><input id="biAngle" type="number" min="0" max="359.99" step="0.01" value="0"></div></div>',
+    '<div id="biVehicleSection"><label for="biVehicleSearch">Search vehicles (name or classname)</label><input id="biVehicleSearch" type="search" autocomplete="off" placeholder="Motorbike, Sedan, Truck ..."><div id="biVehicleMatches" class="biMatches"></div>',
+    '<p class="biSmall">Parts and their spawn probabilities are controlled by your existing cfgspawnabletypes.xml.</p></div>',
     '<div id="biLootSection" hidden><label for="biContainer">Container</label><select id="biContainer"><option>SeaChest</option><option>WoodenCrate</option><option>SmallProtectorCase</option><option>Barrel_Green</option><option>Barrel_Blue</option></select>',
-    '<label for="biItemSearch">Item zoeken (alle classnames uit types.xml)</label><input id="biItemSearch" type="search" autocomplete="off" placeholder="M4, Bandage, Nail ..."><div id="biItemMatches" class="biMatches"></div>',
+    '<label for="biItemSearch">Search items (all classnames from types.xml)</label><input id="biItemSearch" type="search" autocomplete="off" placeholder="M4, Bandage, Nail ..."><div id="biItemMatches" class="biMatches"></div>',
     '<div id="biItems"></div>',
-    '<div class="biWarn">LET OP: cfgspawnabletypes.xml bepaalt de inhoud per containertype, NIET per event of locatie. Als je deze loot exporteert, kan iedere container met dezelfde classname op de server die inhoud krijgen. Gebruik hiervoor alleen een daarvoor gereserveerd containertype.</div>',
-    '<label style="font-weight:400"><input type="checkbox" id="biAcknowledge"> Ik begrijp dat de containerinhoud wereldwijd geldt voor deze classname.</label></div>',
-    '<div class="biRow" style="margin-top:12px"><button type="button" id="biSave">Concept opslaan</button><button type="button" id="biNew">Nieuw</button></div>',
-    '<div class="biDivider"></div><h4>Opgeslagen events</h4><div id="biDrafts"></div>',
-    '<div class="biDivider"></div><h4>Catalogus &amp; Nitrado-bestanden</h4>',
-    '<div id="biCatalog" class="biSmall">Officiële classnames laden ...</div>',
-    '<label for="biFiles">Importeer je bestaande XML-bestanden (aanbevolen)</label>',
+    '<div class="biWarn">WARNING: cfgspawnabletypes.xml applies cargo rules to an entire container classname, NOT to individual locations. Any container of the same classname may receive this cargo. Use only a container type reserved for this purpose.</div>',
+    '<label style="font-weight:400"><input type="checkbox" id="biAcknowledge"> I understand this cargo configuration applies to every container of this classname.</label></div>',
+    '<div class="biRow" style="margin-top:12px"><button type="button" id="biSave">Save draft</button><button type="button" id="biNew">New</button></div>',
+    '<div class="biDivider"></div><h4>Saved events</h4><div id="biDrafts"></div>',
+    '<div class="biDivider"></div><h4>Catalog &amp; Nitrado files</h4>',
+    '<div id="biCatalog" class="biSmall">Loading official classnames ...</div>',
+    '<label for="biFiles">Import existing XML files (recommended)</label>',
     '<input id="biFiles" type="file" accept=".xml" multiple>',
-    '<div class="biSmall">Kies db/events.xml, cfgeventspawns.xml, cfgspawnabletypes.xml en eventueel db/types.xml. Bestaande inhoud wordt behouden bij export; bestanden verlaten je browser niet.</div>',
-    '<div id="biImportStatus" class="biSmall">Nog geen serverbestanden geïmporteerd.</div>',
+    '<div class="biSmall">Select db/events.xml, cfgeventspawns.xml, cfgspawnabletypes.xml and optionally db/types.xml. Existing entries are kept during export. Files remain in your browser.</div>',
+    '<div id="biImportStatus" class="biSmall">No server files imported yet.</div>',
     '<div class="biRow" style="margin-top:10px"><button type="button" id="biExportEvents">events.xml</button><button type="button" id="biExportPositions">cfgeventspawns.xml</button></div>',
     '<button type="button" id="biExportCargo" style="width:100%;margin-top:7px">cfgspawnabletypes.xml (loot)</button>',
-    '<div class="biWarn" style="margin-top:8px">Zonder geïmporteerd bronbestand exporteert de editor alleen een toevoegingenbestand, GEEN volledige vervanging voor je Nitrado-configuratie. Upload die toevoegingen nooit als vervanging. Eerst controleren en back-uppen; wijzigingen vereisen doorgaans een serverherstart.</div>',
+    '<div class="biWarn" style="margin-top:8px">Without imported source files, exports contain additions ONLY, not complete Nitrado configuration files. Never upload these additions as replacements. Back up and validate changes before uploading; a server restart is generally required.</div>',
     '<div id="biStatus" role="status" aria-live="polite"></div>'
   ].join('');
   document.body.appendChild(panel);
   const message = (s, error) => { $('biStatus').textContent = s; $('biStatus').style.color = error ? '#ffb2a2' : '#a8d6e4'; };
   toggle.addEventListener('click', () => { panel.hidden = !panel.hidden; if (!panel.hidden) refresh(); });
-  $('biClose').addEventListener('click', () => { panel.hidden = true; placing = false; $('biPick').textContent = '📍 Kies op kaart'; });
+  $('biClose').addEventListener('click', () => { panel.hidden = true; placing = false; $('biPick').textContent = '📍 Pick on map'; });
   $('biPick').addEventListener('click', () => {
     placing = !placing;
-    $('biPick').textContent = placing ? 'Kaartklik actief…' : '📍 Kies op kaart';
-    message(placing ? 'Klik nu op de gewenste plek op de kaart.' : 'Kaartselectie beëindigd.');
+    $('biPick').textContent = placing ? 'Click a map location…' : '📍 Pick on map';
+    message(placing ? 'Click your preferred location on the map.' : 'Map selection cancelled.');
   });
   map.on('click', e => {
     if (!placing) return;
     const p = leafletToGame(e.latlng);
-    if (!numbers(p.x, 0, 15360) || !numbers(p.z, 0, 15360)) return message('Dit punt valt buiten Chernarus.', true);
+    if (!numbers(p.x, 0, 15360) || !numbers(p.z, 0, 15360)) return message('This location is outside Chernarus.', true);
     chosen = {x:Number(p.x.toFixed(2)), z:Number(p.z.toFixed(2))};
-    placing = false; $('biPick').textContent = '📍 Kies op kaart';
+    placing = false; $('biPick').textContent = '📍 Pick on map';
     $('biPoint').textContent = chosen.x + ' / ' + chosen.z;
     panel.hidden = false;
-    message('Locatie geselecteerd. Kies een event en sla het concept op.');
+    message('Location selected. Choose an event and save the draft.');
   });
   function parseXML(text, root) {
     const doc = new DOMParser().parseFromString(text, 'application/xml');
-    if (doc.querySelector('parsererror') || !doc.documentElement || doc.documentElement.nodeName !== root) throw new Error('Ongeldige XML: verwacht <' + root + '>.');
+    if (doc.querySelector('parsererror') || !doc.documentElement || doc.documentElement.nodeName !== root) throw new Error('Invalid XML: expected <' + root + '>.');
     return doc;
   }
   function addCatalog(doc, source) {
@@ -117,14 +117,14 @@
     }
   }
   function catalogStatus() {
-    $('biCatalog').textContent = itemNames.size + ' items, ' + vehicleNames.size + ' voertuigen. Officiële lijst + eventuele geïmporteerde serverclassnames.';
+    $('biCatalog').textContent = itemNames.size + ' items, ' + vehicleNames.size + ' vehicles. Official catalog plus any imported server classnames.';
   }
   Promise.allSettled([
     fetch(BASE + 'db/types.xml').then(r => { if (!r.ok) throw new Error('types.xml HTTP ' + r.status); return r.text(); }).then(s => addCatalog(parseXML(s, 'types'),'types')),
     fetch(BASE + 'db/events.xml').then(r => { if (!r.ok) throw new Error('events.xml HTTP ' + r.status); return r.text(); }).then(s => addCatalog(parseXML(s, 'events'),'events'))
   ]).then(results => {
     catalogStatus();
-    if (results.some(r => r.status === 'rejected')) message('Sommige officiële catalogi zijn niet geladen. Je kunt de XML-bestanden handmatig importeren.', true);
+    if (results.some(r => r.status === 'rejected')) message('Some official catalogs could not be loaded. You can import the XML files manually.', true);
     updateChoices('vehicle'); updateChoices('item');
   });
   function updateChoices(kind) {
@@ -134,18 +134,18 @@
     const set = kind === 'vehicle' ? vehicleNames : itemNames;
     const matches = [...set].filter(n => !term || n.toLowerCase().includes(term)).sort((a,b) => a.localeCompare(b)).slice(0,25);
     target.replaceChildren();
-    if (!matches.length) { target.textContent = 'Geen classnames gevonden.'; return; }
+    if (!matches.length) { target.textContent = 'No matching classnames found.'; return; }
     matches.forEach(name => {
       const btn = document.createElement('button');
       btn.type = 'button'; btn.textContent = name;
       btn.addEventListener('click', () => {
-        if (kind === 'vehicle') { input.value = name; message('Voertuig gekozen: ' + name); }
+        if (kind === 'vehicle') { input.value = name; message('Vehicle selected: ' + name); }
         else {
-          if (itemList.length >= 40) return message('Maximaal 40 itemregels per lootdrop.', true);
+          if (itemList.length >= 40) return message('A loot drop can contain up to 40 item lines.', true);
           const found = itemList.find(x => x.name === name);
           if (found) found.qty = Math.min(found.qty+1, 20);
           else itemList.push({name,qty:1});
-          input.value = ''; renderItems(); message(name + ' toegevoegd.');
+          input.value = ''; renderItems(); message(name + ' added.');
         }
         target.replaceChildren();
       });
@@ -172,7 +172,7 @@
   }
   function persist() {
     try { localStorage.setItem(STORE, JSON.stringify(drafts)); }
-    catch (e) { message('Opslaan in browser mislukt; controleer opslagruimte en privacy-instellingen.', true); }
+    catch (e) { message('Browser storage failed. Check available space and privacy settings.', true); }
     renderDrafts();
   }
   function setForm(d, index) {
@@ -183,54 +183,54 @@
     $('biContainer').value = d.container || 'SeaChest';
     itemList = (d.items || []).map(i => ({name:i.name,qty:i.qty})); renderItems();
     $('biAcknowledge').checked = false;
-    $('biSave').textContent = 'Wijzigingen opslaan';
+    $('biSave').textContent = 'Save changes';
     panel.hidden = false;
   }
   function resetForm() {
     editingIndex = -1; chosen = null; itemList = []; renderItems(); $('biAcknowledge').checked = false;
-    $('biPoint').textContent = 'Nog geen locatie';
+    $('biPoint').textContent = 'No location selected';
     $('biName').value = 'BuildIt_Event' + (drafts.length + 1);
     $('biKind').value = 'vehicle'; $('biKind').dispatchEvent(new Event('change'));
     $('biAngle').value = '0'; $('biVehicleSearch').value = '';
-    $('biSave').textContent = 'Concept opslaan';
+    $('biSave').textContent = 'Save draft';
   }
-  $('biNew').addEventListener('click', () => { resetForm(); message('Nieuw event. Kies op de kaart een locatie.'); });
+  $('biNew').addEventListener('click', () => { resetForm(); message('New event. Pick a location on the map.'); });
   $('biSave').addEventListener('click', () => {
     const name = $('biName').value.trim(), kind = $('biKind').value;
     const a = Number($('biAngle').value);
-    if (!valid(name)) return message('Eventnaam: uitsluitend letters, cijfers en underscores (maximaal 90).', true);
-    if (!chosen) return message('Selecteer eerst een locatie met de kaartknop.', true);
-    if (!numbers(a,0,359.99)) return message('Rotatie moet tussen 0 en 359.99 liggen.', true);
-    if (drafts.some((d,i) => i !== editingIndex && d.name.toLowerCase() === name.toLowerCase())) return message('Deze eventnaam bestaat al.', true);
+    if (!valid(name)) return message('Event names may contain only letters, digits and underscores (up to 90 characters).', true);
+    if (!chosen) return message('Pick a map location first.', true);
+    if (!numbers(a,0,359.99)) return message('Rotation must be between 0 and 359.99.', true);
+    if (drafts.some((d,i) => i !== editingIndex && d.name.toLowerCase() === name.toLowerCase())) return message('This event name already exists.', true);
     const entry = {name,kind,x:chosen.x,z:chosen.z,a};
     if (kind === 'vehicle') {
-      if (!vehicleNames.has($('biVehicleSearch').value.trim())) return message('Selecteer een voertuig uit de officiële of geïmporteerde lijst.', true);
+      if (!vehicleNames.has($('biVehicleSearch').value.trim())) return message('Select a vehicle from the official or imported catalog.', true);
       entry.vehicle = $('biVehicleSearch').value.trim();
     } else {
-      if (!itemList.length) return message('Voeg eerst minimaal één item toe.', true);
-      if (!itemList.every(i => itemNames.has(i.name) && numbers(i.qty,1,20))) return message('Een item of aantal is ongeldig.', true);
-      if (!$('biAcknowledge').checked) return message('Bevestig eerst de waarschuwing over globale containerinhoud.', true);
+      if (!itemList.length) return message('Add at least one item first.', true);
+      if (!itemList.every(i => itemNames.has(i.name) && numbers(i.qty,1,20))) return message('An item or quantity is invalid.', true);
+      if (!$('biAcknowledge').checked) return message('Acknowledge the global cargo warning first.', true);
       entry.container = $('biContainer').value;
       entry.items = itemList.map(i => ({name:i.name,qty:Number(i.qty)}));
     }
     if (editingIndex < 0) drafts.push(entry); else drafts[editingIndex] = entry;
-    persist(); resetForm(); message('Concept opgeslagen. Er is nog niets gewijzigd op Nitrado.');
+    persist(); resetForm(); message('Draft saved. Nothing has been changed on Nitrado.');
   });
   function renderDrafts() {
     layer.clearLayers();
     const list = $('biDrafts'); list.replaceChildren();
-    if (!drafts.length) list.textContent = 'Nog geen events opgeslagen.';
+    if (!drafts.length) list.textContent = 'No saved events yet.';
     drafts.forEach((d,index) => {
       const m = L.marker(gameToLeaflet(d.x,d.z), {title:d.name}).addTo(layer);
       m.bindTooltip(d.name + ' (' + d.kind + ')');
-      m.on('click', () => { setForm(d,index); message('Event geladen: ' + d.name); });
+      m.on('click', () => { setForm(d,index); message('Event loaded: ' + d.name); });
       const div = document.createElement('div'); div.className = 'biDraft';
       const text = document.createElement('div'); text.textContent = d.name + ' · ' + (d.kind === 'vehicle' ? d.vehicle : d.container) + ' · X ' + d.x + ', Z ' + d.z;
       text.style.marginBottom = '6px'; div.appendChild(text);
       const row = document.createElement('div'); row.className = 'biRow';
-      const edit = document.createElement('button'); edit.textContent = 'Bewerken'; edit.addEventListener('click', () => setForm(d,index));
-      const remove = document.createElement('button'); remove.textContent = 'Verwijderen';
-      remove.addEventListener('click', () => { if (!confirm('Event ' + d.name + ' verwijderen uit je concepten?')) return; drafts.splice(index,1); persist(); resetForm(); });
+      const edit = document.createElement('button'); edit.textContent = 'Edit'; edit.addEventListener('click', () => setForm(d,index));
+      const remove = document.createElement('button'); remove.textContent = 'Delete';
+      remove.addEventListener('click', () => { if (!confirm('Event ' + d.name + ' from your saved drafts?')) return; drafts.splice(index,1); persist(); resetForm(); });
       row.append(edit,remove); div.appendChild(row); list.appendChild(div);
     });
   }
@@ -240,7 +240,7 @@
     let imported = 0;
     for (const file of evt.target.files) {
       const name = file.name.toLowerCase(), type = ({'types.xml':'types','events.xml':'events','cfgeventspawns.xml':'eventposdef','cfgspawnabletypes.xml':'spawnabletypes'})[name];
-      if (!type) { message('Onbekend bestand overgeslagen: ' + file.name, true); continue; }
+      if (!type) { message('Unrecognized file skipped: ' + file.name, true); continue; }
       try {
         const content = await file.text(), doc = parseXML(content,type);
         files[name] = content;
@@ -250,9 +250,9 @@
         imported++;
       } catch (err) { message(file.name + ': ' + err.message, true); }
     }
-    $('biImportStatus').textContent = Object.keys(files).join(', ') || 'Geen bestanden geïmporteerd.';
+    $('biImportStatus').textContent = Object.keys(files).join(', ') || 'No imported files.';
     catalogStatus(); updateChoices('vehicle'); updateChoices('item');
-    if (imported) message(imported + ' bestand(en) gelezen. Alles blijft lokaal in je browser.');
+    if (imported) message(imported + ' file(s) imported. Everything remains in your browser.');
     evt.target.value = '';
   });
   function node(doc,tag,text) {
@@ -288,8 +288,8 @@
     return t;
   }
   function buildOutput(kind) {
-    if (!drafts.length) throw new Error('Maak eerst een event aan.');
-    if (kind === 'cargo' && !drafts.some(d => d.kind === 'loot')) throw new Error('Er zijn nog geen lootdrops om te exporteren.');
+    if (!drafts.length) throw new Error('Create an event first.');
+    if (kind === 'cargo' && !drafts.some(d => d.kind === 'loot')) throw new Error('There are no loot drops to export.');
     const filename = kind === 'events' ? 'events.xml' : kind === 'positions' ? 'cfgeventspawns.xml' : 'cfgspawnabletypes.xml';
     const root = kind === 'events' ? 'events' : kind === 'positions' ? 'eventposdef' : 'spawnabletypes';
     const original = files[filename];
@@ -298,7 +298,7 @@
       const loadouts = new Map();
       drafts.filter(d => d.kind === 'loot').forEach(d => {
         const spec = JSON.stringify(d.items.map(x => [x.name,x.qty]).sort((a,b)=>a[0].localeCompare(b[0])));
-        if (loadouts.has(d.container) && loadouts.get(d.container).spec !== spec) throw new Error('Verschillende lootdrops gebruiken ' + d.container + ' met andere inhoud. De DayZ-engine ondersteunt dit niet afzonderlijk per locatie. Kies verschillende containertypes of dezelfde inhoud.');
+        if (loadouts.has(d.container) && loadouts.get(d.container).spec !== spec) throw new Error('Multiple loot drops use ' + d.container + ' with different cargo. DayZ cannot assign different cargo to the same classname per location. Use distinct container types or identical cargo.');
         loadouts.set(d.container,{spec,items:d.items});
       });
       loadouts.forEach((data,cls) => {
@@ -311,7 +311,7 @@
     } else {
       drafts.forEach(d => {
         const exists = Array.from(doc.documentElement.children).some(el => el.nodeName === 'event' && el.getAttribute('name') === d.name);
-        if (exists) throw new Error('Event "' + d.name + '" bestaat al in ' + filename + '. Pas de eventnaam aan voordat je exporteert.');
+        if (exists) throw new Error('Event "' + d.name + '" already exists in ' + filename + '. Rename the event before exporting.');
         doc.documentElement.appendChild(kind === 'events' ? createEvent(doc,d) : createPos(doc,d));
       });
     }
@@ -327,7 +327,7 @@
     $(pair[0]).addEventListener('click', () => {
       try {
         const result=buildOutput(pair[1]); downloadXML(result);
-        message(result.filename + ' gedownload. ' + (result.complete ? 'Gecombineerd met het geïmporteerde bronbestand. Maak een back-up en controleer de XML voordat je uploadt.' : 'LET OP: alleen toevoegingen! Niet rechtstreeks als vervanging uploaden.'));
+        message(result.filename + ' downloaded. ' + (result.complete ? 'Merged with the imported source file. Back up and validate the XML before uploading.' : 'WARNING: additions only. Do not upload this file as a direct replacement.'));
       } catch(err) { message(err.message,true); }
     });
   });
