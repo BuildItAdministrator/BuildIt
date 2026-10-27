@@ -4,18 +4,51 @@ test.beforeEach(async ({page}) => {
   // This is the non-secret session flag used by the existing client-side gate.
   // No real passwords, API tokens, or Cloudflare keys are used.
   await page.addInitScript(() => sessionStorage.setItem('buildit_access_ok_v1','1'));
-  // Simulate the original third-party place name sources failing.
+  // Even if third-party map sources are unavailable, local canonical labels must work.
   await page.route(/(static\.xam\.nu\/dayz\/json|dzmap\.woozymasta\.ru\/maps)/, route => route.abort());
   await page.goto('/',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#placeSearchInput')).toBeEnabled({timeout:25000});
 });
 
-test('local Chernarus place names and search work without external data', async ({page}) => {
-  await expect(page.locator('.place-wrap').first()).toBeAttached();
-  expect(await page.locator('.place-wrap').count()).toBeGreaterThanOrEqual(80);
+test('all 201 official Chernarus locations load locally and remain searchable', async ({page}) => {
+  await page.waitForFunction(() => typeof placeSearchIndex !== 'undefined' && placeSearchIndex.length === 201);
+  const labels=await page.evaluate(() => placeSearchIndex.map(p => ({name:p.lat,x:p.x,z:p.z})));
+  expect(labels).toHaveLength(201);
+  await expect(page.locator('#placeSearchInput')).toHaveAttribute('placeholder',/Search places/i);
   await page.locator('#placeSearchInput').fill('Berezino');
   await expect(page.locator('#placeSearchResults .place-search-result').first()).toContainText(/Berezino/i);
+  await page.locator('#placeSearchInput').fill('Novodmitrovsk');
+  await expect(page.locator('#placeSearchResults .place-search-result').first()).toContainText(/Novodmitrovsk/i);
 });
+
+test('place names match exact game-world positions (not spawn estimates)', async ({page}) => {
+  const anchors={
+    'Berezino':[12372.38,9760.98],
+    'Chernogorsk':[6778.62,2321.77],
+    'Novodmitrovsk':[11339.77,14391.05],
+    'Elektrozavodsk':[10286.68,1992.77],
+    'Zelenogorsk':[2796,5166],
+    'Severograd':[8168.48,12573.60],
+    'Stary Sobor':[6114,7849],
+    'Svetloyarsk':[13989.74,13263.78],
+    'Tisy':[3441.65,14799.55]
+  };
+  const rows=await page.evaluate(() => placeSearchIndex.map(p=>({name:p.lat,x:p.x,z:p.z})));
+  for(const [name,[x,z]] of Object.entries(anchors)){
+    const place=rows.find(r=>r.name===name);
+    expect(place, 'Missing official location '+name).toBeTruthy();
+    expect(Math.abs(place.x-x),'Incorrect X for '+name).toBeLessThan(0.03);
+    expect(Math.abs(place.z-z),'Incorrect Z for '+name).toBeLessThan(0.03);
+  }
+});
+
+test('minor locations show when zoomed in; names stay in their own positions', async ({page}) => {
+  await page.evaluate(() => map.setZoom(0));
+  await expect.poll(()=>page.locator('.place-wrap').count()).toBe(2);
+  await page.evaluate(() => map.setZoom(5));
+  await expect.poll(()=>page.locator('.place-wrap').count()).toBe(201);
+});
+
 
 test('only place names are enabled initially; other map layers are optional', async ({page}) => {
   await expect(page.locator('#filterPlaceNames')).toBeChecked();
