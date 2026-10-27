@@ -43,9 +43,9 @@ test('place names match exact game-world positions (not spawn estimates)', async
 });
 
 test('minor locations show when zoomed in; names stay in their own positions', async ({page}) => {
-  await page.evaluate(() => map.setZoom(0));
+  await page.evaluate(() => map.setZoom(0, {animate:false}));
   await expect.poll(()=>page.locator('.place-wrap').count()).toBe(2);
-  await page.evaluate(() => map.setZoom(5));
+  await page.evaluate(() => map.setZoom(5, {animate:false}));
   await expect.poll(()=>page.locator('.place-wrap').count()).toBe(201);
 });
 
