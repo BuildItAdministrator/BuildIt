@@ -1,10 +1,10 @@
 // Build It!++ PWA offline shell. No Nitrado API responses or credentials are cached.
 // Map tiles and live Nitrado information still require network access.
-const CACHE_NAME = 'buildit-shell-v3';
+const CACHE_NAME = 'buildit-shell-v4';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './event-manager.js', './ui-layout.js', './locations-fallback.js', './file-manager.js',
-  './theme.css', './theme.js',
+  './theme.css', './theme.js', './map-style.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/app-icon.svg'
 ];
 const LEAFLET_CDN = new Set([
