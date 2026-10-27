@@ -77,7 +77,7 @@
       }catch(error){
         // Nitrado may advertise a stale or incorrect size. Retry by streaming
         // only if the old endpoint rejected the file for being too large.
-        if(!/512\\s*KB|too large|exceed|413/i.test(String(error.message||error)))throw error;
+        if(!/512\s*KB|too large|exceed|413/i.test(String(error.message||error)))throw error;
       }
     }
     const base=normalizeWorkerUrl(document.getElementById('nitradoWorkerUrl').value);
