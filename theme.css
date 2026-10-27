@@ -1,0 +1,155 @@
+/* Build It!++ light/dark UI only: never recolor the satellite map or map markers. */
+#placeSearchInput{width:calc(100% - 46px)!important;}
+#placeSearchResults{left:0!important;right:auto!important;width:calc(100% - 46px)!important;}
+#builditThemeToggle{
+  position:absolute;top:0;right:0;z-index:1190;
+  width:40px;height:38px;box-sizing:border-box;display:flex;
+  align-items:center;justify-content:center;cursor:pointer;
+  border-radius:9px;border:1px solid #73828a;
+  background:rgba(18,31,39,.97);color:#f8e3a1;
+  font-size:22px;line-height:1;box-shadow:0 3px 12px rgba(0,0,0,.33);
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+#builditThemeToggle:hover{filter:brightness(1.12)}
+#builditThemeToggle:focus-visible{outline:3px solid #70c2f0;outline-offset:2px}
+html[data-buildit-theme="light"]{color-scheme:light;}
+html[data-buildit-theme="dark"]{color-scheme:dark;}
+html[data-buildit-theme="light"] body{background:#eaf0f5;color:#203345;}
+html[data-buildit-theme="light"] #builditThemeToggle{
+  background:#ffffff;color:#293f5b;border-color:#a7bdcb;
+  box-shadow:0 2px 10px rgba(41,64,85,.13);
+}
+/* Right-side navigation and place search */
+html[data-buildit-theme="light"] #filterToggle,
+html[data-buildit-theme="light"] #logToggle,
+html[data-buildit-theme="light"] #biToggle{
+  background:#fff!important;color:#1d3447!important;
+  border-color:#b3c6d5!important;box-shadow:0 3px 10px #22394b24!important;
+}
+html[data-buildit-theme="light"] #filterToggle:hover,
+html[data-buildit-theme="light"] #logToggle:hover,
+html[data-buildit-theme="light"] #biToggle:hover{background:#e7f1f8!important}
+html[data-buildit-theme="light"] #logToggle.has-data{border-color:#2086ae!important}
+html[data-buildit-theme="light"] #placeSearchInput{
+  background:#fff;color:#203345;border-color:#aabfcb;
+  box-shadow:0 2px 10px #22394b26
+}
+html[data-buildit-theme="light"] #placeSearchInput::placeholder{color:#647786}
+html[data-buildit-theme="light"] #placeSearchInput:focus{border-color:#347b9b}
+html[data-buildit-theme="light"] #placeSearchResults{
+  background:#fff;color:#203345;border-color:#b2c5d2;box-shadow:0 4px 16px #22394b31
+}
+html[data-buildit-theme="light"] .place-search-result{color:#203345}
+html[data-buildit-theme="light"] .place-search-result:hover,
+html[data-buildit-theme="light"] .place-search-result.active{background:#e7f2f9}
+html[data-buildit-theme="light"] .place-search-lat,
+html[data-buildit-theme="light"] .place-search-empty{color:#586d7c}
+/* Panels, shared form controls and typography */
+html[data-buildit-theme="light"] #filterPanel,
+html[data-buildit-theme="light"] #logPanel,
+html[data-buildit-theme="light"] #biPanel{
+  background:rgba(249,252,255,.98)!important;color:#1b3345!important;
+  border-color:#afc2d0!important;box-shadow:0 7px 26px #203b502b!important
+}
+html[data-buildit-theme="light"] #filterPanel button,
+html[data-buildit-theme="light"] #logPanel button,
+html[data-buildit-theme="light"] #biPanel button{
+  background:#e8f1f8!important;color:#1b3345!important;
+  border-color:#aabfcf!important
+}
+html[data-buildit-theme="light"] #filterPanel button:hover,
+html[data-buildit-theme="light"] #logPanel button:hover,
+html[data-buildit-theme="light"] #biPanel button:hover{background:#d5e7f2!important}
+html[data-buildit-theme="light"] #filterPanel input:not([type="checkbox"]),
+html[data-buildit-theme="light"] #logPanel input:not([type="checkbox"]):not([type="file"]),
+html[data-buildit-theme="light"] #biPanel input:not([type="checkbox"]):not([type="file"]),
+html[data-buildit-theme="light"] #filterPanel select,
+html[data-buildit-theme="light"] #logPanel select,
+html[data-buildit-theme="light"] #biPanel select,
+html[data-buildit-theme="light"] #logPanel textarea{
+  background:#fff!important;color:#1b3345!important;border-color:#aebfce!important
+}
+html[data-buildit-theme="light"] #filterPanel input::placeholder,
+html[data-buildit-theme="light"] #logPanel input::placeholder,
+html[data-buildit-theme="light"] #biPanel input::placeholder{color:#64788a}
+html[data-buildit-theme="light"] #filterPanel input[type="checkbox"],
+html[data-buildit-theme="light"] #logPanel input[type="checkbox"],
+html[data-buildit-theme="light"] #biPanel input[type="checkbox"]{accent-color:#23799b}
+html[data-buildit-theme="light"] #biPanel h3,
+html[data-buildit-theme="light"] #biPanel h4{color:#20384c!important}
+html[data-buildit-theme="light"] .filter-count,
+html[data-buildit-theme="light"] .filter-section-title,
+html[data-buildit-theme="light"] .filter-note,
+html[data-buildit-theme="light"] .spawn-legend,
+html[data-buildit-theme="light"] .log-auto-title,
+html[data-buildit-theme="light"] .log-subtitle,
+html[data-buildit-theme="light"] .log-action-group,
+html[data-buildit-theme="light"] .log-action-count,
+html[data-buildit-theme="light"] .log-event-time,
+html[data-buildit-theme="light"] .log-event-text,
+html[data-buildit-theme="light"] .log-empty,
+html[data-buildit-theme="light"] .log-check,
+html[data-buildit-theme="light"] .log-file-test-help,
+html[data-buildit-theme="light"] .biSmall,
+html[data-buildit-theme="light"] .biTag{color:#526778!important}
+html[data-buildit-theme="light"] .log-auto,
+html[data-buildit-theme="light"] .log-position-mode,
+html[data-buildit-theme="light"] .log-file-test,
+html[data-buildit-theme="light"] .log-summary,
+html[data-buildit-theme="light"] .log-upload,
+html[data-buildit-theme="light"] .log-auto-status,
+html[data-buildit-theme="light"] .log-file-test-status,
+html[data-buildit-theme="light"] .biDraft,
+html[data-buildit-theme="light"] .biMatches{
+  background:#edf4f8!important;color:#254056!important;border-color:#cedbe5!important
+}
+html[data-buildit-theme="light"] .log-auto-status.ok,
+html[data-buildit-theme="light"] .log-file-test-status.ok{color:#176636!important;border-color:#73ad82!important}
+html[data-buildit-theme="light"] .log-auto-status.err,
+html[data-buildit-theme="light"] .log-file-test-status.err{color:#a52d32!important;border-color:#d7a4a4!important}
+html[data-buildit-theme="light"] .log-auto-check,
+html[data-buildit-theme="light"] .biPoint{color:#2b5876!important}
+html[data-buildit-theme="light"] #logDrop,
+html[data-buildit-theme="light"] #logPlayers,
+html[data-buildit-theme="light"] #logActivity{color:#405b70;border-color:#bdcedb}
+html[data-buildit-theme="light"] .log-event{border-color:#d8e3ec}
+html[data-buildit-theme="light"] .log-event.located:hover{background:#e4f0f7}
+html[data-buildit-theme="light"] .log-event-pos{color:#216a8b}
+html[data-buildit-theme="light"] .biWarn{
+  background:#fff3dc!important;color:#67451d!important;border-color:#d6ad66!important
+}
+html[data-buildit-theme="light"] #biStatus{color:#176684!important}
+/* The File Manager inserts its own styles; explicitly theme its custom components. */
+html[data-buildit-theme="light"] #fileManager{
+  background:#f4f8fb!important;color:#203345!important;border-color:#c2d3df!important
+}
+html[data-buildit-theme="light"] #fileManager .fm-note,
+html[data-buildit-theme="light"] #fileManager .fm-path{color:#526778!important}
+html[data-buildit-theme="light"] #fileManager .fm-entries{border-color:#bdcfde!important}
+html[data-buildit-theme="light"] #fileManager .fm-entry{
+  background:#eaf3f8!important;color:#203345!important;border-color:#c2d3df!important
+}
+html[data-buildit-theme="light"] #fileManager .fm-entry:hover{background:#d8eaf4!important}
+html[data-buildit-theme="light"] #fileManager #fmStatus{color:#176684!important}
+/* Login gate and utility overlays */
+html[data-buildit-theme="light"] #accessGate{
+  background:radial-gradient(circle at center,#f4f8fc 0,#e7eef5 70%,#d9e6ef 100%);
+  color:#1d3447
+}
+html[data-buildit-theme="light"] .access-card{
+  background:#fff;border-color:#bdd0dc;box-shadow:0 18px 52px #28486326
+}
+html[data-buildit-theme="light"] .access-subtitle,
+html[data-buildit-theme="light"] .access-note{color:#657989}
+html[data-buildit-theme="light"] #accessPassword{
+  background:#f7fbff;color:#203345;border-color:#aabcca
+}
+html[data-buildit-theme="light"] #accessSubmit{
+  background:#e7f1f7;color:#203345;border-color:#b1c7d5
+}
+html[data-buildit-theme="light"] #accessSubmit:hover{background:#d7e9f4}
+html[data-buildit-theme="light"] #coords,
+html[data-buildit-theme="light"] #status{
+  background:rgba(255,255,255,.94);color:#203345;border-color:#a8c0cf;
+  box-shadow:0 2px 10px #203b5030
+}
