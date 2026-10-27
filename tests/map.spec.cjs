@@ -241,3 +241,94 @@ test('map-style control stays left below zoom and clear of right-hand search and
   await expect(page.locator('#placeSearchResults')).toBeVisible();
   await expect(button).toBeVisible();
 });
+
+
+test('File Manager finds DayZ PS Chernarus mission in FTP root, not noftp/dayzps config',async ({page})=>{
+  const base='/games/ni5774718_3';
+  const noftp=base+'/noftp';
+  const ftproot=base+'/ftproot';
+  const mission=ftproot+'/dayzps_missions/dayzOffline.chernarusplus';
+  const requests=[];
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const request=route.request();
+    const url=new URL(request.url());
+    const dir=url.searchParams.get('dir')||noftp;
+    requests.push({path:url.pathname,dir,method:request.method()});
+    if(url.pathname!=='/api/files/list'){
+      return route.fulfill({status:404,contentType:'application/json',body:'{"error":"not found"}'});
+    }
+    const folders={
+      [noftp]:[{name:'dayzps',type:'directory',path:noftp+'/dayzps'}],
+      [noftp+'/dayzps']:[{name:'config',type:'directory',path:noftp+'/dayzps/config'},{name:'ban.txt',type:'file',path:noftp+'/dayzps/ban.txt'}],
+      [ftproot]:[{name:'dayzps_missions',type:'directory',path:ftproot+'/dayzps_missions'}],
+      [ftproot+'/dayzps_missions']:[{name:'dayzOffline.chernarusplus',type:'directory',path:mission}],
+      [mission]:[{name:'db',type:'directory',path:mission+'/db'},{name:'cfgeventspawns.xml',type:'file',path:mission+'/cfgeventspawns.xml'}],
+      [mission+'/db']:[{name:'types.xml',type:'file',path:mission+'/db/types.xml'},{name:'events.xml',type:'file',path:mission+'/db/events.xml'}]
+    };
+    if(!Object.prototype.hasOwnProperty.call(folders,dir)){
+      return route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({error:'Not found: '+dir})});
+    }
+    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,root:noftp,dir,entries:folders[dir]})});
+  });
+  await page.locator('#logToggle').click();
+  await page.locator('#nitradoWorkerUrl').fill('https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').fill('test_map_sync_key_0123456789');
+  await page.locator('#fmBrowse').click();
+  await expect(page.locator('#fmCurrentDir')).toHaveText(noftp);
+  await page.locator('.fm-entry', {hasText:'dayzps'}).click();
+  await expect(page.locator('#fmStatus')).toContainText('server settings, not Chernarus mission');
+  await page.locator('#fmFindMission').click();
+  await expect(page.locator('#fmCurrentDir')).toHaveText(mission);
+  await expect(page.locator('#fmStatus')).toContainText('Chernarus mission found');
+  await expect(page.locator('#fmEntries')).toContainText('db');
+  await page.locator('.fm-entry',{hasText:'db'}).click();
+  await expect(page.locator('#fmCurrentDir')).toHaveText(mission+'/db');
+  await expect(page.locator('#fmEntries')).toContainText('events.xml');
+  await page.locator('#fmBack').click();
+  await expect(page.locator('#fmCurrentDir')).toHaveText(mission);
+  expect(requests.some(x=>x.dir===mission)).toBe(true);
+  expect(requests.every(x=>x.method==='GET')).toBe(true);
+});
+
+test('File Manager lets user browse FTP root directly when mission auto-discovery is unavailable',async ({page})=>{
+  const noftp='/games/ni5774718_3/noftp';
+  const ftp='/games/ni5774718_3/ftproot';
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const u=new URL(route.request().url());
+    const dir=u.searchParams.get('dir')||noftp;
+    if(dir===noftp)return route.fulfill({status:200,contentType:'application/json',
+      body:JSON.stringify({root:noftp,dir,entries:[{name:'dayzps',path:noftp+'/dayzps',type:'directory'}]})});
+    if(dir===ftp)return route.fulfill({status:200,contentType:'application/json',
+      body:JSON.stringify({root:noftp,dir,entries:[{name:'dayzps_missions',path:ftp+'/dayzps_missions',type:'directory'}]})});
+    return route.fulfill({status:404,contentType:'application/json',body:'{"error":"not found"}'});
+  });
+  await page.locator('#logToggle').click();
+  await page.locator('#nitradoWorkerUrl').fill('https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').fill('test_map_sync_key_0123456789');
+  await page.locator('#fmFtpRoot').click();
+  await expect(page.locator('#fmCurrentDir')).toHaveText(ftp);
+  await expect(page.locator('#fmEntries')).toContainText('dayzps_missions');
+  await expect(page.locator('#fmBack')).toBeDisabled();
+  await page.locator('#fmBrowse').click();
+  await expect(page.locator('#fmCurrentDir')).toHaveText(noftp);
+});
+
+test('Mission finder fails safely without attempting writes if mission directories are unavailable',async ({page})=>{
+  const root='/games/ni5774718_3/noftp';
+  let posts=0;
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    if(route.request().method()!=='GET')posts++;
+    const url=new URL(route.request().url());
+    if(!url.searchParams.has('dir')){
+      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({root,dir:root,entries:[{name:'dayzps',type:'directory',path:root+'/dayzps'}]})});
+    }
+    return route.fulfill({status:404,contentType:'application/json',body:'{"error":"not found"}'});
+  });
+  await page.locator('#logToggle').click();
+  await page.locator('#nitradoWorkerUrl').fill('https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').fill('test_map_sync_key_0123456789');
+  await page.locator('#fmFindMission').click();
+  await expect(page.locator('#fmStatus')).toContainText('not found automatically');
+  await expect(page.locator('#fmStatus')).toContainText('No files were changed');
+  expect(posts).toBe(0);
+});
