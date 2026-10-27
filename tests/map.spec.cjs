@@ -519,7 +519,7 @@ test('file-write test shows exact missing/short-key reason and puts key next to 
   const count=page.locator('#nitradoWriteKeyLength');
   const test=page.locator('#nitradoFileWriteTest');
   await expect(key).toBeVisible();
-  await expect(count).toContainText('Minimum 24 characters');
+  await expect(count).toContainText('Minimum 8 characters');
   const keyBox=await key.boundingBox();
   const buttonBox=await test.boundingBox();
   expect(keyBox.y+keyBox.height).toBeLessThan(buttonBox.y);
@@ -528,14 +528,14 @@ test('file-write test shows exact missing/short-key reason and puts key next to 
     catch(error){return error.message}
   });
   expect(noKey).toContain('MAP_WRITE_KEY is empty');
-  await key.fill('too-short-key');
-  await expect(count).toContainText('13/24 characters');
+  await key.fill('short');
+  await expect(count).toContainText('5/8 characters');
   const shortKey=await page.evaluate(async()=>{
     try{await nitradoRequest('/api/file-write-test',{method:'POST',writeKey:true});return 'unexpected success'}
     catch(error){return error.message}
   });
-  expect(shortKey).toContain('MAP_WRITE_KEY is too short (13/24 characters)');
-  const good='test-only-cloudflare-map-write-key-32-characters';
+  expect(shortKey).toContain('MAP_WRITE_KEY is too short (5/8 characters)');
+  const good='abc12345';
   await key.fill(good);
   await expect(count).toContainText('Length OK');
   await expect(count).toContainText('Cloudflare match not yet tested');
