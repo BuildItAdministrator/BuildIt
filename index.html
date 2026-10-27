@@ -533,10 +533,20 @@ const map=L.map('map',{
   zoomSnap:.25,zoomDelta:.5,wheelPxPerZoomLevel:80
 });
 
-L.tileLayer(
- 'https://static.xam.nu/dayz/maps/chernarusplus/1.27/satellite/{z}/{x}/{y}.webp',
- {tileSize:256,minZoom:0,maxZoom:7,maxNativeZoom:7,noWrap:true}
-).addTo(map);
+// Chernarus+ satellite and topographic tiles share a 256x256 XAM coordinate grid.
+// Switching base map must never change Leaflet view, game XYZ positions or marker layers.
+const MAP_TILE_OPTIONS={tileSize:256,minZoom:0,maxZoom:7,maxNativeZoom:7,noWrap:true,
+ attribution:'Map tiles: <a href="https://dayz.xam.nu/" target="_blank" rel="noopener noreferrer">XAM</a>'};
+const MAP_STYLES={
+ satellite:L.tileLayer('https://static.xam.nu/dayz/maps/chernarusplus/1.27/satellite/{z}/{x}/{y}.webp',MAP_TILE_OPTIONS),
+ topographic:L.tileLayer('https://static.xam.nu/dayz/maps/chernarusplus/1.27/topographic/{z}/{x}/{y}.webp',MAP_TILE_OPTIONS)
+};
+const MAP_STYLE_STORE='buildit_map_style_v1';
+let currentMapStyle='satellite';
+try{
+ if(localStorage.getItem(MAP_STYLE_STORE)==='topographic') currentMapStyle='topographic';
+}catch(_){}
+MAP_STYLES[currentMapStyle].addTo(map);
 
 const bounds=L.latLngBounds([[-256,0],[0,256]]);
 map.setMaxBounds(bounds.pad(.05));
@@ -1669,6 +1679,7 @@ try {
 <script src="./ui-layout.js"></script>
 <script src="./file-manager.js"></script>
 <script src="./theme.js"></script>
+<script src="./map-style.js"></script>
 <script>
 (function(){
   "use strict";

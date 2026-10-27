@@ -153,3 +153,25 @@ html[data-buildit-theme="light"] #status{
   background:rgba(255,255,255,.94);color:#203345;border-color:#a8c0cf;
   box-shadow:0 2px 10px #203b5030
 }
+
+
+/* Compact map-style switch stacked below Leaflet zoom in the upper left. */
+.buildit-map-style-control{margin-top:10px!important;border:0!important;background:transparent!important;box-shadow:none!important;}
+#builditMapStyleToggle{
+  display:flex;align-items:center;justify-content:center;
+  box-sizing:border-box;height:34px;width:120px;max-width:120px;
+  padding:6px 7px;cursor:pointer;user-select:none;white-space:nowrap;
+  font:700 11px/1.15 Arial,Helvetica,sans-serif;
+  color:#f5f8fb;background:rgba(17,23,28,.96);
+  border:1px solid rgba(201,221,235,.38);border-radius:8px;
+  box-shadow:0 2px 10px rgba(0,0,0,.35);
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+#builditMapStyleToggle:hover{background:#253846;}
+#builditMapStyleToggle:focus-visible{outline:3px solid #7ec9ec;outline-offset:2px;}
+html[data-buildit-theme="light"] #builditMapStyleToggle{
+  background:rgba(255,255,255,.98);color:#1d3447;
+  border-color:#b3c6d5;box-shadow:0 2px 10px #22394b26;
+}
+html[data-buildit-theme="light"] #builditMapStyleToggle:hover{background:#e7f1f8;}
+@media(max-width:600px){#builditMapStyleToggle{height:33px;width:112px;font-size:10.5px}}
