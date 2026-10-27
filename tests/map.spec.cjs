@@ -385,6 +385,7 @@ test('live Custom Bases loads every valid spawner JSON from mission/custom but n
   });
   await page.locator('#nitradoWorkerUrl').evaluate((el)=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').evaluate((el)=>el.value='fake_reader_token_for_tests');
+  await page.locator('#filterToggle').click();
   await page.locator('#customBasesRefresh').click();
   await expect(page.locator('#customBasesSyncStatus')).toContainText('3/3 object files mapped');
   const summary=await page.evaluate(()=>window.BUILD_IT_customBasesSync.summary());
@@ -421,6 +422,7 @@ test('custom folder unavailable: preserves preview bases and reports an explicit
   const old=await page.evaluate(()=>baseMarkerLayer.getLayers().length);
   expect(old).toBe(9);
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='fake_key');
+  await page.locator('#filterToggle').click();
   await page.locator('#customBasesRefresh').click();
   await expect(page.locator('#customBasesSyncStatus')).toContainText('Custom Bases sync failed');
   expect(await page.evaluate(()=>baseMarkerLayer.getLayers().length)).toBe(old);
@@ -453,6 +455,7 @@ test('loadouts and non-spawner JSON are excluded and reported, including oversiz
     await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
   });
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='fake_key');
+  await page.locator('#filterToggle').click();
   await page.locator('#customBasesRefresh').click();
   await expect(page.locator('#customBasesSyncStatus')).toContainText('1/3 object files mapped');
   await expect(page.locator('#customBasesSyncStatus')).toContainText('Loadouts excluded: 1');
