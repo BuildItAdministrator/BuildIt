@@ -466,3 +466,48 @@ test('loadouts and non-spawner JSON are excluded and reported, including oversiz
   expect(readCalls).toBe(2);
   expect(await page.evaluate(()=>baseMarkerLayer.getLayers().length)).toBe(1);
 });
+
+
+test('Custom Bases streams JSON bigger than 512KB without changing file editor or server', async ({page})=>{
+  const root='/games/ni5774718_3/ftproot';
+  const custom=root+'/dayzps_missions/dayzOffline.chernarusplus/custom';
+  const big=custom+'/veryLargeBase.json';
+  const objects=Array.from({length:2500},(_,i)=>({
+    name:'Land_Wall_'+('HeavyObject'.repeat(28)),pos:[4060+(i%100)*.15,201,10700+(i%70)*.12],ypr:[0,0,0]
+  }));
+  const raw=JSON.stringify({Objects:objects});
+  expect(raw.length).toBeGreaterThan(512*1024);
+  expect(raw.length).toBeLessThan(20*1024*1024);
+  const calls=[];
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**', async route=>{
+    const u=new URL(route.request().url()),method=route.request().method();
+    calls.push({path:u.pathname,method});
+    let status=200,contentType='application/json',body='';
+    if(u.pathname==='/api/files/list'){
+      const dir=u.searchParams.get('dir');
+      if(!dir){body=JSON.stringify({root:'/games/ni5774718_3/noftp',dir:'/games/ni5774718_3/noftp',entries:[]});}
+      else if(dir===custom){body=JSON.stringify({root:'/games/ni5774718_3/noftp',dir:custom,entries:[
+        {name:'veryLargeBase.json',type:'file',path:big,size:raw.length},
+        {name:'playerloadout.json',type:'file',path:custom+'/playerloadout.json',size:1800000}
+      ]});}
+      else{status=404;body=JSON.stringify({error:'Not found'});}
+    }else if(u.pathname==='/api/files/custom-content'&&u.searchParams.get('file')===big){
+      body=raw;
+    }else{status=404;body=JSON.stringify({error:'Not found'});}
+    await route.fulfill({status,contentType,body});
+  });
+  await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='fake_key');
+  await page.locator('#filterToggle').click();
+  await page.locator('#customBasesRefresh').click();
+  await expect(page.locator('#customBasesSyncStatus')).toContainText('1/1 object files mapped');
+  await expect(page.locator('#customBasesSyncStatus')).toContainText('Loadouts excluded: 1');
+  const state=await page.evaluate(()=>window.BUILD_IT_customBasesSync.summary());
+  expect(state.count).toBe(1);
+  expect(state.mappedFiles).toBe(1);
+  expect(state.failedFiles).toEqual([]);
+  expect(calls.filter(x=>x.path==='/api/files/custom-content')).toHaveLength(1);
+  expect(calls.filter(x=>x.path==='/api/files/read')).toHaveLength(0);
+  expect(calls.every(x=>x.method==='GET')).toBe(true);
+  expect(await page.evaluate(()=>baseMarkerLayer.getLayers().length)).toBe(1);
+});
