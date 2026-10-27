@@ -948,7 +948,7 @@ function nitradoHeaders(){
   return key?{'Authorization':`Bearer ${key}`}:{ };
 }
 
-async function nitradoRequest(path,{withServer=false,method='GET',body=null}={}){
+async function nitradoRequest(path,{withServer=false,method='GET',body=null,writeKey=false}={}){
   const base=normalizeWorkerUrl(nitradoWorkerUrl.value);
   if(!base) throw new Error('Enter the Cloudflare Worker URL first.');
 
@@ -960,6 +960,11 @@ async function nitradoRequest(path,{withServer=false,method='GET',body=null}={})
   }
 
   const headers=nitradoHeaders();
+  if(writeKey){
+    const writeKeyValue=document.getElementById('nitradoWriteKey')?.value.trim()||'';
+    if(writeKeyValue.length<24) throw new Error('Enter MAP_WRITE_KEY in Nitrado File Manager first.');
+    headers['X-Write-Key']=writeKeyValue;
+  }
   const options={
     method,
     headers,
@@ -1092,10 +1097,7 @@ async function testNitradoFileWriteAccess(){
 
   try{
     if(!nitradoServer.value) await loadNitradoServers({quiet:true});
-    if(nitradoWorkerMode==='legacy'){
-      throw new Error('Your current Worker is the original log-only version. Log sync works, but the file-write test requires the upgraded Worker.');
-    }
-    const data=await nitradoRequest('/api/file-write-test',{withServer:true,method:'POST'});
+    const data=await nitradoRequest('/api/file-write-test',{method:'POST',writeKey:true});
     const server=data?.serverName||data?.configuredName||nitradoServer.options[nitradoServer.selectedIndex]?.text||'server';
 
     if(data?.verified){
@@ -1654,6 +1656,7 @@ try {
 </script>
 <script src="./event-manager.js"></script>
 <script src="./ui-layout.js"></script>
+<script src="./file-manager.js"></script>
 <script>
 (function(){
   "use strict";
