@@ -39,6 +39,13 @@
     ':root{--bi-dock-right:10px;--bi-dock-width:230px;--bi-panel-top:210px}',
     '#filterPanel,#logPanel,#biPanel{width:calc(100vw - 20px)!important}',
     '}',
+    '/* Respect iPhone safe areas in standalone Home Screen mode. */',
+    ':root{--bi-panel-top:calc(213px + env(safe-area-inset-top, 0px))}',
+    '#placeSearchBox{top:calc(12px + env(safe-area-inset-top, 0px))!important}',
+    '#filterToggle{top:calc(63px + env(safe-area-inset-top, 0px))!important}',
+    '#logToggle{top:calc(109px + env(safe-area-inset-top, 0px))!important}',
+    '#biToggle{top:calc(155px + env(safe-area-inset-top, 0px))!important}',
+    '@media(max-width:600px){:root{--bi-panel-top:calc(210px + env(safe-area-inset-top, 0px))}}',
     '@media(max-height:320px){',
     '#filterPanel,#logPanel,#biPanel{max-height:95px!important}',
     '}'
