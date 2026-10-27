@@ -544,3 +544,98 @@ test('file-write test shows exact missing/short-key reason and puts key next to 
   const before=await page.evaluate(()=>sessionStorage.getItem('nitradoWriteKey'));
   expect(before).toBeNull();
 });
+
+
+test('Event Manager loads live vehicle XML and previews coordinated changes without writing',async({page})=>{
+  const noftp='/games/ni5774718_3/noftp';
+  const mission='/games/ni5774718_3/ftproot/dayzps_missions/dayzOffline.chernarusplus';
+  const events=mission+'/db/events.xml';
+  const positions=mission+'/cfgeventspawns.xml';
+  const eventXML='<?xml version="1.0"?><events><event name="VehicleVanilla"><children><child type="OffroadHatchback" min="1" max="1"/></children></event></events>';
+  const positionXML='<?xml version="1.0"?><eventposdef><event name="VehicleVanilla"><pos x="1100" z="5000" a="90"/></event></eventposdef>';
+  let calls=[],updates=[];
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const u=new URL(route.request().url()),method=route.request().method();
+    calls.push({route:u.pathname,method});
+    let status=200,result={ok:true};
+    if(u.pathname==='/api/files/list'){
+      const dir=u.searchParams.get('dir');
+      if(!dir)result={root:noftp,dir:noftp,entries:[]};
+      else if(dir===mission)result={root:noftp,dir:mission,entries:[{name:'db',type:'directory',path:mission+'/db'}]};
+      else{status=404;result={error:'Directory unavailable'}}
+    }else if(u.pathname==='/api/files/read'){
+      const p=u.searchParams.get('file');
+      if(p===events||p===positions)result={path:p,content:p===events?eventXML:positionXML,sha256:'a'.repeat(64)};
+      else{status=404;result={error:'Missing'}}
+    }else if(u.pathname==='/api/files/write'){
+      updates.push(route.request().postDataJSON());result={verified:true,backupPath:events+'.bak'};
+    }else{status=404;result={error:'Not configured'}}
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(result)});
+  });
+  await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='fake_key');
+  await page.locator('#biToggle').click();
+  await page.locator('#biLoadServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('Live XML loaded');
+  await page.locator('#biName').fill('VehicleBuildItTest');
+  await page.locator('#biVehicleSearch').fill('OffroadHatchback');
+  await page.locator('#biPick').click();
+  await page.evaluate(()=>map.fire('click',{latlng:L.latLng(8000/SCALE-256,4000/SCALE)}));
+  await page.locator('#biSave').click();
+  await expect(page.locator('#biDrafts')).toContainText('VehicleBuildItTest');
+  await page.locator('#biPreviewServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('READY FOR REVIEW');
+  await expect(page.locator('#biServerPreview')).toContainText('VehicleBuildItTest');
+  await expect(page.locator('#biServerPreview')).toContainText('db/events.xml');
+  await expect(page.locator('#biServerPreview')).toContainText('cfgeventspawns.xml');
+  expect(updates).toHaveLength(0);
+  expect(calls.every(c=>c.method==='GET')).toBe(true);
+  await expect(page.locator('#biUploadServer')).toBeEnabled();
+  await page.locator('#biUploadServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('Stop your DayZ server');
+  expect(updates).toHaveLength(0);
+});
+
+test('Event Manager Nitrado deploy stops with clear error if upload permission is denied',async({page})=>{
+  const noftp='/games/ni5774718_3/noftp';
+  const mission='/games/ni5774718_3/ftproot/dayzps_missions/dayzOffline.chernarusplus';
+  const epath=mission+'/db/events.xml',ppath=mission+'/cfgeventspawns.xml';
+  let attempts=0;
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const u=new URL(route.request().url());
+    const dir=u.searchParams.get('dir');
+    const p=u.searchParams.get('file');
+    let status=200,result={ok:true};
+    if(u.pathname==='/api/files/list'&&!dir)result={root:noftp,dir:noftp,entries:[]};
+    else if(u.pathname==='/api/files/list'&&dir===mission)
+      result={root:noftp,dir:mission,entries:[{name:'db',type:'directory',path:mission+'/db'}]};
+    else if(u.pathname==='/api/files/read'&&(p===epath||p===ppath))
+      result={path:p,content:p===epath?
+        '<events><event name="VehicleVanilla"><children><child type="OffroadHatchback"/></children></event></events>':
+        '<eventposdef><event name="VehicleVanilla"><pos x="2" z="3" a="0"/></event></eventposdef>',
+        sha256:'b'.repeat(64)};
+    else if(u.pathname==='/api/files/write'){
+      attempts++;status=502;result={error:'Nitrado POST returned HTTP 500: Permission denied'};
+    }else{status=404;result={error:'Not found'}}
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(result)});
+  });
+  await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='fake_key');
+  await page.locator('#biToggle').click();
+  await page.locator('#biLoadServer').click();
+  await expect(page.locator('#biPreviewServer')).toBeEnabled();
+  await page.locator('#biName').fill('VehiclePermissionTest');
+  await page.locator('#biVehicleSearch').fill('OffroadHatchback');
+  await page.locator('#biPick').click();
+  await page.evaluate(()=>map.fire('click',{latlng:L.latLng(9000/SCALE-256,5000/SCALE)}));
+  await page.locator('#biSave').click();
+  await page.locator('#biPreviewServer').click();
+  await page.locator('#biServerStopped').check();
+  await page.locator('#nitradoWriteKey').fill('fake-write-key-12-characters');
+  page.on('dialog',dialog=>dialog.accept());
+  await page.locator('#biUploadServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('Permission denied');
+  await expect(page.locator('#biServerPreview')).toContainText('No file upload was verified');
+  expect(attempts).toBe(1);
+  await expect(page.locator('#biUploadServer')).toBeDisabled();
+});
