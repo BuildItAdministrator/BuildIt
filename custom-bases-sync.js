@@ -69,10 +69,16 @@
   async function readObjectSpawnerFile(item){
     const query='?file='+encodeURIComponent(item.path);
     if(item.size>0 && item.size<=MAX_EDITOR_READ_BYTES){
-      const response=await nitradoRequest('/api/files/read'+query);
-      if(response?.path!==item.path||typeof response.content!=='string')
-        throw new Error('Invalid file response');
-      return response.content;
+      try{
+        const response=await nitradoRequest('/api/files/read'+query);
+        if(response?.path!==item.path||typeof response.content!=='string')
+          throw new Error('Invalid file response');
+        return response.content;
+      }catch(error){
+        // Nitrado may advertise a stale or incorrect size. Retry by streaming
+        // only if the old endpoint rejected the file for being too large.
+        if(!/512\\s*KB|too large|exceed|413/i.test(String(error.message||error)))throw error;
+      }
     }
     const base=normalizeWorkerUrl(document.getElementById('nitradoWorkerUrl').value);
     if(!base)throw new Error('Missing Nitrado Worker URL');
