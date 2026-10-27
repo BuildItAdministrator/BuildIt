@@ -511,3 +511,36 @@ test('Custom Bases streams JSON bigger than 512KB without changing file editor o
   expect(calls.every(x=>x.method==='GET')).toBe(true);
   expect(await page.evaluate(()=>baseMarkerLayer.getLayers().length)).toBe(1);
 });
+
+
+test('file-write test shows exact missing/short-key reason and puts key next to test', async ({page})=>{
+  await page.locator('#logToggle').click();
+  const key=page.locator('#nitradoWriteKey');
+  const count=page.locator('#nitradoWriteKeyLength');
+  const test=page.locator('#nitradoFileWriteTest');
+  await expect(key).toBeVisible();
+  await expect(count).toContainText('Minimum 24 characters');
+  const keyBox=await key.boundingBox();
+  const buttonBox=await test.boundingBox();
+  expect(keyBox.y+keyBox.height).toBeLessThan(buttonBox.y);
+  const noKey=await page.evaluate(async()=>{
+    try{await nitradoRequest('/api/file-write-test',{method:'POST',writeKey:true});return 'unexpected success'}
+    catch(error){return error.message}
+  });
+  expect(noKey).toContain('MAP_WRITE_KEY is empty');
+  await key.fill('too-short-key');
+  await expect(count).toContainText('13/24 characters');
+  const shortKey=await page.evaluate(async()=>{
+    try{await nitradoRequest('/api/file-write-test',{method:'POST',writeKey:true});return 'unexpected success'}
+    catch(error){return error.message}
+  });
+  expect(shortKey).toContain('MAP_WRITE_KEY is too short (13/24 characters)');
+  const good='test-only-cloudflare-map-write-key-32-characters';
+  await key.fill(good);
+  await expect(count).toContainText('Length OK');
+  await expect(count).toContainText('Cloudflare match not yet tested');
+  expect(await key.getAttribute('type')).toBe('password');
+  expect(await page.evaluate(()=>localStorage.getItem('nitradoWriteKey'))).toBeNull();
+  const before=await page.evaluate(()=>sessionStorage.getItem('nitradoWriteKey'));
+  expect(before).toBeNull();
+});

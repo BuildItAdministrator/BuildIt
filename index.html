@@ -986,8 +986,14 @@ async function nitradoRequest(path,{withServer=false,method='GET',body=null,writ
 
   const headers=nitradoHeaders();
   if(writeKey){
-    const writeKeyValue=document.getElementById('nitradoWriteKey')?.value.trim()||'';
-    if(writeKeyValue.length<24) throw new Error('Enter MAP_WRITE_KEY in Nitrado File Manager first.');
+    const field=document.getElementById('nitradoWriteKey');
+    if(!field) throw new Error('The MAP_WRITE_KEY input is unavailable. Reload Build It!++ and retry.');
+    const writeKeyValue=field.value.trim();
+    if(writeKeyValue.length<24){
+      field.focus();
+      if(!writeKeyValue) throw new Error('MAP_WRITE_KEY is empty. Enter your Cloudflare MAP_WRITE_KEY in the field directly above Test File Write.');
+      throw new Error('MAP_WRITE_KEY is too short ('+writeKeyValue.length+'/24 characters). Set a new secret of at least 24 characters in Cloudflare, then enter the identical value here.');
+    }
     headers['X-Write-Key']=writeKeyValue;
   }
   const options={
