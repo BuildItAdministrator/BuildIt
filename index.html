@@ -292,6 +292,11 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
     <div class="log-auto-grid">
       <input id="nitradoWorkerUrl" type="url" placeholder="Cloudflare Worker URL">
       <input id="nitradoAccessKey" type="password" placeholder="Map access key">
+      <div class="log-auto-row">
+        <button id="nitradoKeyReveal" class="log-btn" type="button">Show saved key</button>
+        <button id="nitradoKeyCopy" class="log-btn" type="button">Copy saved key</button>
+      </div>
+      <div id="nitradoKeyRecoveryStatus" class="log-auto-status" role="status" aria-live="polite">Only reads this browser's saved key. Never sends it to GitHub.</div>
       <select id="nitradoServer" disabled>
         <option value="">Server - test connection first</option>
       </select>
@@ -1679,5 +1684,57 @@ async function loadDZMapFallback(){
 })();
 </script>
 <script src="./event-manager.js"></script>
+<script>
+(function(){
+  "use strict";
+  const keyInput = document.getElementById("nitradoAccessKey");
+  const reveal = document.getElementById("nitradoKeyReveal");
+  const copy = document.getElementById("nitradoKeyCopy");
+  const message = document.getElementById("nitradoKeyRecoveryStatus");
+  if (!keyInput || !reveal || !copy || !message) return;
+
+  function getSavedKey(){
+    // This reads local browser storage only; no key is sent to the website or logs.
+    const current = keyInput.value.trim();
+    if (current) return current;
+    try {
+      const config = JSON.parse(localStorage.getItem("buildit_nitrado_sync_v1") || "{}");
+      return typeof config.accessKey === "string" ? config.accessKey.trim() : "";
+    } catch (_) { return ""; }
+  }
+  function missingKey(){
+    message.textContent = "No saved access key in this browser. Open the map in the browser where Nitrado Sync was previously set up, or rotate the key in your Cloudflare Worker.";
+  }
+  reveal.addEventListener("click", function(){
+    if (keyInput.type === "text"){
+      keyInput.type = "password";
+      reveal.textContent = "Show saved key";
+      message.textContent = "Key hidden.";
+      return;
+    }
+    const key = getSavedKey();
+    if (!key) return missingKey();
+    keyInput.value = key;
+    keyInput.type = "text";
+    reveal.textContent = "Hide saved key";
+    message.textContent = "Key visible on this device only. Keep it private.";
+  });
+  copy.addEventListener("click", async function(){
+    const key = getSavedKey();
+    if (!key) return missingKey();
+    try {
+      await navigator.clipboard.writeText(key);
+      message.textContent = "Access key copied to your clipboard.";
+    } catch (_) {
+      keyInput.value = key;
+      keyInput.type = "text";
+      reveal.textContent = "Hide saved key";
+      keyInput.focus();
+      keyInput.select();
+      message.textContent = "Automatic copying was blocked. Press Ctrl+C to copy the selected key, then hide it.";
+    }
+  });
+})();
+</script>
 </body>
 </html>
