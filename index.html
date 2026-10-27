@@ -989,10 +989,10 @@ async function nitradoRequest(path,{withServer=false,method='GET',body=null,writ
     const field=document.getElementById('nitradoWriteKey');
     if(!field) throw new Error('The MAP_WRITE_KEY input is unavailable. Reload Build It!++ and retry.');
     const writeKeyValue=field.value.trim();
-    if(writeKeyValue.length<24){
+    if(writeKeyValue.length<8){
       field.focus();
       if(!writeKeyValue) throw new Error('MAP_WRITE_KEY is empty. Enter your Cloudflare MAP_WRITE_KEY in the field directly above Test File Write.');
-      throw new Error('MAP_WRITE_KEY is too short ('+writeKeyValue.length+'/24 characters). Set a new secret of at least 24 characters in Cloudflare, then enter the identical value here.');
+      throw new Error('MAP_WRITE_KEY is too short ('+writeKeyValue.length+'/8 characters). Use a unique random key of at least 8 characters in Cloudflare, then enter the identical value here.');
     }
     headers['X-Write-Key']=writeKeyValue;
   }

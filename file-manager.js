@@ -47,17 +47,17 @@
     if(keyHelp)keySlot.appendChild(keyHelp);
     keySlot.appendChild(keyCount);
     testBlock.querySelector('#nitradoFileWriteTest')?.before(keySlot);
-    keyInput.setAttribute('minlength','24');
+    keyInput.setAttribute('minlength','8');
     keyInput.setAttribute('spellcheck','false');
     keyInput.setAttribute('autocapitalize','off');
     const updateKeyCount=()=>{
       const length=keyInput.value.trim().length;
-      keyCount.textContent=length>=24
+      keyCount.textContent=length>=8
         ? 'Length OK ('+length+' characters). Cloudflare match not yet tested.'
         : length===0
-          ? 'No MAP_WRITE_KEY entered. Minimum 24 characters.'
-          : 'MAP_WRITE_KEY too short: '+length+'/24 characters.';
-      keyCount.dataset.valid=String(length>=24);
+          ? 'No MAP_WRITE_KEY entered. Minimum 8 characters.'
+          : 'MAP_WRITE_KEY too short: '+length+'/8 characters.';
+      keyCount.dataset.valid=String(length>=8);
     };
     keyInput.addEventListener('input',updateKeyCount);
     updateKeyCount();
@@ -249,7 +249,7 @@
   $('fmSave').addEventListener('click',()=>perform(async()=>{
     if(!selected||!sourceDigest)throw new Error('Open a server file first.');
     const key=$('nitradoWriteKey').value.trim();
-    if(key.length<24)throw new Error('Enter the separate MAP_WRITE_KEY (at least 24 characters).');
+    if(key.length<8)throw new Error('Enter the separate MAP_WRITE_KEY (at least 8 characters).');
     validateText(selected,editor.value);
     if(!window.confirm('Overwrite '+selected.split('/').pop()+' on your LIVE DayZ server?\n\nA backup must be created and verified before the upload proceeds. Continue?')){
       state('Upload cancelled.');return;
