@@ -449,6 +449,7 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
 <div id="status">Loading Chernarus location names…</div>
 <div id="coords">X: ---- &nbsp;&nbsp; Z: ----</div>
 
+<script src="./locations-fallback.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 
@@ -1595,95 +1596,109 @@ function addLabel(x,z,names,type){
  return true;
 }
 
-// RAW XAM FIRST:
-// unlike the normalized DZMap GeoJSON, XAM's location records contain
-// the complete "s" names array, so we can use Cyrillic + Latin together.
-async function loadRawXAM(){
- const url='https://static.xam.nu/dayz/json/chernarusplus/1.28-2.json';
- const r=await fetch(url,{cache:'no-cache'});
- if(!r.ok) throw new Error(`XAM HTTP ${r.status}`);
-
- const d=await r.json();
- const locs=d?.markers?.locations;
- if(!Array.isArray(locs)) throw new Error('No XAM locations array');
-
- let n=0;
- for(const l of locs){
-   if(!Array.isArray(l.p)||l.p.length<2) continue;
-
-   const xamY=Number(l.p[0]);
-   const xamX=Number(l.p[1]);
-   const x=(xamX*MAP_SIZE)/256;
-   const z=((256+xamY)*MAP_SIZE)/256;
-
-   if(addLabel(x,z,l.s||[],l.w||'location')) n++;
- }
- return n;
+// Place names load from the same GitHub Pages host first.
+// Public third-party data is an optional upgrade, not a requirement.
+function applyLocationRecords(records,source){
+  if(!Array.isArray(records)||!records.length) return 0;
+  const valid=records.filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.z)&&
+    p.x>=0&&p.x<=MAP_SIZE&&p.z>=0&&p.z<=MAP_SIZE&&
+    Array.isArray(p.names)&&p.names.some(n=>typeof n==='string'&&n.trim()));
+  if(!valid.length) return 0;
+  labels.clearLayers();
+  placeSearchIndex.length=0;
+  let count=0;
+  for(const p of valid) if(addLabel(p.x,p.z,p.names,p.type||'location')) count++;
+  placeSearchInput.disabled=false;
+  placeSearchInput.placeholder='Search places…';
+  status.style.background='rgba(15,15,15,.90)';
+  status.textContent=count+' locations loaded · '+source;
+  if(!filterPlaceNames.checked && map.hasLayer(labels)) map.removeLayer(labels);
+  if(filterPlaceNames.checked && !map.hasLayer(labels)) labels.addTo(map);
+  return count;
 }
 
-// Fallback through DZMap if a browser blocks direct XAM JSON.
-// DZMap currently keeps only one XAM name; namePair() reconstructs
-// the missing second script so there are still always two lines.
+const PLACE_REQUEST_TIMEOUT=7000;
+async function loadRemotePlaces(url,parse){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),PLACE_REQUEST_TIMEOUT);
+  try{
+    const response=await fetch(url,{cache:'no-cache',signal:controller.signal});
+    if(!response.ok) throw new Error('HTTP '+response.status);
+    return parse(await response.json());
+  }finally{
+    clearTimeout(timeout);
+  }
+}
+
+async function loadRawXAMPlaces(){
+  return loadRemotePlaces(
+    'https://static.xam.nu/dayz/json/chernarusplus/1.28-2.json',
+    data=>{
+      const locations=data?.markers?.locations;
+      if(!Array.isArray(locations)) throw new Error('Missing XAM place records');
+      return locations.filter(l=>Array.isArray(l.p)&&l.p.length>=2).map(l=>{
+        const xamY=Number(l.p[0]),xamX=Number(l.p[1]);
+        return {x:(xamX*MAP_SIZE)/256,z:((256+xamY)*MAP_SIZE)/256,names:l.s||[],type:l.w||'location'};
+      });
+    }
+  );
+}
+
 function metricZToGame(lon,lat){
- const x=((lon+180)/360)*MAP_SIZE;
- const latRad=lat*Math.PI/180;
- const mercatorY=Math.log(Math.tan(Math.PI/4+latRad/2));
- const z=((mercatorY+Math.PI)/(2*Math.PI))*MAP_SIZE;
- return {x,z};
+  const x=((lon+180)/360)*MAP_SIZE;
+  const latRad=lat*Math.PI/180;
+  const mercatorY=Math.log(Math.tan(Math.PI/4+latRad/2));
+  const z=((mercatorY+Math.PI)/(2*Math.PI))*MAP_SIZE;
+  return {x,z};
 }
 
-async function loadDZMapFallback(){
- const url='https://dzmap.woozymasta.ru/maps/chernarusplus/locations.geojson';
- const r=await fetch(url,{cache:'no-cache'});
- if(!r.ok) throw new Error(`DZMap HTTP ${r.status}`);
-
- const gj=await r.json();
- if(!Array.isArray(gj.features)) throw new Error('No GeoJSON features');
-
- let n=0;
- for(const f of gj.features){
-   if(f?.geometry?.type!=='Point') continue;
-   const [lon,lat]=f.geometry.coordinates||[];
-   const p=metricZToGame(Number(lon),Number(lat));
-   const name=f?.properties?.name||'';
-   const type=f?.properties?.type||'location';
-
-   if(addLabel(p.x,p.z,[name],type)) n++;
- }
- return n;
+async function loadDZMapPlaces(){
+  return loadRemotePlaces(
+    'https://dzmap.woozymasta.ru/maps/chernarusplus/locations.geojson',
+    data=>{
+      if(!Array.isArray(data?.features)) throw new Error('Missing GeoJSON features');
+      return data.features.filter(f=>f?.geometry?.type==='Point').map(f=>{
+        const [lon,lat]=f.geometry.coordinates||[];
+        const pos=metricZToGame(Number(lon),Number(lat));
+        return {x:pos.x,z:pos.z,names:[f?.properties?.name||''],type:f?.properties?.type||'location'};
+      });
+    }
+  );
 }
 
 (async()=>{
- labels.clearLayers();
- placeSearchIndex.length=0;
-
- try{
-   const count=await loadRawXAM();
-   status.textContent=`${count} locations loaded · Cyrillic + Latin · XAM`;
-   placeSearchInput.disabled=false;
-   placeSearchInput.placeholder='Search place…';
-   setTimeout(()=>status.style.display='none',3000);
-   return;
- }catch(e){
-   console.warn('Direct XAM location data blocked, using fallback:',e);
- }
-
- try{
-   labels.clearLayers();
-   placeSearchIndex.length=0;
-   const count=await loadDZMapFallback();
-   status.textContent=`${count} locations loaded · Cyrillic + Latin · fallback`;
-   placeSearchInput.disabled=false;
-   placeSearchInput.placeholder='Search place…';
-   setTimeout(()=>status.style.display='none',3000);
- }catch(e){
-   console.error(e);
-   status.textContent='Location names could not be loaded.';
-   placeSearchInput.disabled=true;
-   placeSearchInput.placeholder='Place search unavailable';
-   status.style.background='rgba(100,20,20,.92)';
- }
+  const offline=Array.isArray(window.BUILD_IT_OFFLINE_PLACES)?window.BUILD_IT_OFFLINE_PLACES:[];
+  let loaded=applyLocationRecords(offline,'local backup');
+  if(!loaded){
+    status.textContent='Loading place names…';
+    placeSearchInput.disabled=true;
+  }
+  try{
+    // Prefer the complete Cyrillic/Latin XAM database if accessible.
+    let remote;
+    try { remote=await loadRawXAMPlaces(); }
+    catch(firstError){
+      console.warn('XAM location source unavailable:',firstError);
+      remote=await loadDZMapPlaces();
+    }
+    if(Array.isArray(remote)&&remote.length>loaded){
+      const upgraded=applyLocationRecords(remote,'online map');
+      if(upgraded) loaded=upgraded;
+    }
+  }catch(error){
+    console.warn('External location sources unavailable; retaining local backup:',error);
+  }
+  if(loaded){
+    status.textContent=loaded+' locations loaded · '+(loaded===offline.length?'local backup':'online map');
+  }else{
+    status.textContent='Place names unavailable. Try reloading the map.';
+    status.style.background='rgba(100,20,20,.92)';
+    placeSearchInput.disabled=true;
+    placeSearchInput.placeholder='Place search unavailable';
+  }
+  if(loaded) setTimeout(()=>status.style.display='none',3800);
 })();
+
 </script>
 <script src="./event-manager.js"></script>
 <script src="./ui-layout.js"></script>
