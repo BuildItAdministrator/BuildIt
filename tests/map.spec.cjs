@@ -170,3 +170,74 @@ test('theme button fits upper right without covering place search on mobile', as
   const result=await page.locator('#placeSearchResults').boundingBox();
   expect(result.x+result.width).toBeLessThanOrEqual(button.x);
 });
+
+
+test('Chernarus base map switches Satellite and Topographic without moving coordinates or markers', async ({page})=>{
+  // Exercise real Leaflet tile switching without depending on a third-party CDN
+  // being reachable from the CI runner.
+  await page.route('**/topographic/**',route=>route.fulfill({
+    status:200,
+    contentType:'image/gif',
+    body:Buffer.from('R0lGODlhAQABAAD/ACwAAAAAAQABAAACAUwAOw==','base64')
+  }));
+  const button=page.locator('#builditMapStyleToggle');
+  await expect(button).toBeVisible();
+  await expect(button).toHaveText(/Satellite/);
+  await expect(button).toHaveAccessibleName(/Switch to Topographic/);
+  const before=await page.evaluate(()=>({
+    center:{lat:map.getCenter().lat,lng:map.getCenter().lng},zoom:map.getZoom(),
+    markers:placeSearchIndex.length,labels:map.hasLayer(labels),
+    bases:map.hasLayer(baseMarkerLayer),positions:placeSearchIndex.map(p=>[p.lat,p.x,p.z]),
+    tiles:MAP_STYLES.satellite._url
+  }));
+  expect(before.tiles).toContain('/satellite/');
+  await button.click();
+  await expect(button).toHaveText(/Topographic/);
+  await expect(button).toHaveAccessibleName(/Switch to Satellite/);
+  await expect(button).toHaveAttribute('aria-pressed','true');
+  const after=await page.evaluate(()=>({
+    active:currentMapStyle,
+    satelliteVisible:map.hasLayer(MAP_STYLES.satellite),
+    topoVisible:map.hasLayer(MAP_STYLES.topographic),
+    center:{lat:map.getCenter().lat,lng:map.getCenter().lng},zoom:map.getZoom(),
+    markers:placeSearchIndex.length,labels:map.hasLayer(labels),
+    bases:map.hasLayer(baseMarkerLayer),positions:placeSearchIndex.map(p=>[p.lat,p.x,p.z]),
+    tiles:MAP_STYLES.topographic._url,
+    storage:localStorage.getItem('buildit_map_style_v1')
+  }));
+  expect(after.active).toBe('topographic');
+  expect(after.storage).toBe('topographic');
+  expect(after.tiles).toContain('/topographic/');
+  expect(after.satelliteVisible).toBe(false);
+  expect(after.topoVisible).toBe(true);
+  expect(after.center).toEqual(before.center);
+  expect(after.zoom).toBe(before.zoom);
+  expect(after.markers).toBe(201);
+  expect(after.labels).toBe(before.labels);
+  expect(after.bases).toBe(before.bases);
+  expect(after.positions).toEqual(before.positions);
+  await page.reload({waitUntil:'domcontentloaded'});
+  await expect(page.locator('#builditMapStyleToggle')).toHaveText(/Topographic/);
+  expect(await page.evaluate(()=>map.hasLayer(MAP_STYLES.topographic))).toBe(true);
+  await page.locator('#builditMapStyleToggle').click();
+  await expect(page.locator('#builditMapStyleToggle')).toHaveText(/Satellite/);
+  expect(await page.evaluate(()=>localStorage.getItem('buildit_map_style_v1'))).toBe('satellite');
+});
+
+test('map-style control stays left below zoom and clear of right-hand search and menus',async ({page})=>{
+  const button=page.locator('#builditMapStyleToggle');
+  const bb=await button.boundingBox();
+  const zoom=await page.locator('.leaflet-control-zoom').boundingBox();
+  const input=await page.locator('#placeSearchInput').boundingBox();
+  const search=await page.locator('#placeSearchBox').boundingBox();
+  expect(bb).toBeTruthy();
+  expect(bb.width).toBeLessThanOrEqual(121);
+  expect(bb.y).toBeGreaterThanOrEqual(zoom.y+zoom.height);
+  expect(bb.x+bb.width).toBeLessThan(search.x);
+  expect(bb.y).toBeGreaterThanOrEqual(0);
+  await page.locator('#builditThemeToggle').click();
+  await expect(button).toHaveCSS('color','rgb(29, 52, 71)');
+  await page.locator('#placeSearchInput').fill('Berezino');
+  await expect(page.locator('#placeSearchResults')).toBeVisible();
+  await expect(button).toBeVisible();
+});
