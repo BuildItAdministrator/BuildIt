@@ -31,9 +31,50 @@
     '<div id="fmStatus" class="log-auto-status" role="status" aria-live="polite">Browse your server files after the Cloudflare Worker upgrade is deployed.</div>'
   ].join('');
   testBlock.insertAdjacentElement('afterend',panel);
+  // Put the actual write-key input NEXT TO the write-test button rather than
+  // below it in File Manager. It remains the same input used by file uploads.
+  const keySlot=document.createElement('div');
+  keySlot.id='fileWriteKeySlot';
+  const keyLabel=panel.querySelector('label[for="nitradoWriteKey"]');
+  const keyInput=panel.querySelector('#nitradoWriteKey');
+  const keyHelp=keyInput?.nextElementSibling;
+  const keyCount=document.createElement('div');
+  keyCount.id='nitradoWriteKeyLength';
+  keyCount.setAttribute('role','status');
+  keyCount.setAttribute('aria-live','polite');
+  if(keyLabel&&keyInput){
+    keySlot.append(keyLabel,keyInput);
+    if(keyHelp)keySlot.appendChild(keyHelp);
+    keySlot.appendChild(keyCount);
+    testBlock.querySelector('#nitradoFileWriteTest')?.before(keySlot);
+    keyInput.setAttribute('minlength','24');
+    keyInput.setAttribute('spellcheck','false');
+    keyInput.setAttribute('autocapitalize','off');
+    const updateKeyCount=()=>{
+      const length=keyInput.value.trim().length;
+      keyCount.textContent=length>=24
+        ? 'Length OK ('+length+' characters). Cloudflare match not yet tested.'
+        : length===0
+          ? 'No MAP_WRITE_KEY entered. Minimum 24 characters.'
+          : 'MAP_WRITE_KEY too short: '+length+'/24 characters.';
+      keyCount.dataset.valid=String(length>=24);
+    };
+    keyInput.addEventListener('input',updateKeyCount);
+    updateKeyCount();
+  }
   const style=document.createElement('style');
   style.textContent=[
-    '#fileManager{padding:12px;border:1px solid rgba(255,255,255,.14);border-radius:8px;margin:12px 0;background:rgba(16,30,35,.65);color:#eee;font-size:12px}',
+    '#fileWriteKeySlot{margin:10px 0 2px;display:block}',
+    '#fileWriteKeySlot .fm-label{display:block;font-weight:700;margin:0 0 5px}',
+    '#fileWriteKeySlot .fm-note{font-size:11px;line-height:1.45;color:#b9c7cc;margin:5px 0}',
+    '#fileWriteKeySlot #nitradoWriteKey{box-sizing:border-box;width:100%;border:1px solid #50616a;background:#101a20;color:#fff;border-radius:6px;padding:9px;font:inherit}',
+    '#nitradoWriteKeyLength{font-size:11px;line-height:1.4;padding:5px 0;color:#dda1a1}',
+    '#nitradoWriteKeyLength[data-valid="true"]{color:#9ddcad}',
+    'html[data-buildit-theme="light"] #fileWriteKeySlot #nitradoWriteKey{background:#fff;color:#1b3345;border-color:#aebfce}',
+    'html[data-buildit-theme="light"] #fileWriteKeySlot .fm-note{color:#526778}',
+    'html[data-buildit-theme="light"] #nitradoWriteKeyLength{color:#a22c32}',
+    'html[data-buildit-theme="light"] #nitradoWriteKeyLength[data-valid="true"]{color:#176636}',
+        '#fileManager{padding:12px;border:1px solid rgba(255,255,255,.14);border-radius:8px;margin:12px 0;background:rgba(16,30,35,.65);color:#eee;font-size:12px}',
     '#fileManager .fm-note{font-size:11px;line-height:1.5;color:#b9c7cc;margin:8px 0}',
     '#fileManager .fm-label{display:block;font-weight:700;margin:10px 0 5px}',
     '#fileManager input[type=password],#fileManager textarea,#fileManager input[type=file]{box-sizing:border-box;width:100%;border:1px solid #50616a;background:#101a20;color:#fff;border-radius:6px;padding:9px;font:inherit}',
