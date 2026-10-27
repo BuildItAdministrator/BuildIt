@@ -332,3 +332,137 @@ test('Mission finder fails safely without attempting writes if mission directori
   await expect(page.locator('#fmStatus')).toContainText('No files were changed');
   expect(posts).toBe(0);
 });
+
+
+test('live Custom Bases loads every valid spawner JSON from mission/custom but never loadouts',async ({page})=>{
+  const base='/games/ni5774718_3';
+  const mission=base+'/ftproot/dayzps_missions/dayzOffline.chernarusplus';
+  const custom=mission+'/custom';
+  const calls=[];
+  const listings={
+    [custom]:[
+      {name:'baseSander.json',type:'file',path:custom+'/baseSander.json',size:1200},
+      {name:'BASE_OTHER.json',type:'file',path:custom+'/BASE_OTHER.json',size:2200},
+      {name:'playerloadout.json',type:'file',path:custom+'/playerloadout.json',size:1200},
+      {name:'extras',type:'directory',path:custom+'/extras'},
+      {name:'notes.txt',type:'file',path:custom+'/notes.txt',size:20}
+    ],
+    [custom+'/extras']:[
+      {name:'myOtherPoi.json',type:'file',path:custom+'/extras/myOtherPoi.json',size:1100},
+      {name:'SpawnGear.json',type:'file',path:custom+'/extras/SpawnGear.json',size:700}
+    ]
+  };
+  const samples={
+    [custom+'/baseSander.json']:{Objects:[
+      {name:'Land_Cabin',pos:[3960.0,245.0,11050.0],ypr:[0,0,0]},
+      {name:'Land_Wall',pos:[3961.0,250.0,11052.0],ypr:[0,0,0]},
+      {name:'Land_Fence',pos:[3960.5,255.0,11048.5],ypr:[0,0,0]}
+    ]},
+    [custom+'/BASE_OTHER.json']:{Objects:[
+      {name:'Land_House',pos:[6000,100,7000]},
+      {name:'Land_House',pos:[6001,200,7001]},
+      {name:'Land_Bridge',pos:[11000,5,12000]}
+    ]},
+    [custom+'/extras/myOtherPoi.json']:{Objects:[
+      {name:'Land_House',pos:[5000,8,5000]}
+    ]}
+  };
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const u=new URL(route.request().url());
+    calls.push({path:u.pathname,query:u.searchParams.get('file')||u.searchParams.get('dir'),method:route.request().method()});
+    let response,status=200;
+    if(u.pathname==='/api/files/list'){
+      const dir=u.searchParams.get('dir');
+      if(!dir) response={root:base+'/noftp',dir:base+'/noftp',entries:[]};
+      else if(Object.hasOwn(listings,dir))response={root:base+'/noftp',dir,entries:listings[dir]};
+      else{status=404;response={error:'not found'}}
+    }else if(u.pathname==='/api/files/read'){
+      const file=u.searchParams.get('file');
+      if(!Object.hasOwn(samples,file)){status=404;response={error:'not found'}}
+      else response={ok:true,path:file,content:JSON.stringify(samples[file])};
+    }else{status=404;response={error:'not found'}}
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(response)});
+  });
+  await page.locator('#nitradoWorkerUrl').evaluate((el)=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate((el)=>el.value='fake_reader_token_for_tests');
+  await page.locator('#filterToggle').click();
+  await page.locator('#customBasesRefresh').click();
+  await expect(page.locator('#customBasesSyncStatus')).toContainText('3/3 object files mapped');
+  const summary=await page.evaluate(()=>window.BUILD_IT_customBasesSync.summary());
+  expect(summary.mappedFiles).toBe(3);
+  expect(summary.count).toBe(4); // other JSON has two far-away object groups
+  expect(summary.failedFiles).toHaveLength(0);
+  expect(calls.filter(x=>x.path==='/api/files/read')).toHaveLength(3);
+  expect(calls.every(x=>x.method==='GET')).toBe(true);
+  expect(calls.some(x=>String(x.query).toLowerCase().includes('loadout')&&x.path==='/api/files/read')).toBe(false);
+  expect(calls.some(x=>String(x.query).toLowerCase().includes('spawngear')&&x.path==='/api/files/read')).toBe(false);
+  // Replaced legacy previews, not added duplicate markers
+  expect(await page.evaluate(()=>baseMarkerLayer.getLayers().length)).toBe(4);
+  expect(await page.evaluate(()=>basePolygonLayer.getLayers().length)).toBe(1);
+  await page.locator('#filterCustomBases').check();
+  await expect.poll(()=>page.evaluate(()=>map.hasLayer(baseMarkerLayer))).toBe(true);
+  const markers=await page.evaluate(()=>baseMarkerLayer.getLayers().map(l=>{
+    const p=leafletToGame(l.getLatLng());return [p.x,p.z];
+  }));
+  expect(markers.some(([x,z])=>Math.abs(x-3960.5)<1&&Math.abs(z-11050)<2)).toBe(true);
+  expect(markers.some(([x,z])=>Math.abs(x-6000.5)<2&&Math.abs(z-7000.5)<2)).toBe(true);
+  expect(markers.some(([x,z])=>Math.abs(x-11000)<1&&Math.abs(z-12000)<1)).toBe(true);
+  await page.locator('#filterCustomBases').uncheck();
+  expect(await page.evaluate(()=>map.hasLayer(baseMarkerLayer))).toBe(false);
+});
+
+test('custom folder unavailable: preserves preview bases and reports an explicit error',async ({page})=>{
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const u=new URL(route.request().url());
+    const root='/games/ni5774718_3/noftp';
+    if(u.pathname==='/api/files/list'&&!u.searchParams.has('dir'))
+      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({root,dir:root,entries:[]})});
+    return route.fulfill({status:404,contentType:'application/json',body:'{"error":"not found"}'});
+  });
+  const old=await page.evaluate(()=>baseMarkerLayer.getLayers().length);
+  expect(old).toBe(9);
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='fake_key');
+  await page.locator('#filterToggle').click();
+  await page.locator('#customBasesRefresh').click();
+  await expect(page.locator('#customBasesSyncStatus')).toContainText('Custom Bases sync failed');
+  expect(await page.evaluate(()=>baseMarkerLayer.getLayers().length)).toBe(old);
+});
+
+test('loadouts and non-spawner JSON are excluded and reported, including oversized files',async ({page})=>{
+  const root='/games/ni5774718_3/noftp';
+  const dir=root+'/dayzps_missions/dayzOffline.chernarusplus/custom';
+  let readCalls=0;
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const u=new URL(route.request().url());
+    let status=200,body;
+    if(u.pathname==='/api/files/list'){
+      const location=u.searchParams.get('dir');
+      if(!location)body={root,dir:root,entries:[]};
+      else if(location===dir)body={root,dir,entries:[
+        {name:'mybase.json',path:dir+'/mybase.json',type:'file',size:220},
+        {name:'RestrictedArea.json',path:dir+'/RestrictedArea.json',type:'file',size:220},
+        {name:'playerloadout.json',path:dir+'/playerloadout.json',type:'file',size:200},
+        {name:'hugeBase.json',path:dir+'/hugeBase.json',type:'file',size:600000}
+      ]};
+      else{status=404;body={error:'No such directory'}}
+    }else if(u.pathname==='/api/files/read'){
+      readCalls++;
+      const file=u.searchParams.get('file');
+      body={ok:true,path:file,content:JSON.stringify(
+        file.endsWith('mybase.json')?{Objects:[{name:'Land_Cabin',pos:[100,15,200]}]}:{Areas:[{position:[1,2,3]}]}
+      )};
+    }else{status=404;body={error:'bad route'}}
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
+  });
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='fake_key');
+  await page.locator('#filterToggle').click();
+  await page.locator('#customBasesRefresh').click();
+  await expect(page.locator('#customBasesSyncStatus')).toContainText('1/3 object files mapped');
+  await expect(page.locator('#customBasesSyncStatus')).toContainText('Loadouts excluded: 1');
+  await expect(page.locator('#customBasesSyncStatus')).toContainText('hugeBase.json');
+  const sum=await page.evaluate(()=>window.BUILD_IT_customBasesSync.summary());
+  expect(sum.mappedFiles).toBe(1);
+  expect(sum.failedFiles).toHaveLength(1);
+  expect(readCalls).toBe(2);
+  expect(await page.evaluate(()=>baseMarkerLayer.getLayers().length)).toBe(1);
+});
