@@ -631,7 +631,12 @@ test('Event Manager Nitrado deploy stops with clear error if upload permission i
   await page.locator('#biSave').click();
   await page.locator('#biPreviewServer').click();
   await page.locator('#biServerStopped').check();
-  await page.locator('#nitradoWriteKey').fill('fake-write-key-12-characters');
+  // Logs panel is intentionally hidden while Event Manager is open.
+  // The existing write-key input is still read by the shared Worker client.
+  await page.locator('#nitradoWriteKey').evaluate(el=>{
+    el.value='fake-write-key-12-characters';
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+  });
   page.on('dialog',dialog=>dialog.accept());
   await page.locator('#biUploadServer').click();
   await expect(page.locator('#biServerPreview')).toContainText('Permission denied');
