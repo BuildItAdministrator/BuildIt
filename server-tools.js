@@ -332,6 +332,10 @@ $('stPickMap').addEventListener('click',()=>{
      $('stObjectX').value=Number(p.x.toFixed(2));$('stObjectZ').value=Number(p.z.toFixed(2));
    }else if(tool==='Spawn Point Generator'){
      $('stPlayerX').value=Number(p.x.toFixed(2));$('stPlayerZ').value=Number(p.z.toFixed(2));
+   }else if(tool==='Gas Zone Generator'){
+     $('stGasX').value=Number(p.x.toFixed(2));$('stGasZ').value=Number(p.z.toFixed(2));
+   }else if(tool==='Build Relocator'){
+     $('stRelocX').value=Number(p.x.toFixed(2));$('stRelocZ').value=Number(p.z.toFixed(2));
    }
    invalidate();setStatus('Map position selected. Review then publish to Nitrado.');
  });
@@ -389,6 +393,34 @@ function analyze(){
    return {content:change.content,changed:change.changed,message:'PREVIEW — Sort '+change.total+
      ' objects by classname. All object properties and positions remain unchanged.'};
  }
+ if(selected==='Gas Zone Generator'){
+   const change=addons.addGasZone(source,$('stGasName').value,$('stGasX').value,
+     $('stGasY').value,$('stGasZ').value,$('stGasRadius').value);
+   return {content:change.content,changed:1,message:'PREVIEW — New static gas zone '+change.name+
+     '\nPosition X/Y/Z: '+change.pos.join(', ')+'\nRadius: '+change.radius+
+     'm\nClones an existing valid static gas-zone schema and preserves all other areas.'};
+ }
+ if(selected==='Build Relocator'){
+   const change=addons.moveBuild(source,$('stRelocX').value,$('stRelocZ').value);
+   return {content:change.content,changed:change.changed,message:'PREVIEW — Relocate '+change.count+
+     ' existing objects\nCenter '+change.original.join(', ')+' → '+change.target.join(', ')+
+     '\nWARNING: Y elevations are unchanged. Check flat ground before enabling this build.'};
+ }
+ if(['Bag Fill Generator','Weapon Blueprint Generator'].includes(selected)){
+   const kind=selected==='Bag Fill Generator'?'cargo':'attachments';
+   const change=addons.appendEquipment(source,$('stEquipParent').value,$('stEquipItem').value,
+     kind,$('stEquipGroup').value,$('stEquipChance').value);
+   return {content:change.content,changed:1,message:'PREVIEW — Add '+kind+' to '+change.parent+
+     '\nItem: '+change.item+' · group chance '+change.groupChance+' · item chance '+change.itemChance+
+     '\nExisting attachment and cargo groups remain unchanged.'};
+ }
+ if(selected==='Loot & Proxy Calculator'){
+   const info=addons.economyStats(source);
+   return {message:'CURRENT SERVER ECONOMY — '+info.totalTypes+' types · nominal total '+info.nominalTotal+
+     '\nBy category:\n'+info.categories.slice(0,60).map(x=>x.name+' · '+x.count+
+     ' classnames · '+x.nominal+' nominal').join('\n')+
+     '\nNote: nominal values are targets, not real-time physical loot counts.'};
+ }
  if(selected==='Spawnable Types Adjuster'){
    const result=core.editSpawnableChance(source,$('stSpawnableName').value,$('stSpawnableSection').value,$('stSpawnableChance').value);
    return {content:result.content,changed:result.changed,message:'PREVIEW — '+result.classname+' · '+result.section+'\n'+result.changed+' existing chance attributes will be set to '+result.chance+'.\nOther classnames and settings remain unchanged.'};
@@ -428,10 +460,25 @@ function analyze(){
      changes.skipped+' skipped and '+changes.matched+' matched.\nField: '+field+
      '\nThe original XML layout and unrelated entries remain unchanged.'};
 }
-$('stRun').addEventListener('click',()=>{
+$('stRun').addEventListener('click',async()=>{
  if(busy||!snapshot)return;
  invalidate();
+ setBusy(true);
  try{
+   // Only reference real DayZ classnames already declared by the live
+   // economy; do not invent an attachment or cargo classname.
+   if(['Bag Fill Generator','Weapon Blueprint Generator'].includes(selected)){
+     const types=await bridge.read('db/types.xml');
+     const doc=new DOMParser().parseFromString(types.content,'application/xml');
+     if(doc.querySelector('parsererror')||doc.documentElement?.nodeName!=='types')
+       throw new Error('types.xml is invalid. Equipment publishing blocked.');
+     const names=new Set([...doc.documentElement.children].filter(x=>x.nodeName==='type')
+       .map(x=>x.getAttribute('name')));
+     for(const id of ['stEquipParent','stEquipItem']){
+       const classname=$(id).value.trim();
+       if(!names.has(classname))throw new Error(classname+' was not found in the current server types.xml.');
+     }
+   }
    const result=analyze();
    if(typeof result.content==='string'){
      bridge.validateContent(snapshot.path,result.content);
@@ -442,6 +489,7 @@ $('stRun').addEventListener('click',()=>{
    }
    setStatus(result.message+(preview?'\nReady to publish to Nitrado with a verified backup.':''));
  }catch(error){setStatus('Preview blocked: '+error.message,true);}
+ finally{setBusy(false);}
 });
 $('stPublish').addEventListener('click',async()=>{
  if(busy||!preview)return;
