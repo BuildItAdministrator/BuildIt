@@ -299,5 +299,28 @@
     return {content,changed,groups,classname:name,section,chance:chanceStr};
   }
 
-  root.BUILD_IT_SERVER_CORE=Object.freeze({validate,splitJSON,editTypes,eventConflicts,globalsList,editGlobal,spawnableDuplicates,objectDuplicates,addMessage,findClassnames,editSpawnableChance,xmlDoc});
+
+  function eventGroupStats(source){
+    const doc=xmlDoc(source,'eventposdef'),events=[],warnings=[];
+    const duplicates=new Set();
+    let total=0;
+    for(const event of doc.documentElement.children){
+      if(event.nodeName!=='event')continue;
+      const name=event.getAttribute('name')||'(unnamed)';
+      const positions=Array.from(event.getElementsByTagName('pos'));
+      for(const pos of positions){
+        const x=Number(pos.getAttribute('x')),z=Number(pos.getAttribute('z'));
+        if(!Number.isFinite(x)||!Number.isFinite(z)||x<0||z<0)
+          warnings.push('Invalid X/Z for event '+name);
+        const key=name+'|'+x.toFixed(2)+'|'+z.toFixed(2);
+        if(duplicates.has(key))warnings.push('Duplicate position for '+name+' X '+x+' Z '+z);
+        duplicates.add(key);
+      }
+      events.push({name,positions:positions.length});
+      total+=positions.length;
+    }
+    return{events:events.sort((a,b)=>b.positions-a.positions),total,warnings};
+  }
+
+  root.BUILD_IT_SERVER_CORE=Object.freeze({validate,splitJSON,editTypes,eventConflicts,eventGroupStats,globalsList,editGlobal,spawnableDuplicates,objectDuplicates,addMessage,findClassnames,editSpawnableChance,xmlDoc});
 })(window);
