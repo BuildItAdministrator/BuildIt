@@ -1393,10 +1393,10 @@ test('JSON loot migration replaces old Build It references with custom/builditlo
 
 test('Server Tools shows only implemented Nitrado-connected tools and no local file uploads',async({page})=>{
   const stats=await page.evaluate(()=>window.BUILD_IT_TOOLS);
-  expect(stats).toEqual({count:32,ready:32,mode:'nitrado'});
+  expect(stats).toEqual({count:34,ready:34,mode:'nitrado'});
   await page.locator('#toolHubToggle').click();
   await expect(page.locator('#toolHubPanel')).toBeVisible();
-  await expect(page.locator('#stCards .st-card')).toHaveCount(32);
+  await expect(page.locator('#stCards .st-card')).toHaveCount(34);
   await expect(page.locator('#stFile')).toHaveCount(0);
   await expect(page.locator('#stDownload')).toHaveCount(0);
   await page.locator('#stSearch').fill('NPC Generator');
@@ -1819,4 +1819,19 @@ test('Chernarus fresh-spawn generator places coordinates inside a named official
       east:doc.querySelectorAll('group[name="EastCherno"] > pos').length,missingBlocked};
   });
   expect(got).toEqual({groups:['WestCherno','EastCherno'],west:1,east:2,missingBlocked:true});
+});
+
+
+test('Server Tools links Vehicle Spawn and Lootdrop Spawn to existing direct Nitrado Quick Spawn',async({page})=>{
+ await page.locator('#toolHubToggle').click();
+ await page.locator('#stSearch').fill('Vehicle Spawn');
+ await page.locator('#stCards .st-card button').click();
+ await expect(page.locator('#quickSpawnPanel')).toBeVisible();
+ await expect(page.locator('#qsVehicleMode')).toHaveAttribute('aria-pressed','true');
+ await page.locator('#qsClose').click();
+ await page.locator('#toolHubToggle').click();
+ await page.locator('#stSearch').fill('Lootdrop Spawn');
+ await page.locator('#stCards .st-card button').click();
+ await expect(page.locator('#quickSpawnPanel')).toBeVisible();
+ await expect(page.locator('#qsLootMode')).toHaveAttribute('aria-pressed','true');
 });
