@@ -154,5 +154,16 @@ $('qsPublish').addEventListener('click',async()=>{
     setStatus('NOT COMPLETE: '+error.message,true);
   }finally{busy=false;$('qsPick').disabled=false;refreshButton();}
 });
+window.addEventListener('buildit:nitrado-profile-changing',()=>{
+  close();chosen='';coordinates=null;picking=false;
+  $('qsFind').value='';
+  $('qsSelected').textContent='No item selected';
+  $('qsCoordinates').textContent='No position selected';
+  $('qsWriteKey').value='';
+  $('qsHeight').value='';
+  $('qsStatus').textContent='New server selected. Choose a fresh spawn.';
+  if(pin){map.removeLayer(pin);pin=null;}
+  refreshButton();
+});
 window.BUILD_IT_QUICK_SPAWN=Object.freeze({open,close,toggle});
 })();
