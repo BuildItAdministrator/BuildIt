@@ -208,6 +208,18 @@ function fillObject(){
  const item=ext.objectList(snapshot.content).find(e=>String(e.index)===$('stObjectIndex').value);
  if(item){$('stObjectX').value=item.pos[0];$('stObjectZ').value=item.pos[2];}
 }
+function fillEvent(){
+ if(!snapshot||selected!=='Events Organizer')return;
+ const doc=new DOMParser().parseFromString(snapshot.content,'application/xml');
+ const item=[...doc.documentElement.children].find(e=>e.getAttribute('name')===$('stEventName').value);
+ const tag=$('stEventField').value;
+ $('stEventValue').value=item?.getElementsByTagName(tag)[0]?.textContent?.trim()||'';
+}
+function fillUnderground(){
+ if(!snapshot||selected!=='Underground Areas')return;
+ const item=extra.triggers(snapshot.content).find(e=>String(e.index)===$('stUndergroundIndex').value);
+ if(item)$('stUndergroundValue').value=item.darkness;
+}
 function refreshGlobal(){
  if(!snapshot)return;
  const item=core.globalsList(snapshot.content).find(x=>x.name===$('stGlobalName').value);
@@ -247,6 +259,22 @@ async function loadLive(){
      for(const t of types){const opt=document.createElement('option');opt.value=t.name;opt.textContent=t.name+' ('+t.count+' existing zones)';select.appendChild(opt);}
      if(!types.length)throw new Error('No valid infected territory event types found.');
    }
+   if(selected==='Events Organizer'){
+     const names=extra.eventNames(snapshot.content),sel=$('stEventName');
+     sel.replaceChildren();
+     names.forEach(name=>{const o=document.createElement('option');o.value=name;o.textContent=name;sel.appendChild(o);});
+     if(!names.length)throw new Error('No existing events found.');
+     fillEvent();
+   }
+   if(selected==='Underground Areas'){
+     const entries=extra.triggers(snapshot.content),sel=$('stUndergroundIndex');
+     sel.replaceChildren();
+     entries.forEach(item=>{const o=document.createElement('option');o.value=String(item.index);
+       o.textContent=(item.index+1)+'. '+item.pos.join(', ')+' · brightness '+item.darkness;sel.appendChild(o);});
+     if(!entries.length)throw new Error('No existing configurable underground triggers found.');
+     fillUnderground();
+   }
+   if(selected==='Loadout Generator')extra.loadoutDetails(snapshot.content);
    if(selected==='Globals Configurator'){
      const variables=core.globalsList(snapshot.content);
      const select=$('stGlobalName');select.replaceChildren();
@@ -324,6 +352,9 @@ $('stGlobalName').addEventListener('change',()=>{invalidate();refreshGlobal();})
 $('stGameplayPath').addEventListener('change',()=>{invalidate();fillGameplay();});
 $('stWeatherPath').addEventListener('change',()=>{invalidate();fillWeather();});
 $('stObjectIndex').addEventListener('change',()=>{invalidate();fillObject();});
+$('stEventName').addEventListener('change',()=>{invalidate();fillEvent();});
+$('stEventField').addEventListener('change',()=>{invalidate();fillEvent();});
+$('stUndergroundIndex').addEventListener('change',()=>{invalidate();fillUnderground();});
 function clearHeatmap(){if(heatLayer&&typeof map!=='undefined'){map.removeLayer(heatLayer);heatLayer=null;}}
 $('stClearHeatmap').addEventListener('click',()=>{clearHeatmap();setStatus('Heatmap cleared. No server files changed.');});
 $('stShowHeatmap').addEventListener('click',()=>{
@@ -424,6 +455,32 @@ function analyze(){
    return {content:change.content,changed:change.changed,message:'PREVIEW — Sort '+change.total+
      ' objects by classname. All object properties and positions remain unchanged.'};
  }
+ if(selected==='Types Organizer'){
+   const result=extra.organizeTypes(source);
+   return {content:result.content,changed:result.changed,message:'PREVIEW — Alphabetically sort '+result.count+
+     ' existing type entries. Comment boundaries are checked before sorting.'};
+ }
+ if(selected==='Events Organizer'){
+   const result=extra.editEvent(source,$('stEventName').value,$('stEventField').value,$('stEventValue').value);
+   return {content:result.content,changed:result.changed,message:'PREVIEW — Event '+result.name+
+     '\n'+result.field+' → '+result.value+'\nAll other events remain unchanged.'};
+ }
+ if(selected==='Ignore List Generator'){
+   const result=extra.addIgnore(source,$('stIgnoreItem').value);
+   return {content:result.content,changed:1,message:'PREVIEW — Exclude '+result.name+
+     ' from the Central Economy ignore list. Existing exclusions remain intact.'};
+ }
+ if(selected==='Loadout Generator'){
+   const result=extra.addLoadoutCargo(source,$('stLoadoutItem').value);
+   return {content:result.content,changed:1,message:'PREVIEW — Add '+result.item+
+     ' to the existing spawn gear preset '+result.preset+
+     '. This edits registered cargo, not character clothing or attachment slots.'};
+ }
+ if(selected==='Underground Areas'){
+   const result=extra.editTrigger(source,$('stUndergroundIndex').value,$('stUndergroundValue').value);
+   return {content:result.content,changed:result.changed,message:'PREVIEW — Underground trigger #'+(result.index+1)+
+     '\nEye accommodation '+result.previous+' → '+result.current+'. All other triggers are preserved.'};
+ }
  if(selected==='Horde Generator'){
    const change=addons.addHorde(source,$('stHordeType').value,$('stHordeX').value,$('stHordeZ').value,
      $('stHordeRadius').value,$('stHordeMin').value,$('stHordeMax').value);
@@ -505,14 +562,14 @@ $('stRun').addEventListener('click',async()=>{
  try{
    // Only reference real DayZ classnames already declared by the live
    // economy; do not invent an attachment or cargo classname.
-   if(['Bag Fill Generator','Weapon Blueprint Generator'].includes(selected)){
+   if(['Bag Fill Generator','Weapon Blueprint Generator','Loadout Generator','Ignore List Generator'].includes(selected)){
      const types=await bridge.read('db/types.xml');
      const doc=new DOMParser().parseFromString(types.content,'application/xml');
      if(doc.querySelector('parsererror')||doc.documentElement?.nodeName!=='types')
        throw new Error('types.xml is invalid. Equipment publishing blocked.');
      const names=new Set([...doc.documentElement.children].filter(x=>x.nodeName==='type')
        .map(x=>x.getAttribute('name')));
-     for(const id of ['stEquipParent','stEquipItem']){
+     for(const id of (selected==='Loadout Generator'?['stLoadoutItem']:selected==='Ignore List Generator'?['stIgnoreItem']:['stEquipParent','stEquipItem'])){
        const classname=$(id).value.trim();
        if(!names.has(classname))throw new Error(classname+' was not found in the current server types.xml.');
      }
