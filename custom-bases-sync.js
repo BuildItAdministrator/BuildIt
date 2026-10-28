@@ -337,6 +337,15 @@
     if(filter.checked&&hasConnection()&&Date.now()-lastLoaded>=MIN_REFRESH_MS)reload();
   },MIN_REFRESH_MS);
 
+  window.addEventListener('buildit:nitrado-profile-changing',()=>{
+    lastLoaded=0;liveCount=0;liveFiles=0;failedFiles=[];
+    window.BUILD_IT_renderCustomBases([]);
+    display('Server switched. Previous map markers cleared.');
+  });
+  window.addEventListener('buildit:nitrado-profile-changed',()=>{
+    if(hasConnection())void reload();
+  });
+  window.BUILD_IT_CUSTOM_BASES_SYNC=Object.freeze({isBusy:()=>busy});
   // Expose read-only state for regression tests (never keys or raw JSON).
   window.BUILD_IT_customBasesSync={
     refresh:()=>reload({manual:true}),
