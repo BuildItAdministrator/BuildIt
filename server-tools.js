@@ -48,117 +48,240 @@ ROOT.innerHTML=`
 document.body.appendChild(ROOT);
 const $=id=>ROOT.querySelector('#'+id);
 const panel=$('toolHubPanel'),cards=$('stCards'),workspace=$('stWorkspace');
-let selected=null,sourceName='',result=null,urls=[];
-function clearDownloads(){urls.forEach(url=>URL.revokeObjectURL(url));urls=[]; $('stParts').replaceChildren();}
-function fileUrl(content,name=''){const type=/\.xml$/i.test(name)?'application/xml;charset=utf-8':'application/json;charset=utf-8';const url=URL.createObjectURL(new Blob([content],{type}));urls.push(url);return url;}
-function download(name,content){const a=document.createElement('a');a.href=fileUrl(content,name);a.download=name;document.body.appendChild(a);a.click();a.remove();}
+let selected=null,snapshot=null,preview=null,busy=false,remoteList=[];
+const bridge=window.BUILD_IT_SERVER_FILES,core=window.BUILD_IT_SERVER_CORE;
+if(!bridge||!core)throw new Error('Server Tools bridge not ready.');
+const DEFAULTS={
+ 'XML Validator':'db/types.xml',
+ 'JSON Validator':'cfggameplay.json',
+ 'Types Booster':'db/types.xml',
+ 'Types Reducer':'db/types.xml',
+ 'Advanced Types Editor':'db/types.xml',
+ 'Lifetime Reducer':'db/types.xml',
+ 'Event Conflict Check':'db/events.xml',
+ 'Globals Configurator':'db/globals.xml',
+ 'Spawnable Duplicate Checker':'cfgspawnabletypes.xml',
+ 'SpawnObject Duplicate Checker':'custom/builditlootdrop.json'
+};
+const EDITORS=new Set(['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Globals Configurator']);
+function setStatus(text,error=false){
+ $('stResult').textContent=text;$('stResult').dataset.error=String(error);
+}
+function invalidate(){
+ preview=null;$('stPublish').hidden=true;$('stPublish').disabled=true;
+}
+function setBusy(value){
+ busy=value;
+ for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue']){
+   $(id).disabled=value;
+ }
+ $('stRun').disabled=value||!snapshot;
+ $('stPublish').disabled=value||!preview;
+}
 function open(){
-  panel.hidden=false;$('toolHubToggle').setAttribute('aria-expanded','true');
-  const bi=document.getElementById('biPanel');if(bi)bi.hidden=true;
-  for(const id of ['filterPanel','logPanel'])document.getElementById(id)?.classList.add('hidden');
+ panel.hidden=false;$('toolHubToggle').setAttribute('aria-expanded','true');
+ document.getElementById('biPanel')?.setAttribute('hidden','');
+ window.BUILD_IT_QUICK_SPAWN?.close?.();
+ for(const id of ['filterPanel','logPanel'])document.getElementById(id)?.classList.add('hidden');
 }
 function close(){
-  panel.hidden=true;$('toolHubToggle').setAttribute('aria-expanded','false');clearDownloads();
+ if(busy)return;
+ panel.hidden=true;$('toolHubToggle').setAttribute('aria-expanded','false');
 }
 $('toolHubToggle').addEventListener('click',()=>panel.hidden?open():close());
 $('toolHubClose').addEventListener('click',close);
 for(const id of ['filterToggle','logToggle','biToggle']){
-  document.getElementById(id)?.addEventListener('click',()=>{if(!panel.hidden)close();});
+ document.getElementById(id)?.addEventListener('click',close);
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!panel.hidden)close();});
 function render(){
-  const search=$('stSearch').value.trim().toLowerCase(),category=$('stCategory').value;
-  cards.replaceChildren();
-  let shown=0;
-  for(const tool of TOOLS){
-    if(category&&tool.group!==category)continue;
-    if(search&&!tool.name.toLowerCase().includes(search)&&!tool.group.toLowerCase().includes(search))continue;
-    shown++;
-    const ready=ACTIVE.has(tool.name),related=RELATED[tool.name];
-    const box=document.createElement('div');box.className='st-card'+(ready?' st-ready':'');
-    const name=document.createElement('strong');name.textContent=tool.name;
-    const meta=document.createElement('small');meta.textContent=tool.group+' · '+(ready?'Ready':related?'Partly available in Event Manager':'Planned');
-    box.append(name,meta);
-    if(ready||related){
-      const btn=document.createElement('button');btn.type='button';btn.textContent=ready?'Open tool':'Open Event Manager';
-      btn.addEventListener('click',()=>{
-        if(ready)choose(tool.name);
-        else{close();if(window.BUILD_IT_SPAWN_API?.advanced)window.BUILD_IT_SPAWN_API.advanced();else document.getElementById(related)?.click();}
-      });
-      box.appendChild(btn);
-    }
-    cards.appendChild(box);
-  }
-  if(!shown){const empty=document.createElement('p');empty.className='st-help';empty.textContent='No tools found. Adjust your search.';cards.appendChild(empty);}
+ const search=$('stSearch').value.trim().toLowerCase(),category=$('stCategory').value;
+ cards.replaceChildren();
+ let shown=0;
+ for(const tool of TOOLS){
+   if(category&&tool.group!==category)continue;
+   if(search&&!tool.name.toLowerCase().includes(search)&&!tool.group.toLowerCase().includes(search))continue;
+   shown++;
+   const ready=ACTIVE.has(tool.name),related=RELATED[tool.name];
+   const card=document.createElement('div');card.className='st-card'+(ready?' st-ready':'');
+   const title=document.createElement('strong');title.textContent=tool.name;
+   const meta=document.createElement('small');
+   meta.textContent=tool.group+' · '+(ready?'Connected to Nitrado':related?'Partial in Advanced Events':'Planned — server integration not ready');
+   card.append(title,meta);
+   if(ready||related){
+     const btn=document.createElement('button');btn.type='button';
+     btn.textContent=ready?'Open tool':'Advanced editor';
+     btn.addEventListener('click',()=>{
+       if(ready)void choose(tool.name);
+       else{close();window.BUILD_IT_SPAWN_API?.advanced?.();}
+     });
+     card.appendChild(btn);
+   }
+   cards.appendChild(card);
+ }
+ if(!shown){const p=document.createElement('p');p.className='st-help';p.textContent='No matching tools.';cards.appendChild(p);}
 }
 $('stSearch').addEventListener('input',render);
 $('stCategory').addEventListener('change',render);
-function choose(name){
-  selected=name;sourceName='';result=null;clearDownloads();cards.hidden=true;workspace.hidden=false;
-  $('stWorkTitle').textContent=name;$('stSource').value='';$('stFile').value='';
-  $('stResult').textContent='';$('stDownload').hidden=true;
-  const isTypes=['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer'].includes(name);
-  $('stParameters').hidden=!isTypes;
-  $('stSplitControls').hidden=name!=='JSON Splitter';
-  const isSet=name==='Advanced Types Editor';
-  $('stValueLabel').textContent=isSet?'Set numeric value':'Multiplier';
-  $('stValue').value=name==='Types Reducer'?'0.5':name==='Lifetime Reducer'?'0.5':name==='Advanced Types Editor'?'100':'2';
-  $('stValue').max=isSet?'100000000':'1000';
-  $('stField').value=name==='Lifetime Reducer'?'lifetime':'nominal';
-  $('stRun').textContent=['JSON Validator','XML Validator'].includes(name)?'Validate':name==='Event Conflict Check'?'Check events':name==='JSON Splitter'?'Split JSON':'Generate revised types.xml';
-  $('stHelp').textContent=isTypes?'Import types.xml. Values change only in the selected numeric field; XML formatting and declaration are preserved. Inspect the result before uploading.':
-    name==='JSON Splitter'?'Split a JSON array or DayZ Object Spawner Objects[] into downloadable parts. Other JSON structures are not silently modified.':
-    name==='Event Conflict Check'?'Check events.xml for duplicate event names and numeric inconsistencies. Does not overwrite or upload server files.':
-    'Validate a JSON or XML file locally, without changing its content or uploading it.';
+function toolFiles(){
+ return remoteList.filter(file=>{
+   if(selected==='JSON Validator')return file.relative.endsWith('.json');
+   if(selected==='XML Validator')return file.relative.endsWith('.xml');
+   if(selected==='SpawnObject Duplicate Checker')return file.relative.endsWith('.json');
+   return file.relative===DEFAULTS[selected];
+ });
 }
-$('stBack').addEventListener('click',()=>{workspace.hidden=true;cards.hidden=false;selected=null;clearDownloads();});
-$('stFile').addEventListener('change',async()=>{
-  const file=$('stFile').files?.[0];if(!file)return;
-  if(file.size>2*1024*1024){$('stResult').textContent='Maximum local source size is 2 MB.';return;}
-  try{
-    sourceName=file.name;
-    $('stSource').value=await file.text();$('stResult').textContent='Loaded '+file.name+'. Run the tool to analyze it.';
-  }catch(error){$('stResult').textContent=error.message;}
+async function refreshCatalog(){
+ remoteList=await bridge.available();
+ const select=$('stRemoteFile');select.replaceChildren();
+ const matches=toolFiles();
+ for(const file of matches){
+   const option=document.createElement('option');option.value=file.relative;
+   option.textContent=file.relative+(file.size?' · '+Math.ceil(file.size/1024)+' KB':'');
+   select.appendChild(option);
+ }
+ if(matches.some(f=>f.relative===DEFAULTS[selected]))select.value=DEFAULTS[selected];
+ if(!matches.length)throw new Error('Required file '+(DEFAULTS[selected]||'')+' not found on Nitrado. No replacement file will be created.');
+}
+function refreshGlobal(){
+ if(!snapshot)return;
+ const item=core.globalsList(snapshot.content).find(x=>x.name===$('stGlobalName').value);
+ if(item)$('stGlobalValue').value=item.value;
+}
+async function loadLive(){
+ invalidate();snapshot=null;setBusy(true);
+ try{
+   const relative=$('stRemoteFile').value;
+   if(!relative)throw new Error('Choose a Nitrado file.');
+   $('stFileState').textContent='Reading current server file…';
+   snapshot=await bridge.read(relative);
+   if(selected==='Globals Configurator'){
+     const variables=core.globalsList(snapshot.content);
+     const select=$('stGlobalName');select.replaceChildren();
+     for(const variable of variables){
+       const option=document.createElement('option');
+       option.value=variable.name;option.textContent=variable.name+' ('+variable.value+')';
+       select.appendChild(option);
+     }
+     if(!variables.length)throw new Error('No numeric variables available in globals.xml.');
+     refreshGlobal();
+   }
+   $('stFileState').textContent='Live: '+snapshot.relative;
+   setStatus('Nitrado file loaded. Click '+(EDITORS.has(selected)?'Preview server changes.':'Check server file.'));
+ }catch(error){
+   snapshot=null;$('stFileState').textContent='Not loaded';
+   setStatus('Nitrado: '+error.message,true);
+ }finally{setBusy(false);}
+}
+async function choose(name){
+ if(busy)return;
+ selected=name;snapshot=null;invalidate();
+ cards.hidden=true;workspace.hidden=false;
+ $('stWorkTitle').textContent=name;
+ const types=['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer'].includes(name);
+ $('stParameters').hidden=!types;
+ $('stGlobalControls').hidden=name!=='Globals Configurator';
+ $('stValueLabel').textContent=name==='Advanced Types Editor'?'Set value':'Multiplier';
+ $('stValue').value=name==='Types Reducer'||name==='Lifetime Reducer'?'0.5':
+   name==='Advanced Types Editor'?'100':'2';
+ $('stValue').max=name==='Advanced Types Editor'?'100000000':'1000';
+ $('stClassname').value='';
+ $('stField').value=name==='Lifetime Reducer'?'lifetime':'nominal';
+ $('stRun').textContent=EDITORS.has(name)?'Preview server changes':'Check server file';
+ $('stHelp').textContent=EDITORS.has(name)?
+   'The current file is loaded from Nitrado. Preview the changes, then publish with a verified backup. No import or download required.':
+   'This tool checks the existing server file directly. No manual upload or file import.';
+ setStatus('Connecting to Nitrado…');$('stFileState').textContent='Finding active mission…';
+ setBusy(true);
+ try{await refreshCatalog();}
+ catch(error){setStatus(error.message,true);$('stFileState').textContent='Unavailable';}
+ finally{setBusy(false);}
+ if($('stRemoteFile').options.length)await loadLive();
+}
+$('stBack').addEventListener('click',()=>{
+ if(busy)return;
+ selected=null;snapshot=null;invalidate();workspace.hidden=true;cards.hidden=false;
 });
+$('stRemoteFile').addEventListener('change',()=>void loadLive());
+$('stReload').addEventListener('click',()=>void loadLive());
+for(const id of ['stField','stValue','stClassname','stGlobalValue']){
+ $(id).addEventListener('input',invalidate);$(id).addEventListener('change',invalidate);
+}
+$('stGlobalName').addEventListener('change',()=>{invalidate();refreshGlobal();});
+$('stWriteKey').addEventListener('input',()=>{
+ const input=document.getElementById('nitradoWriteKey');
+ if(input)input.value=$('stWriteKey').value;
+});
+function analyze(){
+ if(!snapshot)throw new Error('Load a server file first.');
+ const source=snapshot.content;
+ if(selected==='XML Validator'||selected==='JSON Validator'){
+   const info=core.validate(source,snapshot.relative);
+   return {message:'VALID '+info.kind+' — '+snapshot.relative+'\n'+info.description+
+     (info.warnings.length?'\nWarnings:\n'+info.warnings.slice(0,100).join('\n'):'\nNo issues detected by this checker.')};
+ }
+ if(['Event Conflict Check','Spawnable Duplicate Checker','SpawnObject Duplicate Checker'].includes(selected)){
+   const info=selected==='Event Conflict Check'?core.eventConflicts(source):
+     selected==='Spawnable Duplicate Checker'?core.spawnableDuplicates(source):core.objectDuplicates(source);
+   return {message:'Checked '+info.total+' entries in '+snapshot.relative+
+     '\n'+info.findings.length+' issue(s).'+
+     (info.findings.length?'\n'+info.findings.slice(0,100).join('\n'):'\nNo conflicts detected by the basic checks.')};
+ }
+ if(selected==='Globals Configurator'){
+   const changes=core.editGlobal(source,$('stGlobalName').value,$('stGlobalValue').value);
+   return {content:changes.content,changed:changes.changed,
+     message:changes.name+': '+changes.previous+' → '+changes.current+
+       (changes.changed?'\nOne existing value will change. All other settings are preserved.':'\nNo change necessary.')};
+ }
+ const val=Number($('stValue').value),field=selected==='Lifetime Reducer'?'lifetime':$('stField').value;
+ if(selected==='Types Booster'&&val<1)throw new Error('Booster multiplier must be at least 1.');
+ if(['Types Reducer','Lifetime Reducer'].includes(selected)&&(val<0||val>1))
+   throw new Error('Reduction multiplier must be from 0 to 1.');
+ const changes=core.editTypes(source,{
+   mode:selected==='Advanced Types Editor'?'set':'multiply',
+   field,value:val,classname:$('stClassname').value
+ });
+ return {content:changes.content,changed:changes.changed,
+   message:'PREVIEW — '+snapshot.relative+'\n'+changes.changed+' item(s) will change, '+
+     changes.skipped+' skipped and '+changes.matched+' matched.\nField: '+field+
+     '\nThe original XML layout and unrelated entries remain unchanged.'};
+}
 $('stRun').addEventListener('click',()=>{
-  clearDownloads();result=null;$('stDownload').hidden=true;
-  const source=$('stSource').value;
-  try{
-    if(!source.trim())throw new Error('Select or paste a source file first.');
-    if(new Blob([source]).size>2*1024*1024)throw new Error('Source file exceeds the 2 MB local processing limit.');
-    const core=window.BUILD_IT_SERVER_CORE;
-    if(selected==='XML Validator'||selected==='JSON Validator'){
-      const name=selected==='XML Validator'?(sourceName.endsWith('.xml')?sourceName:'input.xml'):
-        (sourceName.endsWith('.json')?sourceName:'input.json');
-      const info=core.validate(source,name);
-      $('stResult').textContent='VALID '+info.kind+' — '+info.description+
-        (info.warnings.length?'\nWarnings:\n'+info.warnings.slice(0,30).join('\n'):'\nNo issues detected by this validator.');
-    }else if(selected==='Event Conflict Check'){
-      const info=core.eventConflicts(source);
-      $('stResult').textContent='Scanned '+info.total+' events. '+info.findings.length+' issue(s) found.'+
-        (info.findings.length?'\n'+info.findings.slice(0,100).join('\n'):'\nNo conflicts detected by the basic checks.');
-    }else if(selected==='JSON Splitter'){
-      const parts=core.splitJSON(source,$('stChunkSize').value);
-      $('stResult').textContent='Split into '+parts.length+' file(s). Download each part below; no server files were changed.';
-      for(const part of parts){
-        const a=document.createElement('a');a.href=fileUrl(part.content,part.filename);a.download=part.filename;
-        a.textContent=part.filename+' ('+part.count+' entries)';
-        $('stParts').appendChild(a);
-      }
-    }else if(selected){
-      const mode=selected==='Advanced Types Editor'?'set':'multiply';
-      const field=selected==='Lifetime Reducer'?'lifetime':$('stField').value;
-      const val=Number($('stValue').value);
-      if(selected==='Types Booster'&&val<1)throw new Error('Boost multiplier must be 1 or higher.');
-      if(selected==='Types Reducer'&&(val<0||val>1))throw new Error('Reducer multiplier must be from 0 to 1.');
-      if(selected==='Lifetime Reducer'&&(val<0||val>1))throw new Error('Lifetime reduction must be from 0 to 1.');
-      result=core.editTypes(source,{mode,field,value:val,classname:$('stClassname').value});
-      $('stResult').textContent=result.changed+' <type> entries updated. '+result.skipped+' skipped (field absent). '+result.matched+' matched.\nNo server file changed. Download, review and upload using File Manager with backup.';
-      if(result.changed)$('stDownload').hidden=false;
-    }
-  }catch(error){$('stResult').textContent='ERROR — '+error.message;}
+ if(busy||!snapshot)return;
+ invalidate();
+ try{
+   const result=analyze();
+   if(typeof result.content==='string'){
+     bridge.validateContent(snapshot.path,result.content);
+     if(result.changed&&result.content!==snapshot.content){
+       preview={source:snapshot,content:result.content};
+       $('stPublish').hidden=false;$('stPublish').disabled=false;
+     }
+   }
+   setStatus(result.message+(preview?'\nReady to publish to Nitrado with a verified backup.':''));
+ }catch(error){setStatus('Preview blocked: '+error.message,true);}
 });
-$('stDownload').addEventListener('click',()=>{if(result?.content)download('types.xml',result.content);});
+$('stPublish').addEventListener('click',async()=>{
+ if(busy||!preview)return;
+ const pending=preview;
+ if(!window.confirm('Publish '+selected+' to LIVE Nitrado?\n\n'+pending.source.relative+
+   '\n\nConfirm your DayZ server is STOPPED. A verified backup is required before this file is replaced.'))return;
+ setBusy(true);setStatus('Validating current Nitrado file, creating backup and publishing…');
+ try{
+   const result=await bridge.publish(pending.source,pending.content);
+   invalidate();
+   setStatus('UPLOAD VERIFIED — '+pending.source.relative+
+     '\nBackup: '+result.backupPath+'\nStart your server to activate the new settings.');
+   $('stFileState').textContent='Refreshing Nitrado…';
+   snapshot=await bridge.read(pending.source.relative);
+   $('stFileState').textContent='Live: '+snapshot.relative;
+ }catch(error){
+   invalidate();snapshot=null;
+   setStatus('UPLOAD NOT VERIFIED: '+error.message+
+     '\nInspect server file and backups before retrying.',true);
+   $('stFileState').textContent='Reload required';
+ }finally{setBusy(false);}
+});
 render();
-window.BUILD_IT_TOOLS=Object.freeze({count:TOOLS.length,ready:ACTIVE.size});
+window.BUILD_IT_TOOLS=Object.freeze({count:TOOLS.length,ready:ACTIVE.size,mode:'nitrado'});
 })();
