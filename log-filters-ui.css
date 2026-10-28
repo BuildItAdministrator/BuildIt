@@ -1,0 +1,75 @@
+/* Build It!++ · focused log dashboard and unified filter menu */
+#logPanel .log-head{
+  margin-bottom:12px;padding-bottom:11px;border-bottom:1px solid rgba(150,180,198,.19)
+}
+#logPanel .log-title{font-size:16px;letter-spacing:.01em}
+#logPanel .log-head-note{font-size:11px;color:#a6b6c0;margin-top:4px}
+#logPanel .log-close{flex:0 0 auto}
+#logPanel .log-overview{padding:11px;border:1px solid rgba(120,157,177,.22);border-radius:10px;background:rgba(23,40,50,.5)}
+#logPanel .log-overview-top,
+#logPanel .log-activity-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#logPanel .log-overview-top .log-btn,
+#logPanel .log-activity-header .log-btn{flex:0 0 auto;width:auto;min-width:0;padding:7px 10px}
+#logPanel .log-overview #nitradoSyncStatus{border:0;background:transparent;padding:5px 0 0;margin-top:5px;overflow-wrap:anywhere}
+#logPanel .log-overview .log-summary{background:rgba(255,255,255,.035);border:0;border-radius:6px;padding:8px;margin-top:8px;line-height:1.55}
+#logPanel .log-activity-header{margin:14px 0 6px}
+#logPanel .log-filter-hint{font-size:11px;line-height:1.45;color:#9bb4c4;margin:0 0 9px}
+#logPanel #logActivity{max-height:min(38vh,340px);overflow-y:auto;scrollbar-width:thin}
+#logPanel #logActivity .log-event{padding:9px 10px}
+#logPanel .log-advanced{margin-top:9px;border:1px solid rgba(120,157,177,.22);border-radius:9px;background:rgba(255,255,255,.015);overflow:visible}
+#logPanel .log-advanced summary{padding:11px 12px;cursor:pointer;font-size:12px;font-weight:700;list-style:none;display:flex;align-items:center;gap:8px}
+#logPanel .log-advanced summary::before{content:"›";font-size:18px;line-height:0.8;transition:transform .12s ease}
+#logPanel .log-advanced[open] summary::before{transform:rotate(90deg)}
+#logPanel .log-advanced summary::-webkit-details-marker{display:none}
+#logPanel .log-advanced[open] summary{border-bottom:1px solid rgba(120,157,177,.18)}
+#logPanel .log-advanced > :not(summary){margin-left:11px;margin-right:11px}
+#logPanel .log-advanced > :last-child{margin-bottom:11px}
+#logPanel .log-advanced .log-auto{border:0;background:transparent;padding:0;margin-top:9px}
+#logPanel .log-compact-label{font-size:11px;font-weight:700;color:#b8c8d2}
+#logPanel .log-auto-grid{gap:8px}
+#logPanel .log-upload{margin-top:12px}
+#logPanel #logDrop{margin-top:7px}
+#logPanel .log-file-test{margin-top:10px}
+#logPanel #fileManager{margin-top:12px}
+#logPanel .log-file-test-help{line-height:1.5}
+#filterPanel .filter-title{font-size:15px;margin:0 0 10px}
+#filterPanel .filter-menu-label{display:block;font-size:11px;color:#a6b7c2;font-weight:700;margin-bottom:6px}
+#filterPanel .filter-view-select{width:100%;box-sizing:border-box;display:block;background:#121f29;color:#f3f9fd;border:1px solid #557080;border-radius:8px;min-height:39px;padding:9px 10px;font-size:12px;font-weight:700;outline-offset:2px}
+#filterPanel .filter-view[hidden]{display:none!important}
+#filterPanel .filter-view{margin:10px 0 0;padding-top:7px;border-top:1px solid rgba(150,180,198,.18)}
+#filterPanel .filter-section-title{margin:4px 1px 9px;color:#c7d8e1}
+#filterPanel .filter-row{border-radius:6px;padding:8px 7px}
+#filterPanel .filter-row:hover{background:rgba(80,134,162,.11)}
+#filterPanel .filter-toolbar{margin:5px 0 10px}
+#filterPanel .filter-note{font-size:11px;line-height:1.5;color:#9fb4c2;margin:6px 1px 11px}
+#filterPanel .log-actions{grid-template-columns:1fr 1fr;gap:4px 9px}
+#filterPanel .log-check{padding:6px 3px;min-width:0}
+#filterPanel .log-check .log-action-count{margin-left:auto;font-variant-numeric:tabular-nums}
+#filterPanel .log-action-group{margin-top:10px}
+#filterPanel .log-action-label{white-space:nowrap}
+#filterPanel .log-position-mode{margin:10px 0 13px}
+#filterPanel .log-position-mode label{line-height:1.45}
+#filterPanel .filter-players-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 6px}
+#filterPanel .filter-players-header label{font-size:11px;font-weight:700}
+#filterPanel .filter-players-header button{flex:0 0 auto;width:auto;min-width:0;padding:6px 10px}
+#filterPanel #logPlayerSearch{box-sizing:border-box;width:100%;min-height:37px;font-size:12px}
+#filterPanel #logPlayers{max-height:230px;overflow:auto;margin-top:8px}
+#filterPanel .log-player-row{padding:6px 3px;line-height:1.4}
+#filterPanel .log-player-row input{accent-color:#54a7ce}
+#filterPanel .log-empty{padding:10px}
+html[data-buildit-theme="light"] #logPanel .log-head-note,
+html[data-buildit-theme="light"] #logPanel .log-filter-hint,
+html[data-buildit-theme="light"] #filterPanel .filter-menu-label{color:#537186}
+html[data-buildit-theme="light"] #logPanel .log-overview,
+html[data-buildit-theme="light"] #logPanel .log-advanced{background:#f3f8fc;border-color:#c6d8e4}
+html[data-buildit-theme="light"] #logPanel .log-overview .log-summary{background:#e7f0f7;color:#27485b}
+html[data-buildit-theme="light"] #filterPanel .filter-view-select{background:#fff;color:#1b3345;border-color:#aabfcf}
+html[data-buildit-theme="light"] #filterPanel .filter-view{border-color:#d8e6ee}
+html[data-buildit-theme="light"] #filterPanel .filter-section-title{color:#2b5067}
+html[data-buildit-theme="light"] #logPanel .log-compact-label{color:#355b73}
+html[data-buildit-theme="light"] #filterPanel .filter-row:hover{background:#e9f2f8}
+@media (max-width:600px){
+  #logPanel .log-overview{padding:9px}
+  #filterPanel .log-actions{gap:3px 6px}
+  #filterPanel .log-action-label{font-size:10px}
+}

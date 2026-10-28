@@ -284,6 +284,7 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
 
 </style>
 <link rel="stylesheet" href="./theme.css">
+<link rel="stylesheet" href="./log-filters-ui.css">
 </head>
 <body>
 <div id="accessGate" role="dialog" aria-modal="true" aria-labelledby="accessTitle">
@@ -300,75 +301,71 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
 <div id="map"></div>
 
 
-<button id="logToggle" type="button">📄 Logs</button>
+<button id="logToggle" type="button">Logs</button>
 <div id="logPanel" class="hidden">
   <div class="log-head">
-    <div class="log-title">Server Log Viewer</div>
-    <button id="logClose" class="log-close" type="button" title="Close">×</button>
-  </div>
-  <div class="log-auto">
-    <div class="log-auto-title">Automatic Nitrado Sync</div>
-    <div class="log-auto-grid">
-      <input id="nitradoWorkerUrl" type="url" placeholder="Cloudflare Worker URL">
-      <input id="nitradoAccessKey" type="password" placeholder="Map access key">
-      <div class="log-auto-row">
-        <button id="nitradoKeyReveal" class="log-btn" type="button">Show saved key</button>
-        <button id="nitradoKeyCopy" class="log-btn" type="button">Copy saved key</button>
-      </div>
-      <div id="nitradoKeyRecoveryStatus" class="log-auto-status" role="status" aria-live="polite">Only reads this browser's saved key. Never sends it to GitHub.</div>
-      <select id="nitradoServer" disabled>
-        <option value="">Server - test connection first</option>
-      </select>
-      <div class="log-auto-row">
-        <button id="nitradoSyncNow" class="log-btn" type="button">Sync Now</button>
-        <button id="nitradoTest" class="log-btn" type="button">Test Connection</button>
-      </div>
-      <label class="log-auto-check">
-        <input id="nitradoAutoSync" type="checkbox" checked>
-        <span>Auto-sync every 60 seconds</span>
-      </label>
-      <div id="nitradoSyncStatus" class="log-auto-status">Not connected.</div>
+    <div>
+      <div class="log-title">Server Log Viewer</div>
+      <div class="log-head-note">Live activity from your DayZ server</div>
     </div>
+    <button id="logClose" class="log-close" type="button" title="Close Logs" aria-label="Close Logs">×</button>
   </div>
-  <div class="log-file-test">
-    <div class="log-file-test-title">Server File Access Test</div>
-    <div class="log-file-test-help">
-      Safe provider test: creates a harmless text file on the selected Nitrado server,
-      reads it back to verify write access, then tries to delete it automatically.
-      It does not edit events.xml, cfgeventspawns.xml or any live DayZ configuration.
+
+  <div class="log-overview">
+    <div class="log-overview-top">
+      <div class="log-subtitle" style="margin:0">Connection</div>
+      <button id="nitradoSyncNow" class="log-btn log-sync-button" type="button">Refresh logs</button>
     </div>
-    <button id="nitradoFileWriteTest" class="log-btn" type="button" style="width:100%;margin-top:8px">Test File Write</button>
-    <div id="nitradoFileWriteStatus" class="log-file-test-status">Not tested. Provider/master access key required.</div>
+    <div id="nitradoSyncStatus" class="log-auto-status">Not connected.</div>
+    <div id="logSummary" class="log-summary">No log files loaded.</div>
   </div>
-  <div class="log-divider"></div>
-  <div class="log-subtitle" style="margin-top:0">Manual fallback</div>
-  <label class="log-upload">
-    Import Nitrado / DayZ log files
-    <input id="logFileInput" type="file" multiple accept=".ADM,.adm,.log,.txt,text/plain">
-  </label>
-  <div id="logDrop">Drop .ADM, .log or .txt files here</div>
-  <div id="logSummary" class="log-summary">No log files loaded.</div>
-  <div class="log-toolbar">
-    <button id="logSelectAllPlayers" class="log-btn" type="button">All Players</button>
-    <button id="logClear" class="log-btn" type="button">Clear Logs</button>
+
+  <div class="log-activity-header">
+    <div class="log-subtitle" style="margin:0">Recent activity</div>
+    <button id="logClear" class="log-btn log-secondary-button" type="button">Clear</button>
   </div>
-  <div class="log-subtitle">Admin Log Filters</div>
-  <div class="log-toolbar">
-    <button id="logAllActionsOn" class="log-btn" type="button">All Actions On</button>
-    <button id="logAllActionsOff" class="log-btn" type="button">All Actions Off</button>
-  </div>
-  <div class="log-position-mode">
-    <label>
-      <input id="logLatestPositionsOnly" type="checkbox" checked>
-      <span>Map: show latest position only per player</span>
+  <div class="log-filter-hint">Control admin log types and players under <strong>Filters</strong>.</div>
+  <div id="logActivity"><div class="log-empty">No activity loaded. Connect your Nitrado server or import an ADM log.</div></div>
+
+  <details class="log-advanced" id="logConnectionDetails">
+    <summary>Connection settings</summary>
+    <div class="log-auto">
+      <div class="log-auto-grid">
+        <label class="log-compact-label" for="nitradoWorkerUrl">Cloudflare Worker</label>
+        <input id="nitradoWorkerUrl" type="url" placeholder="Cloudflare Worker URL" autocomplete="off">
+        <label class="log-compact-label" for="nitradoAccessKey">Map access key</label>
+        <input id="nitradoAccessKey" type="password" placeholder="Map access key" autocomplete="off">
+        <div class="log-auto-row">
+          <button id="nitradoKeyReveal" class="log-btn" type="button">Show key</button>
+          <button id="nitradoKeyCopy" class="log-btn" type="button">Copy key</button>
+        </div>
+        <div id="nitradoKeyRecoveryStatus" class="log-auto-status" role="status" aria-live="polite">Saved browser key can be recovered here.</div>
+        <label class="log-compact-label" for="nitradoServer">Server</label>
+        <select id="nitradoServer" disabled><option value="">Server - test connection first</option></select>
+        <button id="nitradoTest" class="log-btn" type="button">Test connection</button>
+        <label class="log-auto-check">
+          <input id="nitradoAutoSync" type="checkbox" checked>
+          <span>Auto-sync logs every 60 seconds</span>
+        </label>
+      </div>
+    </div>
+  </details>
+  <details class="log-advanced" id="logManualDetails">
+    <summary>Import ADM logs manually</summary>
+    <label class="log-upload">Choose ADM, LOG or TXT files
+      <input id="logFileInput" type="file" multiple accept=".ADM,.adm,.log,.txt,text/plain">
     </label>
-  </div>
-  <div id="logActions" class="log-actions"></div>
-  <div class="log-subtitle">Players</div>
-  <input id="logPlayerSearch" type="search" placeholder="Search player name…">
-  <div id="logPlayers"><div class="log-empty">Import a log file first.</div></div>
-  <div class="log-subtitle">Activity</div>
-  <div id="logActivity"><div class="log-empty">No activity loaded.</div></div>
+    <div id="logDrop">Or drop log files here</div>
+  </details>
+  <details class="log-advanced" id="logServerFiles">
+    <summary>Server files &amp; write access</summary>
+    <div class="log-file-test">
+      <div class="log-file-test-title">File write access</div>
+      <div class="log-file-test-help">Optional test: creates a temporary text file, reads it back and attempts cleanup. It does not edit DayZ mission files.</div>
+      <button id="nitradoFileWriteTest" class="log-btn" type="button" style="width:100%;margin-top:8px">Test file write</button>
+      <div id="nitradoFileWriteStatus" class="log-file-test-status">Not tested.</div>
+    </div>
+  </details>
 </div>
 
 <div id="placeSearchBox">
@@ -376,26 +373,28 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
   <div id="placeSearchResults" class="hidden"></div>
 </div>
 
-<button id="filterToggle" type="button">☰ Filters</button>
+<button id="filterToggle" type="button">Filters</button>
 <div id="filterPanel" class="hidden">
-  <div class="filter-title">Map Filters</div>
-  <div class="filter-toolbar">
-    <button id="filterAllOn" type="button">All On</button>
-    <button id="filterAllOff" type="button">All Off</button>
-  </div>
-
-  <div class="filter-section-title">Map</div>
-  <label class="filter-row">
-    <input id="filterPlaceNames" type="checkbox" checked>
-    <span>Place Names</span>
-  </label>
-  <label class="filter-row">
-    <input id="filterCustomBases" type="checkbox">
-    <span>🏠 Custom Bases</span>
-    <span class="filter-count">9</span>
-  </label>
-
-  <div class="filter-section-title">Spawns</div>
+  <div class="filter-title">Filters</div>
+  <label class="filter-menu-label" for="filterViewSelect">Choose what to filter</label>
+  <select id="filterViewSelect" class="filter-view-select" aria-label="Filter category">
+    <option value="map">Map layers</option>
+    <option value="spawns">Spawn locations</option>
+    <option value="admin">Admin log events</option>
+    <option value="players">Players &amp; positions</option>
+  </select>
+  <section class="filter-view" data-filter-view="map">
+    <div class="filter-section-title">Map layers</div>
+    <label class="filter-row"><input id="filterPlaceNames" type="checkbox" checked><span>Place Names</span></label>
+    <label class="filter-row"><input id="filterCustomBases" type="checkbox"><span>Custom Bases</span><span class="filter-count">9</span></label>
+    <p class="filter-note">Switch map layers on or off. Select Spawn locations for vehicle and event spawn points.</p>
+  </section>
+  <section class="filter-view" data-filter-view="spawns" hidden>
+    <div class="filter-section-title">Spawn locations</div>
+    <div class="filter-toolbar">
+      <button id="filterAllOn" type="button">Show all</button>
+      <button id="filterAllOff" type="button">Hide all</button>
+    </div>
   <label class="filter-row">
     <input id="filterSpawn_car" type="checkbox">
     <span>🚗 Cars</span>
@@ -462,7 +461,30 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
     <span class="filter-count">21</span>
   </label>
 
-  <div class="filter-note">Use All On / All Off for the full map filter set, or switch categories separately. Base footprints appear when zoomed in.</div>
+
+    <p class="filter-note">Spawn categories are independent from place names and custom bases.</p>
+  </section>
+  <section class="filter-view" data-filter-view="admin" hidden>
+    <div class="filter-section-title">Admin log events</div>
+    <div id="logActionFilterSummary" class="filter-note">17 of 17 types visible</div>
+    <div class="filter-toolbar">
+      <button id="logAllActionsOn" class="log-btn" type="button">Show all</button>
+      <button id="logAllActionsOff" class="log-btn" type="button">Hide all</button>
+    </div>
+    <div id="logActions" class="log-actions"></div>
+  </section>
+  <section class="filter-view" data-filter-view="players" hidden>
+    <div class="filter-section-title">Players &amp; positions</div>
+    <div class="log-position-mode">
+      <label><input id="logLatestPositionsOnly" type="checkbox" checked><span>Show only the latest position per player</span></label>
+    </div>
+    <div class="filter-players-header">
+      <label for="logPlayerSearch">Filter players</label>
+      <button id="logSelectAllPlayers" class="log-btn" type="button">Select all</button>
+    </div>
+    <input id="logPlayerSearch" type="search" placeholder="Search player name…">
+    <div id="logPlayers"><div class="log-empty">Load ADM logs to display players.</div></div>
+  </section>
 </div>
 
 <div id="status">Loading Chernarus location names…</div>
@@ -574,7 +596,7 @@ const filterAllOn=document.getElementById('filterAllOn');
 const filterAllOff=document.getElementById('filterAllOff');
 
 function setAllMapFilters(enabled){
-  for(const input of filterPanel.querySelectorAll('input[type="checkbox"]')){
+  for(const input of filterPanel.querySelectorAll('input[id^="filterSpawn_"]')){
     if(input.checked===enabled) continue;
     input.checked=enabled;
     input.dispatchEvent(new Event('change'));
@@ -583,6 +605,14 @@ function setAllMapFilters(enabled){
 filterAllOn.addEventListener('click',()=>setAllMapFilters(true));
 filterAllOff.addEventListener('click',()=>setAllMapFilters(false));
 
+const filterViewSelect=document.getElementById('filterViewSelect');
+function showFilterView(){
+  for(const section of filterPanel.querySelectorAll('[data-filter-view]')){
+    section.hidden=section.dataset.filterView!==filterViewSelect.value;
+  }
+}
+filterViewSelect.addEventListener('change',showFilterView);
+showFilterView();
 filterToggle.addEventListener('click',()=>{
   filterPanel.classList.toggle('hidden');
 });
@@ -900,7 +930,7 @@ function initLogActionFilters(){
       const input=label.querySelector('input');
       input.addEventListener('change',()=>{
         logActionState.set(key,input.checked);
-        renderLogMap(); renderLogActivity();
+        updateLogActionFilterSummary();renderLogMap(); renderLogActivity();
       });
       logActions.appendChild(label);
     }
@@ -915,15 +945,21 @@ function updateLogActionCounts(){
     if(el) el.textContent=String(count);
   }
 }
+function updateLogActionFilterSummary(){
+  const visible=[...logActionState.values()].filter(Boolean).length;
+  const target=document.getElementById('logActionFilterSummary');
+  if(target)target.textContent=visible+' of '+logActionState.size+' event types visible';
+}
 function setAllLogActions(enabled){
   for(const [key] of Object.entries(LOG_ACTION_META)) logActionState.set(key,enabled);
   for(const input of logActions.querySelectorAll('input[data-log-action]')) input.checked=enabled;
-  renderLogMap(); renderLogActivity();
+  updateLogActionFilterSummary();renderLogMap(); renderLogActivity();
 }
 logAllActionsOn.addEventListener('click',()=>setAllLogActions(true));
 logAllActionsOff.addEventListener('click',()=>setAllLogActions(false));
 logLatestPositionsOnly.addEventListener('change',renderLogMap);
 initLogActionFilters();
+updateLogActionFilterSummary();
 
 
 const NITRADO_CONFIG_KEY='buildit_nitrado_sync_v1';

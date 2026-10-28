@@ -52,10 +52,12 @@ test('minor locations show when zoomed in; names stay in their own positions', a
 
 test('only place names are enabled initially; other map layers are optional', async ({page}) => {
   await expect(page.locator('#filterPlaceNames')).toBeChecked();
-  expect(await page.locator('#filterPanel input[type="checkbox"]:not(#filterPlaceNames)').evaluateAll(
+  expect(await page.locator('#filterCustomBases').isChecked()).toBe(false);
+  expect(await page.locator('#filterPanel input[id^="filterSpawn_"]').evaluateAll(
     elements => elements.every(input => !input.checked)
   )).toBe(true);
   await page.locator('#filterToggle').click();
+  await page.locator('#filterViewSelect').selectOption('spawns');
   await page.locator('#filterSpawn_car').check();
   await expect(page.locator('#filterSpawn_car')).toBeChecked();
 });
@@ -69,6 +71,8 @@ test('right-side menus are aligned and only one panel is open', async ({page}) =
   await page.locator('#filterToggle').click();
   await expect(page.locator('#filterPanel')).toBeVisible();
   await page.locator('#logToggle').click();
+  await page.locator('#logConnectionDetails').evaluate(el=>el.open=true);
+  await page.locator('#logServerFiles').evaluate(el=>el.open=true);
   await expect(page.locator('#logPanel')).toBeVisible();
   await expect(page.locator('#filterPanel')).toBeHidden();
   await page.locator('#biToggle').click();
@@ -117,6 +121,8 @@ test('Nitrado File Manager downloads files and requires a separate write key', a
     await route.fulfill({...init,body:JSON.stringify(response)});
   });
   await page.locator('#logToggle').click();
+  await page.locator('#logConnectionDetails').evaluate(el=>el.open=true);
+  await page.locator('#logServerFiles').evaluate(el=>el.open=true);
   await expect(page.locator('#fileManager')).toBeVisible();
   await page.locator('#nitradoWorkerUrl').fill('https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').fill('fake_read_key_for_browser_test');
@@ -271,6 +277,8 @@ test('File Manager finds DayZ PS Chernarus mission in FTP root, not noftp/dayzps
     return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,root:noftp,dir,entries:folders[dir]})});
   });
   await page.locator('#logToggle').click();
+  await page.locator('#logConnectionDetails').evaluate(el=>el.open=true);
+  await page.locator('#logServerFiles').evaluate(el=>el.open=true);
   await page.locator('#nitradoWorkerUrl').fill('https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').fill('test_map_sync_key_0123456789');
   await page.locator('#fmBrowse').click();
@@ -303,6 +311,8 @@ test('File Manager lets user browse FTP root directly when mission auto-discover
     return route.fulfill({status:404,contentType:'application/json',body:'{"error":"not found"}'});
   });
   await page.locator('#logToggle').click();
+  await page.locator('#logConnectionDetails').evaluate(el=>el.open=true);
+  await page.locator('#logServerFiles').evaluate(el=>el.open=true);
   await page.locator('#nitradoWorkerUrl').fill('https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').fill('test_map_sync_key_0123456789');
   await page.locator('#fmFtpRoot').click();
@@ -325,6 +335,8 @@ test('Mission finder fails safely without attempting writes if mission directori
     return route.fulfill({status:404,contentType:'application/json',body:'{"error":"not found"}'});
   });
   await page.locator('#logToggle').click();
+  await page.locator('#logConnectionDetails').evaluate(el=>el.open=true);
+  await page.locator('#logServerFiles').evaluate(el=>el.open=true);
   await page.locator('#nitradoWorkerUrl').fill('https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').fill('test_map_sync_key_0123456789');
   await page.locator('#fmFindMission').click();
@@ -515,6 +527,8 @@ test('Custom Bases streams JSON bigger than 512KB without changing file editor o
 
 test('file-write test shows exact missing/short-key reason and puts key next to test', async ({page})=>{
   await page.locator('#logToggle').click();
+  await page.locator('#logConnectionDetails').evaluate(el=>el.open=true);
+  await page.locator('#logServerFiles').evaluate(el=>el.open=true);
   const key=page.locator('#nitradoWriteKey');
   const count=page.locator('#nitradoWriteKeyLength');
   const test=page.locator('#nitradoFileWriteTest');
@@ -853,6 +867,8 @@ test('Nitrado File Manager offers explicit duplicate header repair, no automatic
   await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-access');
   await page.locator('#logToggle').click();
+  await page.locator('#logConnectionDetails').evaluate(el=>el.open=true);
+  await page.locator('#logServerFiles').evaluate(el=>el.open=true);
   await page.locator('#fmBrowse').click();
   await page.locator('.fm-entry').filter({hasText:'events.xml'}).click();
   await expect(page.locator('#fmRepairXml')).toBeVisible();
@@ -988,6 +1004,8 @@ test('Nitrado File Manager clearly validates JSON and disables upload when edite
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-access');
   await page.locator('#nitradoWriteKey').evaluate(el=>el.value='random-test-write-key');
   await page.locator('#logToggle').click();
+  await page.locator('#logConnectionDetails').evaluate(el=>el.open=true);
+  await page.locator('#logServerFiles').evaluate(el=>el.open=true);
   await page.locator('#fmBrowse').click();
   await page.locator('.fm-entry').filter({hasText:'cfgGameplay.json'}).click();
   await expect(page.locator('#fmValidationStatus')).toContainText('VALID');
@@ -1022,6 +1040,8 @@ test('Nitrado File Manager blocks invalid XML and wrong DayZ XML root',async({pa
   await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-access');
   await page.locator('#logToggle').click();
+  await page.locator('#logConnectionDetails').evaluate(el=>el.open=true);
+  await page.locator('#logServerFiles').evaluate(el=>el.open=true);
   await page.locator('#fmBrowse').click();
   await page.locator('.fm-entry').filter({hasText:'events.xml'}).click();
   await expect(page.locator('#fmValidationStatus')).toContainText('VALID');
@@ -1031,4 +1051,69 @@ test('Nitrado File Manager blocks invalid XML and wrong DayZ XML root',async({pa
   await page.locator('#fmEditor').fill('<?xml version="1.0"?>\n<?xml version="1.0"?>\n<events/>');
   await expect(page.locator('#fmValidationStatus')).toContainText('INVALID');
   await expect(page.locator('#fmSave')).toBeDisabled();
+});
+
+
+test('Server Log Viewer keeps status and activity prominent with settings collapsed by default',async({page})=>{
+  await page.locator('#logToggle').evaluate(el=>el.click());
+  await expect(page.locator('#logPanel')).toBeVisible();
+  await expect(page.locator('#logActivity')).toBeVisible();
+  await expect(page.locator('#nitradoSyncStatus')).toBeVisible();
+  await expect(page.locator('#nitradoSyncNow')).toBeVisible();
+  await expect(page.locator('#logConnectionDetails')).not.toHaveAttribute('open','');
+  await expect(page.locator('#logManualDetails')).not.toHaveAttribute('open','');
+  await expect(page.locator('#logServerFiles')).not.toHaveAttribute('open','');
+  await expect(page.locator('#nitradoWorkerUrl')).toBeHidden();
+  await expect(page.locator('#logFileInput')).toBeHidden();
+  await expect(page.locator('#fileManager')).toBeHidden();
+  await expect(page.locator('#logActions')).toBeHidden();
+  await page.locator('#logConnectionDetails summary').click();
+  await expect(page.locator('#nitradoWorkerUrl')).toBeVisible();
+  await page.locator('#logServerFiles summary').click();
+  await expect(page.locator('#fileManager')).toBeVisible();
+});
+
+test('One Filters dropdown controls map, spawns, admin logs and players without mixing settings',async({page})=>{
+  await page.locator('#filterToggle').click();
+  const menu=page.locator('#filterViewSelect');
+  await expect(menu).toBeVisible();
+  await expect(page.locator('[data-filter-view="map"]')).toBeVisible();
+  await expect(page.locator('[data-filter-view="admin"]')).toBeHidden();
+  await menu.selectOption('spawns');
+  await expect(page.locator('[data-filter-view="spawns"]')).toBeVisible();
+  await page.locator('#filterAllOn').click();
+  expect(await page.locator('#filterPanel input[id^="filterSpawn_"]').evaluateAll(els=>els.every(e=>e.checked))).toBe(true);
+  await expect(page.locator('#filterPlaceNames')).toBeChecked();
+  await menu.selectOption('admin');
+  await expect(page.locator('#logActions')).toBeVisible();
+  await expect(page.locator('#logActionFilterSummary')).toHaveText('17 of 17 event types visible');
+  await page.locator('#logAllActionsOff').click();
+  await expect(page.locator('#logActionFilterSummary')).toHaveText('0 of 17 event types visible');
+  expect(await page.evaluate(()=>[...logActionState.values()].every(x=>!x))).toBe(true);
+  expect(await page.locator('#filterPanel input[id^="filterSpawn_"]').evaluateAll(els=>els.every(e=>e.checked))).toBe(true);
+  await page.locator('input[data-log-action="kill"]').check();
+  await expect(page.locator('#logActionFilterSummary')).toHaveText('1 of 17 event types visible');
+  expect(await page.evaluate(()=>logActionState.get('kill'))).toBe(true);
+  await menu.selectOption('players');
+  await expect(page.locator('#logLatestPositionsOnly')).toBeVisible();
+  await expect(page.locator('#logPlayerSearch')).toBeVisible();
+  await expect(page.locator('#logPlayers')).toBeVisible();
+  await page.locator('#logLatestPositionsOnly').uncheck();
+  await expect(page.locator('#logLatestPositionsOnly')).not.toBeChecked();
+  await menu.selectOption('map');
+  await expect(page.locator('#filterPlaceNames')).toBeVisible();
+  await expect(page.locator('[data-filter-view="spawns"]')).toBeHidden();
+});
+
+test('Unified Filters menu fits phone viewport without horizontal overflow',async({page})=>{
+  await page.locator('#filterToggle').click();
+  const viewport=page.viewportSize();
+  for(const value of ['map','spawns','admin','players']){
+    await page.locator('#filterViewSelect').selectOption(value);
+    const b=await page.locator('#filterPanel').boundingBox();
+    expect(b.x).toBeGreaterThanOrEqual(0);
+    expect(b.x+b.width).toBeLessThanOrEqual(viewport.width+1);
+    const hasOverflow=await page.locator('#filterPanel').evaluate(el=>el.scrollWidth>el.clientWidth+1);
+    expect(hasOverflow,'Unexpected horizontal overflow for '+value).toBe(false);
+  }
 });
