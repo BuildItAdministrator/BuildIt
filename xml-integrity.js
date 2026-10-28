@@ -26,7 +26,7 @@
     const declaration=content.match(/^\uFEFF?<\?xml\s+[^?]*\?>/i)?.[0];
     const encoding=declaration && attrs(declaration).encoding;
     if(encoding && !/^utf-?8$/.test(encoding))
-      throw new Error('XML declares '+encoding+' instead of UTF-8. Automatic text upload is disabled.');
+      throw new Error('Server file declares '+encoding.toUpperCase()+' encoding; UTF-8 upload is blocked to prevent corruption.');
     return doc;
   }
   function repairDuplicateDeclarations(original,root){
