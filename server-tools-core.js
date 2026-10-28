@@ -262,5 +262,42 @@
     return {scanned,total:matches.length,results:matches.slice(0,100)};
   }
 
-  root.BUILD_IT_SERVER_CORE=Object.freeze({validate,splitJSON,editTypes,eventConflicts,globalsList,editGlobal,spawnableDuplicates,objectDuplicates,addMessage,findClassnames,xmlDoc});
+
+  // Edit an existing spawnable classname only; never invent attachments,
+  // damage rules, or new spawnable entries.
+  function editSpawnableChance(source,classname,section,newChance){
+    xmlDoc(source,'spawnabletypes');
+    const name=String(classname||'').trim();
+    if(!/^[A-Za-z0-9_]{1,100}$/.test(name))throw new Error('Enter one existing spawnable classname.');
+    if(!['attachments','cargo'].includes(section))throw new Error('Choose attachments or cargo.');
+    const chance=Number(newChance);
+    if(newChance===''||!Number.isFinite(chance)||chance<0||chance>1)
+      throw new Error('Chance must be between 0 and 1.');
+    const chanceStr=chance.toFixed(2);
+    const ignored=ignoredXmlRanges(source);
+    let targetMatches=0,changed=0,groups=0;
+    const content=source.replace(/<type\b[^>]*\bname\s*=\s*(["'])([^"']+)\1[^>]*>[\s\S]*?<\/type\s*>/gi,
+      (block,quote,current,offset)=>{
+      if(inXmlComment(ignored,offset)||current.toLowerCase()!==name.toLowerCase())return block;
+      targetMatches++;
+      const groupRE=new RegExp('<'+section+'\\b[^>]*>[\\s\\S]*?<\\/'+section+'\\s*>','gi');
+      return block.replace(groupRE,group=>{
+        groups++;
+        // Change only existing chance attributes within this section. Missing
+        // chances keep DayZ's default behavior, rather than inserting guesses.
+        return group.replace(/\bchance\s*=\s*(["'])([0-9]*\.?[0-9]+)\1/gi,
+          (attr,q,old)=>{
+          if(Number(old)!==chance)changed++;
+          return 'chance='+q+chanceStr+q;
+        });
+      });
+    });
+    if(targetMatches!==1)throw new Error(targetMatches?'Duplicate '+name+' entries found; repair before editing.':
+      'Spawnable '+name+' does not exist in cfgspawnabletypes.xml.');
+    if(!groups)throw new Error(name+' has no existing '+section+' sections to adjust.');
+    xmlDoc(content,'spawnabletypes');
+    return {content,changed,groups,classname:name,section,chance:chanceStr};
+  }
+
+  root.BUILD_IT_SERVER_CORE=Object.freeze({validate,splitJSON,editTypes,eventConflicts,globalsList,editGlobal,spawnableDuplicates,objectDuplicates,addMessage,findClassnames,editSpawnableChance,xmlDoc});
 })(window);
