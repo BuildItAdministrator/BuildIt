@@ -1944,3 +1944,87 @@ test('Nitrado file snapshots are invalidated before another server can be edited
   });
   expect(data).toEqual({reset:'function',isBusy:false});
 });
+
+
+test('menus toggle beside theme controls hides and restores every administration panel',async({page})=>{
+ const menus=page.locator('#builditMenusToggle');
+ const theme=page.locator('#builditThemeToggle');
+ await expect(menus).toBeVisible();
+ await expect(menus).toHaveAccessibleName('Hide menus');
+ const menuBox=await menus.boundingBox(),themeBox=await theme.boundingBox();
+ expect(menuBox.x+menuBox.width).toBeLessThanOrEqual(themeBox.x+1);
+ await page.locator('#filterToggle').click();
+ await expect(page.locator('#filterPanel')).toBeVisible();
+ await menus.click();
+ await expect(page.locator('html')).toHaveAttribute('data-buildit-menus-hidden','true');
+ await expect(page.locator('#filterToggle')).toBeHidden();
+ await expect(page.locator('#filterPanel')).toBeHidden();
+ await expect(page.locator('#placeSearchInput')).toBeHidden();
+ await expect(page.locator('#biServerProfileDock')).toBeHidden();
+ await expect(page.locator('#toolHubToggle')).toBeHidden();
+ await expect(theme).toBeVisible();
+ await expect(menus).toHaveAccessibleName('Show menus');
+ await menus.click();
+ await expect(page.locator('#filterPanel')).toBeVisible();
+ await expect(page.locator('#filterToggle')).toBeVisible();
+ await expect(page.locator('#placeSearchInput')).toBeVisible();
+ await page.reload({waitUntil:'domcontentloaded'});
+ await expect(page.locator('#filterToggle')).toBeVisible();
+ await menus.click();
+ await page.reload({waitUntil:'domcontentloaded'});
+ await expect(page.locator('#builditMenusToggle')).toHaveAccessibleName('Show menus');
+ await expect(page.locator('#filterToggle')).toBeHidden();
+ await page.locator('#builditMenusToggle').click();
+ await expect(page.locator('#filterToggle')).toBeVisible();
+});
+
+test('Quick Spawn map picking shows only map controls and restores the spawn panel on click',async({page})=>{
+ await page.locator('#biToggle').click();
+ await expect(page.locator('#quickSpawnPanel')).toBeVisible();
+ await page.locator('#qsPick').click();
+ await expect(page.locator('html')).toHaveAttribute('data-buildit-map-picking','true');
+ await expect(page.locator('#quickSpawnPanel')).toBeHidden();
+ await expect(page.locator('#filterToggle')).toBeHidden();
+ await expect(page.locator('#builditMapPickCancel')).toBeVisible();
+ await expect(page.locator('#builditThemeToggle')).toBeVisible();
+ await page.evaluate(()=>map.fire('click',{latlng:gameToLeaflet(4444,8888)}));
+ await expect(page.locator('html')).toHaveAttribute('data-buildit-map-picking','false');
+ await expect(page.locator('#quickSpawnPanel')).toBeVisible();
+ await expect(page.locator('#qsCoordinates')).toContainText('4444');
+ await expect(page.locator('#builditMapPickCancel')).toBeHidden();
+ await expect(page.locator('#filterToggle')).toBeVisible();
+});
+
+test('map selection can be cancelled with Escape or on-screen Cancel without losing the panel',async({page})=>{
+ await page.locator('#biToggle').click();
+ await page.locator('#qsPick').click();
+ await expect(page.locator('#quickSpawnPanel')).toBeHidden();
+ await page.keyboard.press('Escape');
+ await expect(page.locator('#quickSpawnPanel')).toBeVisible();
+ await expect(page.locator('#qsCoordinates')).toContainText('No location selected');
+ await page.locator('#qsPick').click();
+ await page.locator('#builditMapPickCancel').click();
+ await expect(page.locator('html')).toHaveAttribute('data-buildit-map-picking','false');
+ await expect(page.locator('#quickSpawnPanel')).toBeVisible();
+ await expect(page.locator('#qsCoordinates')).toContainText('No location selected');
+});
+
+test('Advanced Event Manager uses the same temporary map-only mode',async({page})=>{
+ await openAdvancedEventManager(page);
+ await page.locator('#biPick').click();
+ await expect(page.locator('#biPanel')).toBeHidden();
+ await expect(page.locator('#builditMapPickCancel')).toBeVisible();
+ await page.evaluate(()=>map.fire('click',{latlng:gameToLeaflet(5000,8000)}));
+ await expect(page.locator('html')).toHaveAttribute('data-buildit-map-picking','false');
+ await expect(page.locator('#biPanel')).toBeVisible();
+ await expect(page.locator('#biPoint')).toContainText('5000');
+});
+test('map focus does not override a manually hidden menu preference',async({page})=>{
+ await page.locator('#biToggle').click();
+ await page.locator('#qsPick').click();
+ await expect(page.locator('#quickSpawnPanel')).toBeHidden();
+ await page.locator('#builditMenusToggle').click();
+ await expect(page.locator('html')).toHaveAttribute('data-buildit-map-picking','false');
+ await expect(page.locator('html')).toHaveAttribute('data-buildit-menus-hidden','false');
+ await expect(page.locator('#quickSpawnPanel')).toBeVisible();
+});
