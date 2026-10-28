@@ -1391,24 +1391,68 @@ test('JSON loot migration replaces old Build It references with custom/builditlo
 });
 
 
-test('server tool catalog lists 53 items with only functional tools actionable',async({page})=>{
+test('server tools catalog shows 53 items, with no local-file import workflow',async({page})=>{
   const stats=await page.evaluate(()=>window.BUILD_IT_TOOLS);
-  expect(stats).toEqual({count:53,ready:8});
+  expect(stats).toEqual({count:53,ready:10,mode:'nitrado'});
   await page.locator('#toolHubToggle').click();
   await expect(page.locator('#toolHubPanel')).toBeVisible();
   await expect(page.locator('#stCards .st-card')).toHaveCount(53);
-  await page.locator('#stSearch').fill('JSON Validator');
-  await expect(page.locator('#stCards .st-card')).toHaveCount(1);
-  await page.locator('#stCards .st-card button').click();
-  await expect(page.locator('#stWorkTitle')).toHaveText('JSON Validator');
-  await page.locator('#stSource').fill('{"Objects":[{"name":"Apple","pos":[1,2,3]}]}');
-  await page.locator('#stRun').click();
-  await expect(page.locator('#stResult')).toContainText('VALID JSON');
-  await page.locator('#stBack').click();
+  await expect(page.locator('#stFile')).toHaveCount(0);
+  await expect(page.locator('#stDownload')).toHaveCount(0);
   await page.locator('#stSearch').fill('NPC Generator');
   await expect(page.locator('#stCards .st-card')).toHaveCount(1);
   await expect(page.locator('#stCards .st-card')).toContainText('Planned');
   await expect(page.locator('#stCards .st-card button')).toHaveCount(0);
+  await page.locator('#stSearch').fill('JSON Splitter');
+  await expect(page.locator('#stCards .st-card')).toContainText('Planned');
+  await expect(page.locator('#stCards .st-card button')).toHaveCount(0);
+});
+
+test('live Nitrado Types Booster previews then publishes with current SHA and backup',async({page})=>{
+  const root='/games/ni5774718_3/noftp';
+  const mission='/games/ni5774718_3/ftproot/dayzps_missions/dayzOffline.chernarusplus';
+  const path=mission+'/db/types.xml';
+  const xml='<?xml version="1.0" encoding="UTF-8"?>\n<types>\n  <type name="Apple"><nominal>10</nominal><min>5</min></type>\n  <type name="Pear"><nominal>20</nominal><min>2</min></type>\n</types>';
+  const calls=[];
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const url=new URL(route.request().url()),method=route.request().method();
+    calls.push({path:url.pathname,method,body:method==='POST'?route.request().postDataJSON():null});
+    let status=200,data={};
+    if(url.pathname==='/api/files/list'){
+      const dir=url.searchParams.get('dir');
+      if(!dir)data={root,dir:root,entries:[]};
+      else if(dir===mission)data={root,dir,entries:[{name:'db',type:'directory',path:mission+'/db'}]};
+      else if(dir===mission+'/db')data={root,dir,entries:[{name:'types.xml',type:'file',path,size:xml.length}]};
+      else{status=404;data={error:'Missing folder'};}
+    }else if(url.pathname==='/api/files/read'){
+      const file=url.searchParams.get('file');
+      if(file===path)data={path,content:xml,sha256:'a'.repeat(64)};
+      else{status=404;data={error:'Missing file'};}
+    }else if(url.pathname==='/api/files/write'){
+      data={verified:true,backupPath:path+'.buildit-backup'};
+    }else{status=404;data={error:'Unexpected route'};}
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
+  });
+  await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-access');
+  await page.locator('#toolHubToggle').click();
+  await page.locator('#stSearch').fill('Types Booster');
+  await page.locator('#stCards .st-card button').click();
+  await expect(page.locator('#stFileState')).toContainText('Live: db/types.xml');
+  await page.locator('#stValue').fill('2');
+  await page.locator('#stRun').click();
+  await expect(page.locator('#stResult')).toContainText('2 item(s) will change');
+  expect(calls.filter(x=>x.path==='/api/files/write')).toHaveLength(0);
+  await expect(page.locator('#stPublish')).toBeVisible();
+  await page.locator('#stWriteKey').fill('test-write-access');
+  page.on('dialog',d=>d.accept());
+  await page.locator('#stPublish').click();
+  await expect(page.locator('#stResult')).toContainText('UPLOAD VERIFIED');
+  const writes=calls.filter(x=>x.path==='/api/files/write');
+  expect(writes).toHaveLength(1);
+  expect(writes[0].body).toMatchObject({path,expectedSha256:'a'.repeat(64),confirm:true});
+  expect(writes[0].body.content).toContain('<nominal>40</nominal>');
+  expect(writes[0].body.content).toContain('<nominal>20</nominal>');
 });
 
 test('server tools preserve XML declaration and unchanged types when editing nominal',async({page})=>{
