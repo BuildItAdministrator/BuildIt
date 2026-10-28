@@ -13,7 +13,7 @@ const C=[
  ['Equipment & effects',['Loadout Generator','Weapon Blueprint Generator','Bag Fill Generator','CfgEffect Converter']]
 ];
 const TOOLS=C.flatMap(([group,names])=>names.map(name=>({name,group})));
-const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer']);
+const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','SpawnObject Heatmap','Event Group Calculator']);
 const RELATED={'Events Organizer':'biToggle','Build A Vehicle':'biToggle'};
 const ROOT=document.createElement('div');ROOT.id='serverToolsRoot';
 ROOT.innerHTML=`
@@ -49,6 +49,7 @@ ROOT.innerHTML=`
    <div id="stObjectMoveControls" class="st-params" hidden><label class="st-field st-wide"><span>Object from server file</span><select id="stObjectIndex"></select></label><label class="st-field"><span>X</span><input id="stObjectX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Z</span><input id="stObjectZ" type="number" min="0" max="15360" step="0.01"></label></div>
    <div id="stPlayerSpawnControls" class="st-params" hidden><label class="st-field"><span>Spawn X</span><input id="stPlayerX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Spawn Z</span><input id="stPlayerZ" type="number" min="0" max="15360" step="0.01"></label></div>
    <div id="stMapControls" class="st-actions" hidden><button id="stPickMap" type="button">Pick on map</button><span class="st-help">Optional map selection for X/Z.</span></div>
+   <div id="stHeatmapControls" class="st-actions" hidden><button id="stShowHeatmap" type="button">Show density on map</button><button id="stClearHeatmap" type="button">Clear heatmap</button></div>
    <div class="st-actions"><button id="stRun" type="button" disabled>Check / Preview</button><button id="stPublish" type="button" hidden disabled>Apply to Nitrado</button></div>
    <pre id="stResult" class="st-result" role="status" aria-live="polite"></pre>
    <details class="st-settings"><summary>Connection · MAP_WRITE_KEY</summary><p class="st-help">Use the same write key as the File Manager. This key is never saved.</p><label class="st-field"><span>Write key</span><input id="stWriteKey" type="password" autocomplete="off" placeholder="MAP_WRITE_KEY"></label></details>
@@ -57,7 +58,7 @@ ROOT.innerHTML=`
 document.body.appendChild(ROOT);
 const $=id=>ROOT.querySelector('#'+id);
 const panel=$('toolHubPanel'),cards=$('stCards'),workspace=$('stWorkspace');
-let selected=null,snapshot=null,preview=null,busy=false,remoteList=[];
+let selected=null,snapshot=null,preview=null,busy=false,remoteList=[],heatLayer=null;
 const bridge=window.BUILD_IT_SERVER_FILES,core=window.BUILD_IT_SERVER_CORE,ext=window.BUILD_IT_SERVER_EXTENSIONS;
 if(!bridge||!core||!ext)throw new Error('Server Tools dependencies not ready.');
 const DEFAULTS={
@@ -79,7 +80,9 @@ const DEFAULTS={
  'Weather Manager':'cfgweather.xml',
  'Spawn Point Generator':'cfgplayerspawnpoints.xml',
  'SpawnObject Mover':'custom/builditlootdrop.json',
- 'SpawnObject Organizer':'custom/builditlootdrop.json'
+ 'SpawnObject Organizer':'custom/builditlootdrop.json',
+ 'SpawnObject Heatmap':'custom/builditlootdrop.json',
+ 'Event Group Calculator':'cfgeventspawns.xml'
 };
 const EDITORS=new Set(['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Globals Configurator','Messages Generator','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer']);
 function setStatus(text,error=false){
@@ -145,7 +148,7 @@ function toolFiles(){
  return remoteList.filter(file=>{
    if(selected==='JSON Validator')return file.relative.endsWith('.json');
    if(selected==='XML Validator')return file.relative.endsWith('.xml');
-   if(['SpawnObject Duplicate Checker','SpawnObject Mover','SpawnObject Organizer'].includes(selected))return file.relative.endsWith('.json');
+   if(['SpawnObject Duplicate Checker','SpawnObject Mover','SpawnObject Organizer','SpawnObject Heatmap'].includes(selected))return file.relative.startsWith('custom/')&&file.relative.endsWith('.json');
    if(selected==='Weather Manager')return file.relative==='cfgweather.xml';
    if(selected==='Messages Generator')return ['db/messages.xml','messages.xml'].includes(file.relative);
    return file.relative===DEFAULTS[selected];
@@ -247,6 +250,7 @@ async function choose(name){
  $('stObjectMoveControls').hidden=name!=='SpawnObject Mover';
  $('stPlayerSpawnControls').hidden=name!=='Spawn Point Generator';
  $('stMapControls').hidden=!['SpawnObject Mover','Spawn Point Generator'].includes(name);
+ $('stHeatmapControls').hidden=name!=='SpawnObject Heatmap';
  $('stValueLabel').textContent=name==='Advanced Types Editor'?'Set value':'Multiplier';
  $('stValue').value=name==='Types Reducer'||name==='Lifetime Reducer'?'0.5':
    name==='Advanced Types Editor'?'100':'2';
@@ -335,6 +339,14 @@ function analyze(){
    return {content:change.content,changed:change.changed,message:'PREVIEW — Move '+change.name+
      '\nOld X/Y/Z: '+change.previous.join(', ')+'\nNew X/Y/Z: '+change.current.join(', ')+
      '\nOriginal Y elevation and all other objects are retained.'};
+ }
+ if(selected==='Event Group Calculator'){
+   const groups=core.eventGroupStats(source);
+   return {message:'LIVE EVENT GROUPS — '+groups.events.length+' event groups, '+groups.total+' configured positions.\n'+groups.events.slice(0,60).map(g=>g.name+' · '+g.positions+' positions').join('\n')+(groups.warnings.length?'\nWarnings:\n'+groups.warnings.slice(0,30).join('\n'):'')};
+ }
+ if(selected==='SpawnObject Heatmap'){
+   const objects=ext.objectList(source);
+   return {message:objects.length+' existing objects loaded from '+snapshot.relative+'. Use Show density on map to visualize positions. No server files modified.'};
  }
  if(selected==='SpawnObject Organizer'){
    const change=ext.organizeObjects(source);
