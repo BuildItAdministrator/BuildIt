@@ -119,7 +119,7 @@ function render(){
  const search=$('stSearch').value.trim().toLowerCase(),category=$('stCategory').value;
  cards.replaceChildren();
  let shown=0;
- for(const tool of TOOLS){
+ for(const tool of TOOLS.slice().sort((a,b)=>Number(ACTIVE.has(b.name))-Number(ACTIVE.has(a.name)))){
    if(category&&tool.group!==category)continue;
    if(search&&!tool.name.toLowerCase().includes(search)&&!tool.group.toLowerCase().includes(search))continue;
    shown++;
@@ -127,7 +127,7 @@ function render(){
    const card=document.createElement('div');card.className='st-card'+(ready?' st-ready':'');
    const title=document.createElement('strong');title.textContent=tool.name;
    const meta=document.createElement('small');
-   meta.textContent=tool.group+' · '+(ready?'Connected to Nitrado':related?'Partial in Advanced Events':'Planned — server integration not ready');
+   meta.textContent=tool.group+' · '+(ready?'Connected to Nitrado':related?'Partial in Advanced Events':'Nog in ontwikkeling · nog niet beschikbaar');
    card.append(title,meta);
    if(ready||related){
      const btn=document.createElement('button');btn.type='button';
