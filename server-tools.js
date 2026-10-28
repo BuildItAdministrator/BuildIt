@@ -1,6 +1,6 @@
 /* Build It!++ — compact DayZ console tools hub.
  * 53-item roadmap; only working tools have an action.
- * No network writes: use existing File Manager for reviewed Nitrado uploads.
+ * Server-connected tools use the shared authenticated read/write bridge.
  */
 (function(){
 'use strict';
@@ -13,11 +13,11 @@ const C=[
  ['Equipment & effects',['Loadout Generator','Weapon Blueprint Generator','Bag Fill Generator','CfgEffect Converter']]
 ];
 const TOOLS=C.flatMap(([group,names])=>names.map(name=>({name,group})));
-const ACTIVE=new Set(['XML Validator','JSON Validator','JSON Splitter','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check']);
+const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker']);
 const RELATED={'Events Organizer':'biToggle','Build A Vehicle':'biToggle'};
 const ROOT=document.createElement('div');ROOT.id='serverToolsRoot';
 ROOT.innerHTML=`
-<button type="button" id="toolHubToggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="toolHubPanel">Server Tools <span class="st-count">${ACTIVE.size} ready · ${TOOLS.length} listed</span></button>
+<button type="button" id="toolHubToggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="toolHubPanel">Server Tools <span class="st-count">${ACTIVE.size} connected · ${TOOLS.length} listed</span></button>
 <section id="toolHubPanel" hidden role="dialog" aria-label="DayZ Server Tools">
  <header class="st-header">
    <div><strong>Server Tools</strong><small>Console configuration studio · ${TOOLS.length} catalogued</small></div>
@@ -27,24 +27,22 @@ ROOT.innerHTML=`
    <label class="st-field"><span>Find a tool</span><input id="stSearch" type="search" autocomplete="off" placeholder="Search all ${TOOLS.length} tools…"></label>
    <label class="st-field"><span>Category</span><select id="stCategory"><option value="">All categories</option>${C.map(([name])=>'<option>'+name+'</option>').join('')}</select></label>
  </div>
- <div class="st-summary">Ready tools can process your local files. Planned entries are listed for the roadmap only.</div>
+ <div class="st-summary">Every active tool reads your Nitrado server files directly. Changes are previewed, checked and backed up before being published. No manual imports or exports.</div>
  <div id="stCards" class="st-cards" aria-live="polite"></div>
  <div id="stWorkspace" class="st-workspace" hidden>
    <div class="st-work-head"><strong id="stWorkTitle"></strong><button type="button" id="stBack">Back to tools</button></div>
    <p id="stHelp" class="st-help"></p>
-   <label class="st-field"><span>Import a local source file</span><input id="stFile" type="file" accept=".xml,.json,text/xml,application/json"></label>
-   <label class="st-field"><span>Source XML or JSON (can also paste here)</span><textarea id="stSource" rows="8" spellcheck="false" placeholder="Import your file or paste its complete contents"></textarea></label>
+   <label class="st-field"><span>File on Nitrado</span><select id="stRemoteFile"></select></label>
+   <div class="st-actions"><button id="stReload" type="button">Refresh from Nitrado</button><span id="stFileState" class="st-help" role="status" aria-live="polite"></span></div>
    <div id="stParameters" class="st-params" hidden>
      <label class="st-field"><span>Modify</span><select id="stField"><option value="nominal">Nominal amount</option><option value="min">Minimum amount</option><option value="lifetime">Lifetime (seconds)</option><option value="restock">Restock (seconds)</option><option value="quantmin">Quantity minimum</option><option value="quantmax">Quantity maximum</option><option value="cost">Cost</option></select></label>
      <label class="st-field"><span id="stValueLabel">Multiplier</span><input type="number" id="stValue" value="2" min="0" max="1000" step="0.1"></label>
      <label class="st-field st-wide"><span>Classname filter (optional)</span><input id="stClassname" type="text" placeholder="Empty applies to all types"></label>
    </div>
-   <div id="stSplitControls" class="st-params" hidden>
-     <label class="st-field"><span>Entries per JSON file</span><input type="number" id="stChunkSize" min="1" max="10000" step="1" value="100"></label>
-   </div>
-   <div class="st-actions"><button id="stRun" type="button">Validate / Generate</button><button id="stDownload" type="button" hidden>Download edited file</button></div>
+   <div id="stGlobalControls" class="st-params" hidden><label class="st-field"><span>Existing global</span><select id="stGlobalName"></select></label><label class="st-field"><span>New numeric value</span><input type="number" id="stGlobalValue" step="any"></label></div>
+   <div class="st-actions"><button id="stRun" type="button" disabled>Check / Preview</button><button id="stPublish" type="button" hidden disabled>Apply to Nitrado</button></div>
    <pre id="stResult" class="st-result" role="status" aria-live="polite"></pre>
-   <div id="stParts" class="st-parts"></div>
+   <details class="st-settings"><summary>Connection · MAP_WRITE_KEY</summary><p class="st-help">Use the same write key as the File Manager. This key is never saved.</p><label class="st-field"><span>Write key</span><input id="stWriteKey" type="password" autocomplete="off" placeholder="MAP_WRITE_KEY"></label></details>
  </div>
 </section>`;
 document.body.appendChild(ROOT);
