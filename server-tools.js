@@ -13,7 +13,7 @@ const C=[
  ['Equipment & effects',['Loadout Generator','Weapon Blueprint Generator','Bag Fill Generator','CfgEffect Converter']]
 ];
 const TOOLS=C.flatMap(([group,names])=>names.map(name=>({name,group})));
-const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder']);
+const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder','Spawnable Types Adjuster']);
 const RELATED={'Events Organizer':'biToggle','Build A Vehicle':'biToggle'};
 const ROOT=document.createElement('div');ROOT.id='serverToolsRoot';
 ROOT.innerHTML=`
@@ -43,6 +43,7 @@ ROOT.innerHTML=`
    <div id="stMessageControls" class="st-params" hidden><label class="st-field st-wide"><span>Server message (max 160 characters)</span><textarea id="stMessageText" maxlength="160" rows="3" placeholder="Welcome to our DayZ server!"></textarea></label><label class="st-field"><span>Repeat (minutes)</span><input id="stMessageInterval" type="number" min="1" max="1440" step="1" value="30"></label></div>
    <div id="stTierControls" class="st-params" hidden><label class="st-field"><span>Explicit loot tier</span><select id="stTier"><option>Tier1</option><option>Tier2</option><option>Tier3</option><option>Tier4</option></select></label><label class="st-field"><span>Nominal multiplier</span><input id="stTierFactor" type="number" min="1" max="1000" step="0.1" value="2"></label></div>
    <div id="stClassSearchControls" class="st-params" hidden><label class="st-field st-wide"><span>Search actual server classnames</span><input id="stClassSearch" type="search" autocomplete="off" placeholder="e.g. M4A1, Apple, Offroad"></label></div>
+   <div id="stSpawnableControls" class="st-params" hidden><label class="st-field st-wide"><span>Exact existing classname</span><input id="stSpawnableName" type="text" placeholder="e.g. Offroad_02_Beige"></label><label class="st-field"><span>Existing section</span><select id="stSpawnableSection"><option value="attachments">Attachments</option><option value="cargo">Cargo</option></select></label><label class="st-field"><span>Chance (0–1)</span><input id="stSpawnableChance" type="number" min="0" max="1" step="0.05" value="1"></label></div>
    <div class="st-actions"><button id="stRun" type="button" disabled>Check / Preview</button><button id="stPublish" type="button" hidden disabled>Apply to Nitrado</button></div>
    <pre id="stResult" class="st-result" role="status" aria-live="polite"></pre>
    <details class="st-settings"><summary>Connection · MAP_WRITE_KEY</summary><p class="st-help">Use the same write key as the File Manager. This key is never saved.</p><label class="st-field"><span>Write key</span><input id="stWriteKey" type="password" autocomplete="off" placeholder="MAP_WRITE_KEY"></label></details>
@@ -67,9 +68,10 @@ const DEFAULTS={
  'SpawnObject Duplicate Checker':'custom/builditlootdrop.json',
  'Messages Generator':'db/messages.xml',
  'Tier Booster':'db/types.xml',
- 'Classname Finder':'db/types.xml'
+ 'Classname Finder':'db/types.xml',
+ 'Spawnable Types Adjuster':'cfgspawnabletypes.xml'
 };
-const EDITORS=new Set(['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Globals Configurator','Messages Generator']);
+const EDITORS=new Set(['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Globals Configurator','Messages Generator','Spawnable Types Adjuster']);
 function setStatus(text,error=false){
  $('stResult').textContent=text;$('stResult').dataset.error=String(error);
 }
@@ -78,7 +80,7 @@ function invalidate(){
 }
 function setBusy(value){
  busy=value;
- for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch']){
+ for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance']){
    $(id).disabled=value;
  }
  $('stRun').disabled=value||!snapshot;
@@ -192,6 +194,7 @@ async function choose(name){
  $('stMessageControls').hidden=name!=='Messages Generator';
  $('stTierControls').hidden=name!=='Tier Booster';
  $('stClassSearchControls').hidden=name!=='Classname Finder';
+ $('stSpawnableControls').hidden=name!=='Spawnable Types Adjuster';
  $('stValueLabel').textContent=name==='Advanced Types Editor'?'Set value':'Multiplier';
  $('stValue').value=name==='Types Reducer'||name==='Lifetime Reducer'?'0.5':
    name==='Advanced Types Editor'?'100':'2';
@@ -216,7 +219,7 @@ $('stBack').addEventListener('click',()=>{
 });
 $('stRemoteFile').addEventListener('change',()=>void loadLive());
 $('stReload').addEventListener('click',()=>void loadLive());
-for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch']){
+for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance']){
  $(id).addEventListener('input',invalidate);$(id).addEventListener('change',invalidate);
 }
 $('stGlobalName').addEventListener('change',()=>{invalidate();refreshGlobal();});
@@ -238,6 +241,10 @@ function analyze(){
    return {message:'Checked '+info.total+' entries in '+snapshot.relative+
      '\n'+info.findings.length+' issue(s).'+
      (info.findings.length?'\n'+info.findings.slice(0,100).join('\n'):'\nNo conflicts detected by the basic checks.')};
+ }
+ if(selected==='Spawnable Types Adjuster'){
+   const result=core.editSpawnableChance(source,$('stSpawnableName').value,$('stSpawnableSection').value,$('stSpawnableChance').value);
+   return {content:result.content,changed:result.changed,message:'PREVIEW — '+result.classname+' · '+result.section+'\n'+result.changed+' existing chance attributes will be set to '+result.chance+'.\nOther classnames and settings remain unchanged.'};
  }
  if(selected==='Classname Finder'){
    const matches=core.findClassnames(source,$('stClassSearch').value);
