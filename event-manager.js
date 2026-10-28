@@ -9,7 +9,39 @@
   const valid = v => /^[A-Za-z0-9_]{1,90}$/.test(v);
   const numbers = (n, min, max) => Number.isFinite(Number(n)) && Number(n) >= min && Number(n) <= max;
   const itemNames = new Set();
-  const vehicleNames = new Set();
+  // Verified vanilla DayZ 1.30 vehicle bodies, including rarely configured color variants.
+  // Also augment with every official map's vehicle-event classnames and imported server events.
+  const VEHICLE_LABELS={
+  "OffroadHatchback": "Ada 4x4 - Green",
+  "OffroadHatchback_Blue": "Ada 4x4 - Blue",
+  "OffroadHatchback_White": "Ada 4x4 - White",
+  "Hatchback_02": "Gunter 2 - Red",
+  "Hatchback_02_Black": "Gunter 2 - Black",
+  "Hatchback_02_Blue": "Gunter 2 - Blue",
+  "CivilianSedan": "Olga 24 - White",
+  "CivilianSedan_Black": "Olga 24 - Black",
+  "CivilianSedan_Wine": "Olga 24 - Wine",
+  "Sedan_02": "Sarka 120 - Yellow",
+  "Sedan_02_Grey": "Sarka 120 - Grey",
+  "Sedan_02_Red": "Sarka 120 - Red",
+  "Truck_01_Covered": "M3S truck - Green",
+  "Truck_01_Covered_Blue": "M3S truck - Blue",
+  "Truck_01_Covered_Orange": "M3S truck - Orange",
+  "Offroad_02": "M1025 Humvee - Green",
+  "Offroad_02_Beige": "M1025 Humvee - Sand (beige)",
+  "Boat_01_Black": "Rubber boat - Black",
+  "Boat_01_Blue": "Rubber boat - Blue",
+  "Boat_01_Camo": "Rubber boat - Camo",
+  "Boat_01_Orange": "Rubber boat - Orange",
+  "Motorbike_01_Blue": "Jana 50 moped - Blue",
+  "Motorbike_01_Red": "Jana 50 moped - Red",
+  "Motorbike_01_Yellow": "Jana 50 moped - Yellow",
+  "Motorbike_02_Blue": "Bitrak 682 dirt bike - Blue",
+  "Motorbike_02_Green": "Bitrak 682 dirt bike - Green",
+  "Motorbike_02_Red": "Bitrak 682 dirt bike - Red",
+  "Motorbike_02_Yellow": "Bitrak 682 dirt bike - Yellow"
+};
+  const vehicleNames = new Set(Object.keys(VEHICLE_LABELS));
   const files = {};
   let chosen = null, placing = false, editingIndex = -1, itemList = [], drafts = [];
   try {
@@ -95,9 +127,9 @@
     '<section class="biSection"><div class="biSectionTitle"><span class="biStep">01</span><h4>Configure spawn</h4></div>',
     '<div class="biPickRow"><button type="button" id="biPick">Pick location on map</button><span id="biPoint" class="biPoint">No location selected</span></div>',
     '<label for="biName">Event name</label><input id="biName" value="BuildIt_Event1" maxlength="90" spellcheck="false">',
-    '<div class="biRow"><div><label for="biKind">Event type</label><select id="biKind"><option value="vehicle">Vehicle / motorcycle</option><option value="loot">Loot drop (manual XML)</option></select></div>',
+    '<div class="biRow"><div><label for="biKind">Event type</label><select id="biKind"><option value="vehicle">Vehicles / motorbikes / boats</option><option value="loot">Loot drop (manual XML)</option></select></div>',
     '<div><label for="biAngle">Rotation (°)</label><input id="biAngle" type="number" min="0" max="359.99" step="0.01" value="0"></div></div>',
-    '<div id="biVehicleSection"><label for="biVehicleSearch">Vehicle classname</label><input id="biVehicleSearch" type="search" autocomplete="off" placeholder="Search car, truck or motorcycle…"><div id="biVehicleMatches" class="biMatches"></div>',
+    '<div id="biVehicleSection"><label for="biVehicleSearch">Vehicle classname</label><input id="biVehicleSearch" type="search" autocomplete="off" placeholder="Search car, Humvee, bike or boat…"><div id="biVehicleMatches" class="biMatches"></div>',
     '<p class="biSmall">Vehicle parts use your existing cfgspawnabletypes.xml rules.</p></div>',
     '<div id="biLootSection" hidden><label for="biContainer">Container</label><select id="biContainer"><option>SeaChest</option><option>WoodenCrate</option><option>SmallProtectorCase</option><option>Barrel_Green</option><option>Barrel_Blue</option></select>',
     '<label for="biItemSearch">Item classname</label><input id="biItemSearch" type="search" autocomplete="off" placeholder="Search items…"><div id="biItemMatches" class="biMatches"></div>',
@@ -169,9 +201,10 @@
   function catalogStatus() {
     $('biCatalog').textContent = itemNames.size + ' items, ' + vehicleNames.size + ' vehicles. Official catalog plus any imported server classnames.';
   }
+  const ECONOMY_MISSIONS=['dayzOffline.chernarusplus','dayzOffline.enoch','dayzOffline.sakhal'];
   Promise.allSettled([
     fetch(BASE + 'db/types.xml').then(r => { if (!r.ok) throw new Error('types.xml HTTP ' + r.status); return r.text(); }).then(s => addCatalog(parseXML(s, 'types'),'types')),
-    fetch(BASE + 'db/events.xml').then(r => { if (!r.ok) throw new Error('events.xml HTTP ' + r.status); return r.text(); }).then(s => addCatalog(parseXML(s, 'events'),'events'))
+    ...ECONOMY_MISSIONS.map(mission=>fetch('https://raw.githubusercontent.com/BohemiaInteractive/DayZ-Central-Economy/master/'+mission+'/db/events.xml').then(r=>{if(!r.ok)throw new Error(mission+' events.xml HTTP '+r.status);return r.text();}).then(s=>addCatalog(parseXML(s,'events'),'events')))
   ]).then(results => {
     catalogStatus();
     if (results.some(r => r.status === 'rejected')) message('Some official catalogs could not be loaded. You can import the XML files manually.', true);
@@ -184,14 +217,14 @@
     target.replaceChildren();
     // Empty suggestion lists used to occupy a large part of the phone panel.
     // Keep searches compact until someone actually starts typing.
-    if(term.length<2){target.hidden=true;return;}
+    if(term.length<2 && (kind!=='vehicle'||term.length!==0)){target.hidden=true;return;}
     target.hidden=false;
     const set = kind === 'vehicle' ? vehicleNames : itemNames;
-    const matches = [...set].filter(n => n.toLowerCase().includes(term)).sort((a,b) => a.localeCompare(b)).slice(0,25);
+    const matches = [...set].filter(n => n.toLowerCase().includes(term) || (kind==='vehicle' && String(VEHICLE_LABELS[n]||'').toLowerCase().includes(term))).sort((a,b) => a.localeCompare(b)).slice(0,80);
     if (!matches.length) { target.textContent = 'No matching classnames found.'; return; }
     matches.forEach(name => {
       const btn = document.createElement('button');
-      btn.type = 'button'; btn.textContent = name;
+      btn.type = 'button'; btn.textContent = kind==='vehicle' && VEHICLE_LABELS[name] ? VEHICLE_LABELS[name]+' · '+name : name;
       btn.addEventListener('click', () => {
         if (kind === 'vehicle') { input.value = name; message('Vehicle selected: ' + name); }
         else {
@@ -207,6 +240,7 @@
     });
   }
   $('biVehicleSearch').addEventListener('input', () => updateChoices('vehicle'));
+  $('biVehicleSearch').addEventListener('focus', () => updateChoices('vehicle'));
   $('biItemSearch').addEventListener('input', () => updateChoices('item'));
   $('biKind').addEventListener('change', () => {
     $('biVehicleSection').hidden = $('biKind').value !== 'vehicle';
