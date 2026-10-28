@@ -242,5 +242,25 @@
     return {content:updated,changed:1,interval,text};
   }
 
-  root.BUILD_IT_SERVER_CORE=Object.freeze({validate,splitJSON,editTypes,eventConflicts,globalsList,editGlobal,spawnableDuplicates,objectDuplicates,addMessage,xmlDoc});
+
+  function findClassnames(source,term){
+    const doc=xmlDoc(source,'types');
+    const query=String(term||'').toLowerCase().trim();
+    if(query.length<2)throw new Error('Enter at least 2 characters to search classnames.');
+    const matches=[];
+    let scanned=0;
+    for(const element of doc.documentElement.children){
+      if(element.nodeName!=='type')continue;
+      scanned++;
+      const name=element.getAttribute('name')||'';
+      if(name.toLowerCase().includes(query)){
+        const nominal=element.getElementsByTagName('nominal')[0]?.textContent?.trim()||'—';
+        const min=element.getElementsByTagName('min')[0]?.textContent?.trim()||'—';
+        matches.push({name,nominal,min});
+      }
+    }
+    return {scanned,total:matches.length,results:matches.slice(0,100)};
+  }
+
+  root.BUILD_IT_SERVER_CORE=Object.freeze({validate,splitJSON,editTypes,eventConflicts,globalsList,editGlobal,spawnableDuplicates,objectDuplicates,addMessage,findClassnames,xmlDoc});
 })(window);
