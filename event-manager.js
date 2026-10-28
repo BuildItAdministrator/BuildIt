@@ -114,7 +114,8 @@
     '<label class="biConfirm"><input type="checkbox" id="biServerStopped"> My DayZ server is stopped and I have reviewed the changes.</label>',
     '<button type="button" id="biUploadServer" class="biPrimary biFull" disabled>Back up &amp; upload</button>',
     '<p class="biSmall">An upload requires your file-write key. Existing files are checked and backed up before replacement.</p></section>',
-    '<details class="biAdvanced"><summary>Advanced · Manual XML tools</summary>',
+    '<details class="biAdvanced" id="biAdvanced"><summary>Advanced · Manual XML tools</summary>',
+    '<button type="button" id="biLoadServer" class="biFull">Reload live server XML</button>',
     '<div class="biSmall" id="biCatalog">Loading official classnames…</div>',
     '<label for="biFiles">Import XML from your computer</label><input id="biFiles" type="file" accept=".xml" multiple>',
     '<div id="biImportStatus" class="biSmall">Optional: import existing XML for offline export.</div>',
@@ -262,24 +263,37 @@
       entry.items = itemList.map(i => ({name:i.name,qty:Number(i.qty)}));
     }
     if (editingIndex < 0) drafts.push(entry); else drafts[editingIndex] = entry;
-    persist(); resetForm(); message('Draft saved. Nothing has been changed on Nitrado.');
+    clearStaged(); persist(); resetForm(); message('Spawn queued. Review changes to prepare the upload.');
   });
   function renderDrafts() {
     layer.clearLayers();
     const list = $('biDrafts'); list.replaceChildren();
-    if (!drafts.length) list.textContent = 'No saved events yet.';
+    $('biDraftCount').textContent=drafts.length+' saved';
+    if (!drafts.length){
+      const empty=document.createElement('div');empty.className='biSmall';
+      empty.textContent='No queued events. Save a spawn to add one.';
+      list.appendChild(empty);
+    }
     drafts.forEach((d,index) => {
-      const m = L.marker(gameToLeaflet(d.x,d.z), {title:d.name}).addTo(layer);
-      m.bindTooltip(d.name + ' (' + d.kind + ')');
-      m.on('click', () => { setForm(d,index); message('Event loaded: ' + d.name); });
-      const div = document.createElement('div'); div.className = 'biDraft';
-      const text = document.createElement('div'); text.textContent = d.name + ' · ' + (d.kind === 'vehicle' ? d.vehicle : d.container) + ' · X ' + d.x + ', Z ' + d.z;
-      text.style.marginBottom = '6px'; div.appendChild(text);
-      const row = document.createElement('div'); row.className = 'biRow';
-      const edit = document.createElement('button'); edit.textContent = 'Edit'; edit.addEventListener('click', () => setForm(d,index));
-      const remove = document.createElement('button'); remove.textContent = 'Delete';
-      remove.addEventListener('click', () => { if (!confirm('Event ' + d.name + ' from your saved drafts?')) return; drafts.splice(index,1); persist(); resetForm(); });
-      row.append(edit,remove); div.appendChild(row); list.appendChild(div);
+      const marker=L.marker(gameToLeaflet(d.x,d.z), {title:d.name}).addTo(layer);
+      marker.bindTooltip(d.name+' ('+d.kind+')');
+      marker.on('click', () => {setForm(d,index); message('Editing '+d.name);});
+      const card=document.createElement('div');card.className='biDraft';
+      const title=document.createElement('div');title.className='biDraftTitle';title.textContent=d.name;
+      const details=document.createElement('div');details.className='biDraftDetails';
+      details.textContent=(d.kind==='vehicle'?d.vehicle:d.container)+
+        '  ·  X '+d.x+' / Z '+d.z+'  ·  '+d.a+'°';
+      const row=document.createElement('div');row.className='biRow';
+      const edit=document.createElement('button');edit.type='button';edit.textContent='Edit';
+      edit.title='Edit queued event '+d.name;
+      edit.addEventListener('click',()=>setForm(d,index));
+      const remove=document.createElement('button');remove.type='button';remove.textContent='Remove';
+      remove.title='Remove queued event '+d.name;
+      remove.addEventListener('click',()=>{
+        if(!confirm('Remove '+d.name+' from your saved drafts?'))return;
+        drafts.splice(index,1);clearStaged();persist();resetForm();
+      });
+      row.append(edit,remove);card.append(title,details,row);list.appendChild(card);
     });
   }
   function refresh() { renderDrafts(); catalogStatus(); }
@@ -494,13 +508,13 @@
     deployUpload.disabled=true;
     $('biServerStopped').checked=false;
   }
-  deployLoad.addEventListener('click',async()=>{
-    if(eventDeploy.loading||eventDeploy.sending)return;
-    eventDeploy.loading=true;deployLoad.disabled=true;
-    clearStaged();deployPreview.disabled=true;
-    setDeploy('Finding mission and downloading complete live XML files…');
+  async function loadLiveXml(){
+    if(eventDeploy.loading||eventDeploy.sending)throw new Error('A Nitrado operation is already running.');
+    eventDeploy.loading=true;
+    deployLoad.disabled=true;
+    setDeploy('Reading current XML from Nitrado…');
     try{
-      if(typeof nitradoRequest!=='function')throw new Error('Nitrado connection is unavailable. Set up Logs → Automatic Nitrado Sync first.');
+      if(typeof nitradoRequest!=='function')throw new Error('Connect Nitrado in Logs before publishing.');
       const mission=await discoverServerMission();
       const paths={
         'events.xml':mission+'/db/events.xml',
@@ -517,37 +531,51 @@
       eventDeploy.signatures={'events.xml':events.sha256,'cfgeventspawns.xml':positions.sha256};
       addCatalog(parseXML(events.content,'events'),'events');
       catalogStatus();updateChoices('vehicle');
-      $('biImportStatus').textContent='Loaded complete events.xml and cfgeventspawns.xml from Nitrado.';
-      deployPreview.disabled=false;
-      setDeploy('Live XML loaded from '+mission+'. Save a vehicle draft, then click Preview vehicle changes.');
-    }catch(e){setDeploy('Could not load live Nitrado XML: '+e.message,true);}
-    finally{eventDeploy.loading=false;deployLoad.disabled=false;}
+      $('biImportStatus').textContent='Latest events.xml and cfgeventspawns.xml loaded from Nitrado.';
+    }finally{
+      eventDeploy.loading=false;
+      deployLoad.disabled=false;
+    }
+  }
+  deployLoad.addEventListener('click',async()=>{
+    if(eventDeploy.sending||eventDeploy.loading)return;
+    clearStaged();deployPreview.disabled=true;
+    try{
+      await loadLiveXml();
+      setDeploy('Server XML reloaded. Review changes to prepare an upload.');
+    }catch(e){setDeploy('Nitrado reload failed: '+e.message,true);}
+    finally{deployPreview.disabled=false;}
   });
-  deployPreview.addEventListener('click',()=>{
+  deployPreview.addEventListener('click',async()=>{
+    if(eventDeploy.sending||eventDeploy.loading)return;
     clearStaged();
+    deployPreview.disabled=true;
     try{
       const selected=vehicleDrafts();
-      if(!eventDeploy.mission)throw new Error('Load live Nitrado XML files first.');
-      // The existing composer verifies duplicates and preserves the rest of the XML.
-      const events=buildOutput('events'), positions=buildOutput('positions');
+      // Always refresh originals: an offline import or previous preview
+      // must never be used as the source of a live server replacement.
+      await loadLiveXml();
+      const events=buildOutput('events'),positions=buildOutput('positions');
       if(!events.complete||!positions.complete)
-        throw new Error('Incomplete Nitrado XML; refusing an additions-only replacement.');
+        throw new Error('Incomplete Nitrado XML. Upload refused.');
       if(new TextEncoder().encode(events.xml).byteLength>512*1024||
          new TextEncoder().encode(positions.xml).byteLength>512*1024)
-        throw new Error('Generated XML exceeds the 512 KB write limit. No upload attempted.');
+        throw new Error('Generated XML exceeds the 512 KB upload limit.');
       eventDeploy.staged={
         xml:{'events.xml':events.xml,'cfgeventspawns.xml':positions.xml},
         snapshot:deploymentSnapshot()
       };
-      const previewNames=selected.map(d=>d.name+' → '+d.vehicle+
-        ' (X '+d.x+', Z '+d.z+', rotation '+d.a+'°)').join('\n');
-      setDeploy('READY FOR REVIEW — no server files changed.\n'+
-        'Add '+selected.length+' vehicle event(s):\n'+previewNames+
-        '\n\nWill back up and replace these live files:\n'+
-        eventDeploy.paths['events.xml']+'\n'+eventDeploy.paths['cfgeventspawns.xml']+
-        '\n\nIMPORTANT: both writes must succeed. If the second fails, the first may already be updated; use the displayed backup path to restore it.');
+      const previewNames=selected.map(d=>d.name+' · '+d.vehicle+
+        ' · X '+d.x+', Z '+d.z+', '+d.a+'°').join('\n');
+      setDeploy('READY — '+selected.length+' vehicle event(s) will be added:\n\n'+previewNames+
+        '\n\nFiles: db/events.xml and cfgeventspawns.xml.'+
+        '\nOriginal XML structure, whitespace and comments will be retained.'+
+        '\nBoth files receive verified backups before replacement. If the second upload fails, restore the first from its backup.');
       deployUpload.disabled=false;
-    }catch(e){setDeploy('Preview failed: '+e.message,true);}
+    }catch(e){
+      eventDeploy.mission='';
+      setDeploy('Review failed: '+e.message,true);
+    }finally{deployPreview.disabled=false;}
   });
   deployUpload.addEventListener('click',async()=>{
     if(eventDeploy.sending)return;
