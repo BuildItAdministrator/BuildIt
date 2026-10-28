@@ -3,7 +3,7 @@
  */
 (function(){
   'use strict';
-  const MAX_FILE_BYTES=512*1024;
+  const MAX_FILE_BYTES=4*1024*1024;
   const ROOTS={
     'events.xml':'events',
     'cfgeventspawns.xml':'eventposdef',
