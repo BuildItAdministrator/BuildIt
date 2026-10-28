@@ -1393,7 +1393,7 @@ test('JSON loot migration replaces old Build It references with custom/builditlo
 
 test('server tools catalog shows 53 items, with no local-file import workflow',async({page})=>{
   const stats=await page.evaluate(()=>window.BUILD_IT_TOOLS);
-  expect(stats).toEqual({count:53,ready:12,mode:'nitrado'});
+  expect(stats).toEqual({count:53,ready:13,mode:'nitrado'});
   await page.locator('#toolHubToggle').click();
   await expect(page.locator('#toolHubPanel')).toBeVisible();
   await expect(page.locator('#stCards .st-card')).toHaveCount(53);
@@ -1604,3 +1604,17 @@ test('server-native Globals Configurator safely edits one existing numeric value
   expect(data.content).toContain('name="LootDamageMax" type="1" value="0.25"');
 });
 
+
+
+test('server Classname Finder uses existing types.xml without generating a replacement',async({page})=>{
+ const data=await page.evaluate(()=>{
+   const xml='<types><type name="Apple"><nominal>50</nominal><min>10</min></type>'+
+     '<type name="AppleSeed"><nominal>25</nominal><min>5</min></type>'+
+     '<type name="Pear"><nominal>15</nominal></type></types>';
+   return window.BUILD_IT_SERVER_CORE.findClassnames(xml,'apple');
+ });
+ expect(data.scanned).toBe(3);
+ expect(data.total).toBe(2);
+ expect(data.results.map(x=>x.name)).toEqual(['Apple','AppleSeed']);
+ expect(data.results[0].nominal).toBe('50');
+});
