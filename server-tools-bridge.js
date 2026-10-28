@@ -5,7 +5,7 @@
 (function(){
   'use strict';
   const ALLOWED=/^(?:(?:db|custom)\/)?[A-Za-z0-9_.-]+\.(?:xml|json|txt)$/i;
-  const MAX_BYTES=512*1024;
+  const MAX_BYTES=4*1024*1024;
   const utf8=s=>new TextEncoder().encode(s).byteLength;
   const requireRequest=()=>{
     if(typeof nitradoRequest!=='function')
@@ -85,13 +85,13 @@
     if(data?.path!==path||typeof data?.content!=='string'||!/^[0-9a-f]{64}$/.test(data.sha256||''))
       throw new Error('Nitrado returned an incomplete response for '+relative+'.');
     if(utf8(data.content)>MAX_BYTES)
-      throw new Error(relative+' exceeds the Worker 512 KB edit limit.');
+      throw new Error(relative+' exceeds the Worker 4 MB edit limit.');
     return Object.freeze({relative,path,content:data.content,sha256:data.sha256});
   }
   const sameSource=(a,b)=>a?.path===b?.path&&a?.sha256===b?.sha256;
   function validateContent(path,content){
     if(typeof content!=='string'||!content.length||utf8(content)>MAX_BYTES)
-      throw new Error('Generated file is empty or exceeds 512 KB.');
+      throw new Error('Generated file is empty or exceeds 4 MB.');
     window.BUILD_IT_FORMAT?.validate(path,content);
     // Fail closed for invalid UTF-8 XML declarations, as the Worker writes UTF-8.
     if(/\.xml$/i.test(path)){
