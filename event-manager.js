@@ -740,7 +740,7 @@
     try {
       const result=window.BUILD_IT_LOOT.build(drafts);
       window.BUILD_IT_LOOT.download(result.filename,result.content);
-      message('Downloaded '+result.filename+' with '+result.count+' non-persistent items from '+result.events+' location(s). Upload it to the mission folder and register it in cfggameplay.json.');
+      message('Downloaded '+result.filename+' with '+result.count+' non-persistent items from '+result.events+' location(s). Place it in the mission custom folder, and register '+window.BUILD_IT_LOOT.SPAWNER_REF+' in cfggameplay.json.');
     }catch(error){message('JSON loot export failed: '+error.message,true);}
   });
   $('biExportGameplayJson').addEventListener('click',async()=>{
@@ -756,7 +756,7 @@
       }
       const updated=window.BUILD_IT_LOOT.gameplay(original);
       window.BUILD_IT_LOOT.download('cfggameplay.json',updated);
-      message('Updated cfggameplay.json downloaded. Existing settings and spawner entries preserved. Install both JSON files in your active mission folder, enable cfgGameplay and restart.');
+      message('Updated cfggameplay.json downloaded. Existing settings and spawner entries preserved. Put '+window.BUILD_IT_LOOT.FILENAME+' in the mission custom folder, upload cfggameplay.json to the mission root, enable cfgGameplay and restart.');
     }catch(error){
       message('Could not prepare cfggameplay.json: '+error.message+'. If Nitrado access is unavailable, import your existing cfggameplay.json from Advanced.',true);
     }finally{btn.disabled=false;}
@@ -770,6 +770,20 @@
   };
   const lootSnapshot=()=>JSON.stringify(drafts.filter(d=>d.kind==='loot'));
   const lootButton=$('biDeployLoot');
+  async function lootFileExists(mission,filename){
+    const root=await nitradoRequest('/api/files/list?dir='+encodeURIComponent(mission));
+    if(root?.dir!==mission||!Array.isArray(root.entries)||root.entries.length>=500)
+      throw new Error('Mission folder could not be checked reliably; refusing to create a loot file.');
+    const custom=root.entries.find(entry=>String(entry.name||'').toLowerCase()==='custom');
+    if(!custom)return false;
+    if(!['dir','directory','folder'].includes(String(custom.type||'').toLowerCase()))
+      throw new Error('Mission custom path exists but is not a folder.');
+    const folder=mission+'/custom';
+    const listed=await nitradoRequest('/api/files/list?dir='+encodeURIComponent(folder));
+    if(listed?.dir!==folder||!Array.isArray(listed.entries)||listed.entries.length>=500)
+      throw new Error('Custom folder cannot be listed reliably; refusing to create a loot file.');
+    return listed.entries.some(entry=>String(entry.name||'').toLowerCase()===filename.toLowerCase());
+  }
   $('biPrepareLoot').addEventListener('click',async()=>{
     if(lootBusy||eventDeploy.sending||eventDeploy.loading)return;
     lootBusy=true;lootStaged=null;lootButton.disabled=true;
@@ -778,12 +792,11 @@
       const pending=window.BUILD_IT_LOOT.build(drafts);
       lootMessage('Reading the existing mission loot JSON and cfggameplay.json…');
       const mission=await discoverServerMission();
-      const lootPath=mission+'/'+pending.filename;
+      const lootPath=mission+'/'+window.BUILD_IT_LOOT.SPAWNER_REF;
       const gameplayPath=mission+'/cfggameplay.json';
-      const listing=await nitradoRequest('/api/files/list?dir='+encodeURIComponent(mission));
-      if(listing?.dir!==mission||!Array.isArray(listing.entries))
-        throw new Error('The mission directory could not be checked for an existing loot file.');
-      const exists=listing.entries.some(e=>e.name===pending.filename);
+      // The DayZ console Object Spawner loads files from custom/ in the mission directory.
+      // Detect the folder first; a fresh installation may not have custom/ yet.
+      const exists=await lootFileExists(mission,pending.filename);
       const current=exists?await serverXmlRead(lootPath):null;
       const gameplayLive=await serverXmlRead(gameplayPath);
       const original=current?JSON.parse(current.content):{Objects:[]};
@@ -792,10 +805,10 @@
       // Never silently replace or delete existing configured loot.
       const merged=JSON.stringify({...original,Objects:[...original.Objects,...JSON.parse(pending.content).Objects]},null,2)+'\n';
       window.BUILD_IT_FORMAT.validate(lootPath,merged);
-      const gameplay=window.BUILD_IT_LOOT.gameplay(gameplayLive.content,pending.filename);
+      const gameplay=window.BUILD_IT_LOOT.gameplay(gameplayLive.content);
       window.BUILD_IT_FORMAT.validate(gameplayPath,gameplay);
       const needsGameplay=gameplay!==gameplayLive.content &&
-        !(JSON.parse(gameplayLive.content).WorldsData?.objectSpawnersArr||[]).includes(pending.filename);
+        !(JSON.parse(gameplayLive.content).WorldsData?.objectSpawnersArr||[]).includes(window.BUILD_IT_LOOT.SPAWNER_REF);
       lootStaged={
         snapshot:lootSnapshot(),pending,
         paths:{loot:lootPath,gameplay:gameplayPath},
@@ -835,11 +848,8 @@
       // does not need changing, to prevent an obsolete configuration preview.
       for(const name of ['loot','gameplay']){
         if(name==='loot'&&staged.needsCreate){
-          const dir=staged.paths.loot.slice(0,staged.paths.loot.lastIndexOf('/'));
-          const listed=await nitradoRequest('/api/files/list?dir='+encodeURIComponent(dir));
-          if(listed?.dir!==dir||!Array.isArray(listed.entries))
-            throw new Error('Unable to verify the loot file does not exist. No files were uploaded.');
-          if(listed.entries.some(e=>e.name===staged.pending.filename))
+          const mission=staged.paths.loot.split('/custom/')[0];
+          if(await lootFileExists(mission,staged.pending.filename))
             throw new Error('The loot file was created by another process. Review again to avoid overwriting it.');
           continue;
         }
