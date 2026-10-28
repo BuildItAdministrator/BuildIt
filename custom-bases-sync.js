@@ -82,7 +82,13 @@
     }
     const base=normalizeWorkerUrl(document.getElementById('nitradoWorkerUrl').value);
     if(!base)throw new Error('Missing Nitrado Worker URL');
-    const url=base+'/api/files/custom-content'+query;
+    const multi=window.BUILD_IT_NITRADO_WORKER_MODE==='multi';
+    const username=String(window.BUILD_IT_NITRADO_EXPECTED_USERNAME||'');
+    const service=window.BUILD_IT_NITRADO_PROFILES?.current()?.serverId;
+    if(multi&&(!username||!service||!item.path.startsWith('/games/'+username+'/')))
+      throw new Error('Custom JSON belongs to a different server or multi-server identity is not verified.');
+    const url=base+'/api/files/custom-content'+query+
+      (multi?'&server='+encodeURIComponent(service):'');
     const response=await fetch(url,{headers:nitradoHeaders(),cache:'no-store'});
     if(!response.ok){
       // Nitrado sometimes omits file sizes in directory metadata.
