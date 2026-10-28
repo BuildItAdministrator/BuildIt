@@ -1919,3 +1919,28 @@ test('legacy profile migration retains saved browser credentials but no write ke
  expect(stored.profiles).toHaveLength(1);
  expect(stored.profiles[0]).not.toHaveProperty('writeKey');
 });
+
+
+test('server profiles replace previous server event marker data with selected server cfgeventspawns.xml',async({page})=>{
+  const info=await page.evaluate(()=>{
+    const source='<eventposdef><event name="VehicleHumvee"><pos x="4500" z="9800" a="90"/></event>'+
+      '<event name="VehicleTruck"><pos x="2000" z="4000"/></event></eventposdef>';
+    const parsed=window.BUILD_IT_SERVER_SPAWNS.parse(source);
+    const count=window.BUILD_IT_replaceSpawnGroups(parsed.groups);
+    const humvee=document.querySelector('#filterSpawn_offroad')?.closest('.filter-row')?.querySelector('.filter-count')?.textContent;
+    window.BUILD_IT_replaceSpawnGroups([]);
+    const cleared=document.querySelector('#filterSpawn_offroad')?.closest('.filter-row')?.querySelector('.filter-count')?.textContent;
+    return {total:parsed.total,groups:parsed.groups.length,count,humvee,cleared};
+  });
+  expect(info).toEqual({total:2,groups:2,count:2,humvee:'1',cleared:'0'});
+});
+
+test('Nitrado file snapshots are invalidated before another server can be edited',async({page})=>{
+  const data=await page.evaluate(()=>{
+    const api=window.BUILD_IT_SERVER_FILES;
+    if(typeof api.resetForServer!=='function'||typeof api.isBusy!=='function')throw Error('Server bridge safety hooks missing');
+    window.dispatchEvent(new CustomEvent('buildit:nitrado-profile-changing',{detail:{profileId:'different-server'}}));
+    return {reset:typeof api.resetForServer,isBusy:api.isBusy()};
+  });
+  expect(data).toEqual({reset:'function',isBusy:false});
+});
