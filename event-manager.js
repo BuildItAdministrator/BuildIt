@@ -153,7 +153,7 @@
     '<button type="button" id="biExportLootJson" class="biPrimary biFull">Download loot JSON</button>',
     '<button type="button" id="biExportGameplayJson" class="biFull">Download updated cfggameplay.json</button>',
     '<button type="button" id="biPrepareLoot" class="biFull">Review live loot JSON upload</button>',
-    '<div id="biLootReview" class="biMessage" role="status" aria-live="polite">A newly created loot JSON must first be placed in the mission folder through Nitrado FTP. Future updates can be uploaded safely here.</div>',
+    '<div id="biLootReview" class="biMessage" role="status" aria-live="polite">Review your loot before publishing. New JSON files require the Worker create-file endpoint.</div>',
     '<label class="biConfirm"><input type="checkbox" id="biLootServerStopped"> My server is stopped and I reviewed the JSON.</label>',
     '<button type="button" id="biDeployLoot" class="biPrimary biFull" disabled>Back up &amp; upload loot JSON</button>',
     '<p class="biSmall">Install both in your server mission folder. Existing cfgGameplay settings and object-spawner references are preserved. Enable cfgGameplay in Nitrado before restarting.</p></section>',
@@ -761,9 +761,8 @@
       message('Could not prepare cfggameplay.json: '+error.message+'. If Nitrado access is unavailable, import your existing cfggameplay.json from Advanced.',true);
     }finally{btn.disabled=false;}
   });
-  // Existing mission JSON files can be deployed safely with backup and SHA checks.
-  // A missing BuildIt_LootDrops.json must be bootstrapped once through Nitrado FTP;
-  // the Worker file-write endpoint has no guaranteed create-file support.
+  // Supports new JSON files via a dedicated, authenticated /api/files/create endpoint.
+  // The endpoint must be deployed in the existing Cloudflare Worker first.
   let lootStaged=null,lootBusy=false;
   const lootMessage=(value,error=false)=>{
     const element=$('biLootReview');element.textContent=value;
@@ -781,11 +780,13 @@
       const mission=await discoverServerMission();
       const lootPath=mission+'/'+pending.filename;
       const gameplayPath=mission+'/cfggameplay.json';
-      let current;
-      try{current=await serverXmlRead(lootPath);}
-      catch(error){throw new Error('The existing '+pending.filename+' could not be read. On first use download it and upload it to the mission folder using Nitrado FTP, then try again. '+error.message);}
+      const listing=await nitradoRequest('/api/files/list?dir='+encodeURIComponent(mission));
+      if(listing?.dir!==mission||!Array.isArray(listing.entries))
+        throw new Error('The mission directory could not be checked for an existing loot file.');
+      const exists=listing.entries.some(e=>e.name===pending.filename);
+      const current=exists?await serverXmlRead(lootPath):null;
       const gameplayLive=await serverXmlRead(gameplayPath);
-      const original=JSON.parse(current.content);
+      const original=current?JSON.parse(current.content):{Objects:[]};
       if(!original||typeof original!=='object'||Array.isArray(original)||!Array.isArray(original.Objects))
         throw new Error(pending.filename+' is not a valid DayZ Object Spawner file.');
       // Never silently replace or delete existing configured loot.
@@ -798,16 +799,18 @@
       lootStaged={
         snapshot:lootSnapshot(),pending,
         paths:{loot:lootPath,gameplay:gameplayPath},
-        input:{loot:current.sha256,gameplay:gameplayLive.sha256},
+        input:{loot:current?.sha256||null,gameplay:gameplayLive.sha256},
         output:{loot:merged,gameplay},
-        needsGameplay
+        needsCreate:!exists,needsGameplay
       };
       lootMessage('READY — '+pending.count+' new non-persistent loot items at '+pending.events+
         ' locations. Existing JSON Objects retained ('+original.Objects.length+').\n'+
         pending.filename+': validated '+window.BUILD_IT_FORMAT.validate(lootPath,merged).bytes+' bytes.\n'+
         (needsGameplay?'cfggameplay.json: registered spawner file, existing settings preserved.\n':
           'cfggameplay.json: spawner is already registered; no update required.\n')+
-        'Nitrado will create verified backups before replacing the file(s).');
+        (exists?'Nitrado will back up the existing loot file before replacing it.':
+          'New loot JSON: the Worker must support the secure /api/files/create endpoint.')+
+        (needsGameplay?' Gameplay JSON will be backed up before it is updated.':''));
       lootButton.disabled=false;
     }catch(error){lootMessage('Review failed: '+error.message,true);}
     finally{lootBusy=false;btn.disabled=false;}
@@ -821,8 +824,8 @@
     if(!$('biLootServerStopped').checked){
       lootMessage('Stop the server and confirm that you reviewed the JSON.',true);return;
     }
-    if(!window.confirm('Upload '+lootStaged.pending.count+' loot items to your LIVE Nitrado server?\n'+
-      'Existing loot objects are kept. Backups are created before overwriting. Continue?'))return;
+    if(!window.confirm('Publish '+lootStaged.pending.count+' loot items to your LIVE Nitrado server?\n'+
+      'New JSON files are created once; existing files are backed up before overwriting. Continue?'))return;
     lootBusy=true;lootButton.disabled=true;$('biPrepareLoot').disabled=true;
     const staged=lootStaged;
     const names=staged.needsGameplay?['loot','gameplay']:['loot'];
@@ -831,6 +834,15 @@
       // Both source files are checked before the first write, even when gameplay
       // does not need changing, to prevent an obsolete configuration preview.
       for(const name of ['loot','gameplay']){
+        if(name==='loot'&&staged.needsCreate){
+          const dir=staged.paths.loot.slice(0,staged.paths.loot.lastIndexOf('/'));
+          const listed=await nitradoRequest('/api/files/list?dir='+encodeURIComponent(dir));
+          if(listed?.dir!==dir||!Array.isArray(listed.entries))
+            throw new Error('Unable to verify the loot file does not exist. No files were uploaded.');
+          if(listed.entries.some(e=>e.name===staged.pending.filename))
+            throw new Error('The loot file was created by another process. Review again to avoid overwriting it.');
+          continue;
+        }
         const latest=await serverXmlRead(staged.paths[name]);
         if(latest.sha256!==staged.input[name])
           throw new Error(staged.paths[name].split('/').pop()+' changed after review. No files were uploaded. Review again.');
@@ -838,29 +850,36 @@
       for(const name of names)
         window.BUILD_IT_FORMAT.validate(staged.paths[name],staged.output[name]);
       for(const name of names){
-        lootMessage('Backing up and uploading '+staged.paths[name].split('/').pop()+'…');
-        const result=await nitradoRequest('/api/files/write',{
-          method:'POST',writeKey:true,
-          body:{
-            path:staged.paths[name],content:staged.output[name],
-            expectedSha256:staged.input[name],confirm:true
-          }
-        });
-        if(!result?.verified||!result?.backupPath)
-          throw new Error('Upload verification failed for '+name+'.');
-        uploaded.push({name,backup:result.backupPath});
+        const creating=name==='loot'&&staged.needsCreate;
+        lootMessage((creating?'Creating and verifying ':'Backing up and uploading ')+staged.paths[name].split('/').pop()+'…');
+        let result;
+        try{
+          result=await nitradoRequest(creating?'/api/files/create':'/api/files/write',{
+            method:'POST',writeKey:true,
+            body:creating?
+              {path:staged.paths[name],content:staged.output[name],expectedAbsent:true,confirm:true}:
+              {path:staged.paths[name],content:staged.output[name],expectedSha256:staged.input[name],confirm:true}
+          });
+        }catch(error){
+          if(creating)throw new Error('The Cloudflare Worker could not create the loot file. Deploy its secure /api/files/create handler first. '+error.message);
+          throw error;
+        }
+        if(!result?.verified||(creating?!result.created:!result.backupPath))
+          throw new Error('Server verification failed for '+name+'.');
+        uploaded.push({name,backup:result.backupPath||null,created:creating});
       }
       const count=staged.pending.count;
       drafts=drafts.filter(d=>d.kind!=='loot');persist();resetForm();
       lootMessage('UPLOAD VERIFIED — '+count+' JSON loot items saved.\n'+
-        uploaded.map(r=>staged.paths[r.name].split('/').pop()+' backup: '+r.backup).join('\n')+
+        uploaded.map(r=>staged.paths[r.name].split('/').pop()+
+          (r.created?' created':(' backup: '+r.backup))).join('\n')+
         '\nStart the server to spawn these items.');
       lootStaged=null;
       $('biLootServerStopped').checked=false;
     }catch(error){
       lootMessage('UPLOAD FAILED: '+error.message+'\n'+
-        (uploaded.length?'Uploaded before failure: '+uploaded.map(r=>r.name+' (backup '+r.backup+')').join(', ')+
-          '. Restore these from Nitrado backups before retrying.':
+        (uploaded.length?'Uploaded before failure: '+uploaded.map(r=>r.name+(r.created?' (new file)':' (backup '+r.backup+')')).join(', ')+
+          '. Restore updated files from their backups; review newly created files before retrying.':
           'No upload was verified. Confirm the MAP_WRITE_KEY and server file permissions.')+
         '\nNo automatic rollback was attempted.',true);
       lootStaged=null;
