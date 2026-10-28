@@ -294,6 +294,71 @@
     } });
     return t;
   }
+  // Only append new event nodes: DOM XMLSerializer rewrites all original
+  // whitespace and can accidentally duplicate the XML declaration.
+  function xmlEscapedText(value){
+    return String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function xmlEscapedAttribute(value){
+    return xmlEscapedText(value).replace(/"/g,'&quot;').replace(/\r/g,'&#13;')
+      .replace(/\n/g,'&#10;').replace(/\t/g,'&#9;');
+  }
+  function formatNewXmlNode(element, level, unit, newline){
+    const tag=element.tagName;
+    const attrs=Array.from(element.attributes).map(a=>
+      ' '+a.name+'="'+xmlEscapedAttribute(a.value)+'"').join('');
+    const kids=Array.from(element.childNodes);
+    if(!kids.length)return level+'<'+tag+attrs+'/>';
+    if(kids.length===1 && kids[0].nodeType===3)
+      return level+'<'+tag+attrs+'>'+xmlEscapedText(kids[0].nodeValue)+'</'+tag+'>';
+    const inner=kids.map(n=>{
+      if(n.nodeType===1)return formatNewXmlNode(n,level+unit,unit,newline);
+      if(n.nodeType===3)return level+unit+xmlEscapedText(n.nodeValue);
+      throw new Error('Unexpected event XML node type.');
+    }).join(newline);
+    return level+'<'+tag+attrs+'>'+newline+inner+newline+level+'</'+tag+'>';
+  }
+  function appendXmlEventsWithoutReformatting(original,root,newNodes){
+    const originalDoc=parseXML(original,root);
+    const declaration=original.match(/^\uFEFF?\s*<\?xml\b([\s\S]*?)\?>/i);
+    const encoding=declaration?.[1]?.match(/\bencoding\s*=\s*(['"])(.*?)\1/i)?.[2];
+    // Existing Worker always re-encodes UTF-8; block any other declaration.
+    if(encoding && !/^utf-?8$/i.test(encoding))
+      throw new Error('Server file declares '+encoding+' encoding; UTF-8 upload is blocked to prevent corruption.');
+    const oldNames=new Set(Array.from(originalDoc.documentElement.children)
+      .filter(n=>n.tagName==='event').map(n=>String(n.getAttribute('name')||'').toLowerCase()));
+    for(const el of newNodes){
+      const key=String(el.getAttribute('name')||'').toLowerCase();
+      if(oldNames.has(key))throw new Error('Event "'+el.getAttribute('name')+'" already exists in the original '+root+' file.');
+      oldNames.add(key);
+    }
+    const newline=original.includes('\r\n')?'\r\n':
+      original.includes('\n')?'\n':original.includes('\r')?'\r':'\n';
+    const closing=[...original.matchAll(new RegExp('</'+root+'\\s*>','gi'))].pop();
+    if(!closing)throw new Error('Missing closing </'+root+'>; refusing to overwrite.');
+    const closeStart=closing.index;
+    const beforeClose=original.slice(0,closeStart);
+    const lastLine=Math.max(beforeClose.lastIndexOf('\n'),beforeClose.lastIndexOf('\r'));
+    const linePrefix=lastLine<0?beforeClose:beforeClose.slice(lastLine+1);
+    const closeIndent=/^[ \t]*$/.test(linePrefix)?linePrefix:'';
+    const indentEvent=(original.match(/(?:\r\n|\n|\r)([ \t]+)<event(?=[\s>])/i)||[])[1];
+    const eventIndent=indentEvent || (closeIndent+(original.includes('\t')?'\t':'    '));
+    const indentChild=(original.match(/(?:\r\n|\n|\r)([ \t]+)<(?:nominal|pos|flags|children)(?=[\s>])/i)||[])[1];
+    const unit=indentChild&&indentChild.startsWith(eventIndent)&&indentChild.length>eventIndent.length
+      ?indentChild.slice(eventIndent.length):
+      eventIndent.includes('\t')?'\t':eventIndent.length>=2?' '.repeat(Math.min(4,eventIndent.length)):'    ';
+    const insertionAt=closeStart-closeIndent.length;
+    const prefix=original.slice(0,insertionAt);
+    const blocks=newNodes.map(el=>formatNewXmlNode(el,eventIndent,unit,newline)).join(newline);
+    const insertion=(/[\r\n]$/.test(prefix)?'':newline)+blocks+newline;
+    const merged=prefix+insertion+original.slice(insertionAt);
+    const resultDoc=parseXML(merged,root);
+    if(resultDoc.documentElement.children.length!==originalDoc.documentElement.children.length+newNodes.length)
+      throw new Error('New XML failed its structure check; upload cancelled.');
+    if(!merged.startsWith(prefix)||!merged.endsWith(original.slice(insertionAt)))
+      throw new Error('Original XML preservation check failed.');
+    return merged;
+  }
   function buildOutput(kind) {
     if (!drafts.length) throw new Error('Create an event first.');
     if (kind === 'cargo' && !drafts.some(d => d.kind === 'loot')) throw new Error('There are no loot drops to export.');
@@ -316,10 +381,16 @@
         while (cargo.firstChild) typeNode.appendChild(cargo.firstChild);
       });
     } else {
-      drafts.forEach(d => {
-        const exists = Array.from(doc.documentElement.children).some(el => el.nodeName === 'event' && el.getAttribute('name') === d.name);
-        if (exists) throw new Error('Event "' + d.name + '" already exists in ' + filename + '. Rename the event before exporting.');
-        doc.documentElement.appendChild(kind === 'events' ? createEvent(doc,d) : createPos(doc,d));
+      if(original){
+        const elements=drafts.map(d=>kind==='events'?createEvent(doc,d):createPos(doc,d));
+        const xml=appendXmlEventsWithoutReformatting(original,root,elements);
+        return {filename,xml,complete:true};
+      }
+      drafts.forEach(d=>{
+        const exists=Array.from(doc.documentElement.children).some(el=>
+          el.nodeName==='event' && el.getAttribute('name')?.toLowerCase()===d.name.toLowerCase());
+        if(exists)throw new Error('Event "'+d.name+'" already exists in '+filename+'. Rename it before exporting.');
+        doc.documentElement.appendChild(kind==='events'?createEvent(doc,d):createPos(doc,d));
       });
     }
     const xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + new XMLSerializer().serializeToString(doc);
