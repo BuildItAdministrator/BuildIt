@@ -807,8 +807,9 @@
       window.BUILD_IT_FORMAT.validate(lootPath,merged);
       const gameplay=window.BUILD_IT_LOOT.gameplay(gameplayLive.content);
       window.BUILD_IT_FORMAT.validate(gameplayPath,gameplay);
-      const needsGameplay=gameplay!==gameplayLive.content &&
-        !(JSON.parse(gameplayLive.content).WorldsData?.objectSpawnersArr||[]).includes(window.BUILD_IT_LOOT.SPAWNER_REF);
+      const oldSpawners=JSON.parse(gameplayLive.content).WorldsData?.objectSpawnersArr||[];
+      const newSpawners=JSON.parse(gameplay).WorldsData.objectSpawnersArr;
+      const needsGameplay=JSON.stringify(oldSpawners)!==JSON.stringify(newSpawners);
       lootStaged={
         snapshot:lootSnapshot(),pending,
         paths:{loot:lootPath,gameplay:gameplayPath},
