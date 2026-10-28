@@ -993,7 +993,7 @@
         throw new Error('Current loot JSON does not contain a valid Objects array.');
       const merged=JSON.stringify({...existing,Objects:[
         ...existing.Objects,...JSON.parse(pending.content).Objects
-      ]},null,2)+'\\n';
+      ]},null,2)+'\n';
       const gameplay=window.BUILD_IT_LOOT.gameplay(gameplayLive.content);
       window.BUILD_IT_FORMAT.validate(lootPath,merged);
       window.BUILD_IT_FORMAT.validate(gameplayPath,gameplay);
