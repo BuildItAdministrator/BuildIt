@@ -282,6 +282,29 @@ $('stGlobalName').addEventListener('change',()=>{invalidate();refreshGlobal();})
 $('stGameplayPath').addEventListener('change',()=>{invalidate();fillGameplay();});
 $('stWeatherPath').addEventListener('change',()=>{invalidate();fillWeather();});
 $('stObjectIndex').addEventListener('change',()=>{invalidate();fillObject();});
+function clearHeatmap(){if(heatLayer&&typeof map!=='undefined'){map.removeLayer(heatLayer);heatLayer=null;}}
+$('stClearHeatmap').addEventListener('click',()=>{clearHeatmap();setStatus('Heatmap cleared. No server files changed.');});
+$('stShowHeatmap').addEventListener('click',()=>{
+ if(!snapshot||selected!=='SpawnObject Heatmap'||typeof map==='undefined'||typeof L==='undefined'||typeof gameToLeaflet!=='function')return;
+ try{
+   const objects=ext.objectList(snapshot.content),grid=new Map();
+   for(const object of objects){
+     const x=Number(object.pos[0]),z=Number(object.pos[2]);
+     if(!Number.isFinite(x)||!Number.isFinite(z)||x<0||z<0||x>15360||z>15360)continue;
+     const key=Math.floor(x/100)+'_'+Math.floor(z/100);
+     const bin=grid.get(key)||{count:0,x:Math.floor(x/100)*100+50,z:Math.floor(z/100)*100+50};
+     bin.count++;grid.set(key,bin);
+   }
+   clearHeatmap();heatLayer=L.layerGroup().addTo(map);
+   for(const bin of grid.values()){
+     L.circleMarker(gameToLeaflet(bin.x,bin.z),{
+       radius:Math.min(20,5+Math.sqrt(bin.count)*2),weight:1,color:'#e57d44',
+       fillColor:'#e57d44',fillOpacity:Math.min(0.85,0.22+bin.count*0.04)
+     }).bindTooltip(bin.count+' objects in this 100m cell').addTo(heatLayer);
+   }
+   setStatus('Mapped '+objects.length+' objects in '+grid.size+' density cells. No server files changed.');
+ }catch(error){setStatus(error.message,true);}
+});
 $('stPickMap').addEventListener('click',()=>{
  if(busy||typeof map==='undefined'||typeof leafletToGame!=='function'){
    setStatus('Map selection unavailable.',true);return;
