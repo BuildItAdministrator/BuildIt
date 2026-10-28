@@ -15,7 +15,7 @@ html[data-buildit-theme="light"]{
   color-scheme:light;
   --bi-bg:#f3f7fa;--bi-panel:#fbfdff;--bi-panel-raised:#eff5f8;
   --bi-panel-muted:#f1f6fa;--bi-line:#bed0db;--bi-line-soft:#dce7ec;
-  --bi-text:#203747;--bi-muted:#547084;--bi-subtle:#67899a;
+  #bi-text:#1b3345;--bi-muted:#547084;--bi-subtle:#67899a;
   --bi-accent:#137c87;--bi-accent-deep:#137c87;--bi-accent-ink:#fff;
   --bi-green:#20784e;--bi-red:#b63a46;--bi-warning:#9b6d22;
   --bi-shadow:0 14px 42px rgba(35,65,81,.17),0 2px 8px rgba(35,65,81,.1);
@@ -60,7 +60,7 @@ html[data-buildit-theme="light"] #builditBrand .brand-caption{color:#5a7989}
   height:43px!important;min-height:43px!important;
   border-radius:11px!important;border:1px solid var(--bi-line)!important;
   background:var(--bi-panel)!important;color:var(--bi-text)!important;
-  padding:10px 49px 10px 40px!important;
+  padding:10px 12px 10px 40px!important;
   font-size:12px!important;font-weight:650!important;
   box-shadow:0 5px 22px rgba(0,0,0,.24)!important;
   letter-spacing:.005em
@@ -70,7 +70,7 @@ html[data-buildit-theme="light"] #builditBrand .brand-caption{color:#5a7989}
 #placeSearchBox .bi-search-icon{position:absolute;top:12px;left:13px;z-index:1;display:inline-flex;color:var(--bi-muted);pointer-events:none}
 #placeSearchBox .bi-search-icon .bi-icon{width:18px;height:18px}
 #builditThemeToggle{
-  top:5px!important;right:5px!important;
+  top:3px!important;right:3px!important;
   width:33px!important;height:33px!important;
   border-radius:8px!important;
   background:transparent!important;color:var(--bi-muted)!important;
