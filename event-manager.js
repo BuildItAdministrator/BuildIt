@@ -169,7 +169,11 @@
   ].join('');
   document.body.appendChild(panel);
   const message = (s, error) => { $('biStatus').textContent = s; $('biStatus').style.color = error ? '#ffb2a2' : '#a8d6e4'; };
-  toggle.addEventListener('click', () => { panel.hidden = !panel.hidden; if (!panel.hidden) refresh(); });
+  toggle.textContent='Quick Spawn';
+  toggle.addEventListener('click', () => {
+    if(window.BUILD_IT_QUICK_SPAWN?.toggle){window.BUILD_IT_QUICK_SPAWN.toggle();return;}
+    panel.hidden = !panel.hidden; if (!panel.hidden) refresh();
+  });
   $('biClose').addEventListener('click', () => { panel.hidden = true; placing = false; $('biPick').textContent = 'Pick on map'; });
   $('biPick').addEventListener('click', () => {
     placing = !placing;
