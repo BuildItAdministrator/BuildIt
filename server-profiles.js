@@ -242,8 +242,21 @@ window.BUILD_IT_EVENT_DRAFTS?.bindInitial(activeId,profiles.length===1);
 window.BUILD_IT_NITRADO_PROFILES=Object.freeze({
  current:()=>active()&&{id:active().id,name:active().name,serverId:active().serverId,serviceId:active().serviceId},
  list:()=>profiles.map(p=>({id:p.id,name:p.name,serverName:p.serverName})),
- select:id=>changeTo(id)
+ select:id=>changeTo(id),
+ connectionMatches:()=>{
+  const p=active(),c=admin.current();
+  return !!p&&p.workerUrl===c.workerUrl&&p.accessKey===c.accessKey&&
+    (p.serverId==='default'||p.serverId===c.serverId);
+ }
 });
+for(const id of ['nitradoWorkerUrl','nitradoAccessKey','nitradoServer']){
+ $(id)?.addEventListener('change',()=>{
+  if(!window.BUILD_IT_NITRADO_PROFILES.connectionMatches()){
+   message('Nitrado-verbinding wijkt af van het gekozen profiel. Sla de wijzigingen op via Manage.',true);
+   $('nitradoSyncStatus').textContent='Connection differs from saved profile. Server file edits are blocked.';
+  }
+ });
+}
 const now=admin.current(),profile=active();
 if(profile&&(profile.workerUrl!==now.workerUrl||profile.accessKey!==now.accessKey||
  (profile.serverId!=='default'&&profile.serverId!==now.serverId))){
