@@ -1,0 +1,58 @@
+/* Quick Spawn: single-purpose DayZ PS5 publishing panel.
+ * Avoids XML/JSON upload controls in the primary workflow.
+ */
+#quickSpawnPanel{
+ position:absolute;z-index:1170;
+ top:var(--bi-panel-top,259px);right:var(--bi-dock-right,12px);
+ width:min(385px,calc(100vw - 24px));max-height:calc(100dvh - 280px);
+ overflow-y:auto;box-sizing:border-box;padding:16px;border:1px solid var(--bi-line);
+ border-radius:14px;box-shadow:var(--bi-shadow);background:var(--bi-panel);
+ color:var(--bi-text);font:12px/1.5 Inter,Arial,sans-serif;
+}
+#quickSpawnPanel[hidden],#quickSpawnPanel [hidden]{display:none!important}
+#quickSpawnPanel .qs-head{display:flex;justify-content:space-between;align-items:start;gap:12px;
+ padding-bottom:12px;border-bottom:1px solid var(--bi-line-soft)}
+#quickSpawnPanel .qs-head strong{display:block;font-size:18px;font-weight:790}
+#quickSpawnPanel .qs-head small{display:block;color:var(--bi-muted);font-size:11px}
+#quickSpawnPanel button{cursor:pointer;padding:9px 11px;background:var(--bi-panel-raised);
+ color:var(--bi-text);border:1px solid var(--bi-line);border-radius:8px;
+ font:700 12px Inter,Arial,sans-serif}
+#quickSpawnPanel button:hover:not(:disabled){border-color:var(--bi-accent)}
+#quickSpawnPanel button:disabled{opacity:.48;cursor:not-allowed}
+#quickSpawnPanel #qsClose{font-size:22px;line-height:20px;padding:4px 9px}
+#quickSpawnPanel .qs-mode{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;
+ margin:13px 0;background:var(--bi-panel-muted);border:1px solid var(--bi-line-soft);border-radius:10px}
+#quickSpawnPanel .qs-mode button{border:0;background:transparent}
+#quickSpawnPanel .qs-mode button[aria-pressed="true"]{background:var(--bi-accent-deep);color:#fff}
+#quickSpawnPanel .qs-step{display:flex;align-items:center;gap:9px;margin:14px 0 9px;font-size:12px}
+#quickSpawnPanel .qs-step span{width:24px;height:24px;border-radius:7px;
+ display:inline-grid;place-items:center;background:var(--bi-panel-raised);color:var(--bi-accent);
+ border:1px solid var(--bi-line-soft);font-weight:800}
+#quickSpawnPanel .qs-step strong{font-size:12px}
+#quickSpawnPanel .qs-label{display:block;font-size:11px;color:var(--bi-muted);margin-bottom:6px}
+#quickSpawnPanel input{width:100%;box-sizing:border-box;background:var(--bi-panel-raised);
+ border:1px solid var(--bi-line);border-radius:8px;padding:10px 11px;color:var(--bi-text);
+ font:12px Inter,Arial,sans-serif}
+#quickSpawnPanel .qs-matches{border:1px solid var(--bi-line);border-radius:8px;
+ max-height:144px;overflow:auto;margin-top:4px;background:var(--bi-panel-raised)}
+#quickSpawnPanel .qs-matches button{display:block;width:100%;border:0;border-radius:0;
+ padding:8px 11px;text-align:left;font-size:11px;font-weight:500}
+#quickSpawnPanel .qs-matches button:hover{background:var(--bi-panel-muted)}
+#quickSpawnPanel .qs-selected,#quickSpawnPanel .qs-coordinates{
+ min-height:22px;margin:7px 0;font-size:11px;color:var(--bi-accent);overflow-wrap:anywhere}
+#quickSpawnPanel .qs-duo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+#quickSpawnPanel .qs-duo label{font-size:11px;color:var(--bi-muted)}
+#quickSpawnPanel .qs-duo input{margin-top:5px}
+#quickSpawnPanel .qs-note{color:var(--bi-muted);font-size:11px;line-height:1.55;margin:8px 0}
+#quickSpawnPanel #qsPick,#quickSpawnPanel #qsPublish{width:100%;padding:11px 12px;text-align:center}
+#quickSpawnPanel #qsPublish:not(:disabled){background:var(--bi-accent-deep);color:#fff;border-color:transparent}
+#quickSpawnPanel .qs-status{min-height:30px;white-space:pre-wrap;overflow-wrap:anywhere;
+ border:1px solid var(--bi-line-soft);background:var(--bi-panel-muted);
+ border-radius:8px;padding:9px 10px;color:var(--bi-accent);font-size:11px;line-height:1.45}
+#quickSpawnPanel .qs-status[data-error="true"]{color:var(--bi-red)}
+#quickSpawnPanel .qs-settings{margin-top:12px;border-top:1px solid var(--bi-line-soft);padding:9px 0}
+#quickSpawnPanel .qs-settings summary{cursor:pointer;color:var(--bi-muted);font-size:11px}
+#quickSpawnPanel #qsAdvanced{width:100%;font-size:11px;border-color:transparent;background:transparent;color:var(--bi-muted)}
+@media(max-width:600px){
+ #quickSpawnPanel{right:10px;width:calc(100vw - 20px);max-height:calc(100dvh - 270px)}
+}
