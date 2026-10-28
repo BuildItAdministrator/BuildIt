@@ -13,7 +13,7 @@ const C=[
  ['Equipment & effects',['Loadout Generator','Weapon Blueprint Generator','Bag Fill Generator','CfgEffect Converter']]
 ];
 const TOOLS=C.flatMap(([group,names])=>names.map(name=>({name,group})));
-const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder','Spawnable Types Adjuster']);
+const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer']);
 const RELATED={'Events Organizer':'biToggle','Build A Vehicle':'biToggle'};
 const ROOT=document.createElement('div');ROOT.id='serverToolsRoot';
 ROOT.innerHTML=`
@@ -44,6 +44,11 @@ ROOT.innerHTML=`
    <div id="stTierControls" class="st-params" hidden><label class="st-field"><span>Explicit loot tier</span><select id="stTier"><option>Tier1</option><option>Tier2</option><option>Tier3</option><option>Tier4</option></select></label><label class="st-field"><span>Nominal multiplier</span><input id="stTierFactor" type="number" min="1" max="1000" step="0.1" value="2"></label></div>
    <div id="stClassSearchControls" class="st-params" hidden><label class="st-field st-wide"><span>Search actual server classnames</span><input id="stClassSearch" type="search" autocomplete="off" placeholder="e.g. M4A1, Apple, Offroad"></label></div>
    <div id="stSpawnableControls" class="st-params" hidden><label class="st-field st-wide"><span>Exact existing classname</span><input id="stSpawnableName" type="text" placeholder="e.g. Offroad_02_Beige"></label><label class="st-field"><span>Existing section</span><select id="stSpawnableSection"><option value="attachments">Attachments</option><option value="cargo">Cargo</option></select></label><label class="st-field"><span>Chance (0–1)</span><input id="stSpawnableChance" type="number" min="0" max="1" step="0.05" value="1"></label></div>
+   <div id="stGameplayControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing gameplay setting</span><select id="stGameplayPath"></select></label><label class="st-field st-wide"><span>New value</span><input id="stGameplayValue" type="text" placeholder="true, false or a number"></label></div>
+   <div id="stWeatherControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing weather parameter</span><select id="stWeatherPath"></select></label><label class="st-field st-wide"><span>Value (0–1)</span><input id="stWeatherValue" type="number" min="0" max="1" step="0.05"></label></div>
+   <div id="stObjectMoveControls" class="st-params" hidden><label class="st-field st-wide"><span>Object from server file</span><select id="stObjectIndex"></select></label><label class="st-field"><span>X</span><input id="stObjectX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Z</span><input id="stObjectZ" type="number" min="0" max="15360" step="0.01"></label></div>
+   <div id="stPlayerSpawnControls" class="st-params" hidden><label class="st-field"><span>Spawn X</span><input id="stPlayerX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Spawn Z</span><input id="stPlayerZ" type="number" min="0" max="15360" step="0.01"></label></div>
+   <div id="stMapControls" class="st-actions" hidden><button id="stPickMap" type="button">Pick on map</button><span class="st-help">Optional map selection for X/Z.</span></div>
    <div class="st-actions"><button id="stRun" type="button" disabled>Check / Preview</button><button id="stPublish" type="button" hidden disabled>Apply to Nitrado</button></div>
    <pre id="stResult" class="st-result" role="status" aria-live="polite"></pre>
    <details class="st-settings"><summary>Connection · MAP_WRITE_KEY</summary><p class="st-help">Use the same write key as the File Manager. This key is never saved.</p><label class="st-field"><span>Write key</span><input id="stWriteKey" type="password" autocomplete="off" placeholder="MAP_WRITE_KEY"></label></details>
@@ -53,8 +58,8 @@ document.body.appendChild(ROOT);
 const $=id=>ROOT.querySelector('#'+id);
 const panel=$('toolHubPanel'),cards=$('stCards'),workspace=$('stWorkspace');
 let selected=null,snapshot=null,preview=null,busy=false,remoteList=[];
-const bridge=window.BUILD_IT_SERVER_FILES,core=window.BUILD_IT_SERVER_CORE;
-if(!bridge||!core)throw new Error('Server Tools bridge not ready.');
+const bridge=window.BUILD_IT_SERVER_FILES,core=window.BUILD_IT_SERVER_CORE,ext=window.BUILD_IT_SERVER_EXTENSIONS;
+if(!bridge||!core||!ext)throw new Error('Server Tools dependencies not ready.');
 const DEFAULTS={
  'XML Validator':'db/types.xml',
  'JSON Validator':'cfggameplay.json',
@@ -69,9 +74,14 @@ const DEFAULTS={
  'Messages Generator':'db/messages.xml',
  'Tier Booster':'db/types.xml',
  'Classname Finder':'db/types.xml',
- 'Spawnable Types Adjuster':'cfgspawnabletypes.xml'
+ 'Spawnable Types Adjuster':'cfgspawnabletypes.xml',
+ 'Gameplay Generator':'cfggameplay.json',
+ 'Weather Manager':'cfgweather.xml',
+ 'Spawn Point Generator':'cfgplayerspawnpoints.xml',
+ 'SpawnObject Mover':'custom/builditlootdrop.json',
+ 'SpawnObject Organizer':'custom/builditlootdrop.json'
 };
-const EDITORS=new Set(['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Globals Configurator','Messages Generator','Spawnable Types Adjuster']);
+const EDITORS=new Set(['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Globals Configurator','Messages Generator','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer']);
 function setStatus(text,error=false){
  $('stResult').textContent=text;$('stResult').dataset.error=String(error);
 }
@@ -80,7 +90,7 @@ function invalidate(){
 }
 function setBusy(value){
  busy=value;
- for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance']){
+ for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPickMap']){
    $(id).disabled=value;
  }
  $('stRun').disabled=value||!snapshot;
@@ -135,7 +145,8 @@ function toolFiles(){
  return remoteList.filter(file=>{
    if(selected==='JSON Validator')return file.relative.endsWith('.json');
    if(selected==='XML Validator')return file.relative.endsWith('.xml');
-   if(selected==='SpawnObject Duplicate Checker')return file.relative.endsWith('.json');
+   if(['SpawnObject Duplicate Checker','SpawnObject Mover','SpawnObject Organizer'].includes(selected))return file.relative.endsWith('.json');
+   if(selected==='Weather Manager')return file.relative==='cfgweather.xml';
    if(selected==='Messages Generator')return ['db/messages.xml','messages.xml'].includes(file.relative);
    return file.relative===DEFAULTS[selected];
  });
@@ -195,6 +206,11 @@ async function choose(name){
  $('stTierControls').hidden=name!=='Tier Booster';
  $('stClassSearchControls').hidden=name!=='Classname Finder';
  $('stSpawnableControls').hidden=name!=='Spawnable Types Adjuster';
+ $('stGameplayControls').hidden=name!=='Gameplay Generator';
+ $('stWeatherControls').hidden=name!=='Weather Manager';
+ $('stObjectMoveControls').hidden=name!=='SpawnObject Mover';
+ $('stPlayerSpawnControls').hidden=name!=='Spawn Point Generator';
+ $('stMapControls').hidden=!['SpawnObject Mover','Spawn Point Generator'].includes(name);
  $('stValueLabel').textContent=name==='Advanced Types Editor'?'Set value':'Multiplier';
  $('stValue').value=name==='Types Reducer'||name==='Lifetime Reducer'?'0.5':
    name==='Advanced Types Editor'?'100':'2';
@@ -219,7 +235,7 @@ $('stBack').addEventListener('click',()=>{
 });
 $('stRemoteFile').addEventListener('change',()=>void loadLive());
 $('stReload').addEventListener('click',()=>void loadLive());
-for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance']){
+for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPickMap']){
  $(id).addEventListener('input',invalidate);$(id).addEventListener('change',invalidate);
 }
 $('stGlobalName').addEventListener('change',()=>{invalidate();refreshGlobal();});
