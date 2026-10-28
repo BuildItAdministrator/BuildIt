@@ -47,7 +47,7 @@ ROOT.innerHTML=`
    <div id="stGameplayControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing gameplay setting</span><select id="stGameplayPath"></select></label><label class="st-field st-wide"><span>New value</span><input id="stGameplayValue" type="text" placeholder="true, false or a number"></label></div>
    <div id="stWeatherControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing weather parameter</span><select id="stWeatherPath"></select></label><label class="st-field st-wide"><span>Value (0–1)</span><input id="stWeatherValue" type="number" min="0" max="1" step="0.05"></label></div>
    <div id="stObjectMoveControls" class="st-params" hidden><label class="st-field st-wide"><span>Object from server file</span><select id="stObjectIndex"></select></label><label class="st-field"><span>X</span><input id="stObjectX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Z</span><input id="stObjectZ" type="number" min="0" max="15360" step="0.01"></label></div>
-   <div id="stPlayerSpawnControls" class="st-params" hidden><label class="st-field"><span>Spawn X</span><input id="stPlayerX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Spawn Z</span><input id="stPlayerZ" type="number" min="0" max="15360" step="0.01"></label></div>
+   <div id="stPlayerSpawnControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing fresh-spawn group</span><select id="stPlayerGroup"></select></label><label class="st-field"><span>Spawn X</span><input id="stPlayerX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Spawn Z</span><input id="stPlayerZ" type="number" min="0" max="15360" step="0.01"></label></div>
    <div id="stMapControls" class="st-actions" hidden><button id="stPickMap" type="button">Pick on map</button><span class="st-help">Optional map selection for X/Z.</span></div>
    <div id="stHeatmapControls" class="st-actions" hidden><button id="stShowHeatmap" type="button">Show density on map</button><button id="stClearHeatmap" type="button">Clear heatmap</button></div>
    <div id="stHordeControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing infected event type</span><select id="stHordeType"></select></label><label class="st-field"><span>X</span><input id="stHordeX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Z</span><input id="stHordeZ" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Radius (m)</span><input id="stHordeRadius" type="number" min="10" max="300" value="80"></label><label class="st-field"><span>Minimum infected</span><input id="stHordeMin" type="number" min="1" max="75" step="1" value="10"></label><label class="st-field"><span>Maximum infected</span><input id="stHordeMax" type="number" min="1" max="75" step="1" value="20"></label></div>
@@ -113,7 +113,7 @@ function invalidate(){
 }
 function setBusy(value){
  busy=value;
- for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPickMap','stGasName','stGasX','stGasZ','stGasY','stGasRadius','stRelocX','stRelocZ','stEquipParent','stEquipItem','stEquipGroup','stEquipChance','stHordeType','stHordeX','stHordeZ','stHordeRadius','stHordeMin','stHordeMax','stIgnoreItem','stEventName','stEventField','stEventValue','stLoadoutItem','stUndergroundIndex','stUndergroundValue']){
+ for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPlayerGroup','stPickMap','stGasName','stGasX','stGasZ','stGasY','stGasRadius','stRelocX','stRelocZ','stEquipParent','stEquipItem','stEquipGroup','stEquipChance','stHordeType','stHordeX','stHordeZ','stHordeRadius','stHordeMin','stHordeMax','stIgnoreItem','stEventName','stEventField','stEventValue','stLoadoutItem','stUndergroundIndex','stUndergroundValue']){
    $(id).disabled=value;
  }
  $('stRun').disabled=value||!snapshot;
@@ -231,6 +231,12 @@ async function loadLive(){
    if(!relative)throw new Error('Choose a Nitrado file.');
    $('stFileState').textContent='Reading current server file…';
    snapshot=await bridge.read(relative);
+   if(selected==='Spawn Point Generator'){
+     const groups=ext.spawnGroups(snapshot.content),select=$('stPlayerGroup');
+     select.replaceChildren();
+     for(const name of groups){const o=document.createElement('option');o.value=name;o.textContent=name;select.appendChild(o);}
+     if(!groups.length)throw new Error('No valid fresh-spawn groups found.');
+   }
    if(selected==='Gameplay Generator'){
      const entries=ext.gameplayEntries(snapshot.content),select=$('stGameplayPath');
      select.replaceChildren();
@@ -344,7 +350,7 @@ $('stBack').addEventListener('click',()=>{
 });
 $('stRemoteFile').addEventListener('change',()=>void loadLive());
 $('stReload').addEventListener('click',()=>void loadLive());
-for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPickMap','stGasName','stGasX','stGasZ','stGasY','stGasRadius','stRelocX','stRelocZ','stEquipParent','stEquipItem','stEquipGroup','stEquipChance','stHordeType','stHordeX','stHordeZ','stHordeRadius','stHordeMin','stHordeMax','stIgnoreItem','stEventName','stEventField','stEventValue','stLoadoutItem','stUndergroundIndex','stUndergroundValue']){
+for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPlayerGroup','stPickMap','stGasName','stGasX','stGasZ','stGasY','stGasRadius','stRelocX','stRelocZ','stEquipParent','stEquipItem','stEquipGroup','stEquipChance','stHordeType','stHordeX','stHordeZ','stHordeRadius','stHordeMin','stHordeMax','stIgnoreItem','stEventName','stEventField','stEventValue','stLoadoutItem','stUndergroundIndex','stUndergroundValue']){
  $(id).addEventListener('input',invalidate);$(id).addEventListener('change',invalidate);
 }
 $('stGlobalName').addEventListener('change',()=>{invalidate();refreshGlobal();});
@@ -431,8 +437,8 @@ function analyze(){
      change.previous+' → '+change.value+'\nOther weather settings are preserved.'};
  }
  if(selected==='Spawn Point Generator'){
-   const change=ext.addSpawnPoint(source,$('stPlayerX').value,$('stPlayerZ').value);
-   return {content:change.content,changed:1,message:'PREVIEW — Add fresh spawn at X '+change.x+' / Z '+change.z+
+   const change=ext.addSpawnPoint(source,$('stPlayerX').value,$('stPlayerZ').value,$('stPlayerGroup').value);
+   return {content:change.content,changed:1,message:'PREVIEW — Add fresh spawn in '+change.group+' at X '+change.x+' / Z '+change.z+
      '\nOriginal spawn points and all other groups are preserved.'};
  }
  if(selected==='SpawnObject Mover'){
