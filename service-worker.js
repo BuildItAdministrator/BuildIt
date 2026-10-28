@@ -1,9 +1,9 @@
 // Build It!++ PWA offline shell. No Nitrado API responses or credentials are cached.
 // Map tiles and live Nitrado information still require network access.
-const CACHE_NAME = 'buildit-shell-v30';
+const CACHE_NAME = 'buildit-shell-v31';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
-  './server-tools-core.js', './server-tools-extensions.js', './server-tools-addons.js', './server-tools-final.js', './server-tools-bridge.js', './server-tools.js', './server-tools.css', './quick-spawn.js', './quick-spawn.css', './xml-integrity.js', './format-validator.js', './loot-spawner.js', './event-manager.js', './ui-layout.js', './locations-fallback.js', './file-manager.js',
+  './server-tools-core.js', './server-tools-extensions.js', './server-tools-addons.js', './server-tools-final.js', './server-tools-bridge.js', './server-profiles.js', './server-profiles.css', './server-tools.js', './server-tools.css', './quick-spawn.js', './quick-spawn.css', './xml-integrity.js', './format-validator.js', './loot-spawner.js', './event-manager.js', './ui-layout.js', './locations-fallback.js', './file-manager.js',
   './theme.css', './log-filters-ui.css', './design-system.css', './theme.js', './map-style.js', './custom-bases-sync.js', './ui-icons.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/app-icon.svg'
 ];
