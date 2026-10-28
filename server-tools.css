@@ -1,0 +1,69 @@
+/* Build It!++ tools hub — follows existing light/dark system. */
+#serverToolsRoot{font-family:inherit}
+#toolHubToggle{
+ position:absolute;z-index:1152;top:201px;right:var(--bi-dock-right,12px);
+ width:min(var(--bi-dock-width,264px),calc(100vw - 24px));height:40px;
+ box-sizing:border-box;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;
+ border:1px solid var(--bi-line);border-radius:9px;
+ background:var(--bi-panel);color:var(--bi-text);box-shadow:var(--bi-shadow);
+ cursor:pointer;font-size:13px;font-weight:760;text-align:left;
+}
+#toolHubToggle:hover,#toolHubToggle[aria-expanded=true]{border-color:var(--bi-accent);background:var(--bi-panel-raised)}
+#toolHubToggle .st-count{font-size:10px;color:var(--bi-muted);font-weight:600;white-space:nowrap}
+#toolHubPanel{
+ position:absolute;z-index:1175;top:253px;right:var(--bi-dock-right,12px);
+ width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 266px);
+ overflow:auto;box-sizing:border-box;padding:16px;border:1px solid var(--bi-line);
+ border-radius:var(--bi-radius);color:var(--bi-text);background:var(--bi-panel);
+ box-shadow:var(--bi-shadow);
+}
+#toolHubPanel[hidden],#toolHubPanel [hidden]{display:none!important}
+.st-header,.st-work-head,.st-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.st-header{padding-bottom:12px;border-bottom:1px solid var(--bi-line-soft)}
+.st-header strong{display:block;font-size:17px;letter-spacing:.01em}
+.st-header small{display:block;margin-top:4px;color:var(--bi-muted);font-size:11px}
+#toolHubClose{font-size:24px;line-height:1;min-width:32px}
+.st-toolbar,.st-params{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:10px;margin:12px 0}
+.st-field{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--bi-muted);font-weight:600}
+.st-field input,.st-field select,.st-field textarea{
+ width:100%;min-width:0;box-sizing:border-box;border:1px solid var(--bi-line);border-radius:8px;
+ padding:9px 10px;background:var(--bi-panel-raised);color:var(--bi-text);font-size:12px
+}
+.st-field textarea{font:11px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical;max-height:240px}
+.st-field input[type=file]{font-size:11px}
+.st-summary,.st-help{font-size:12px;line-height:1.5;color:var(--bi-muted);margin:10px 0 12px}
+.st-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.st-card{
+ min-width:0;display:flex;flex-direction:column;gap:4px;align-items:flex-start;
+ border:1px solid var(--bi-line-soft);border-radius:10px;background:var(--bi-panel-muted);
+ padding:11px 12px
+}
+.st-card strong{font-size:12px;line-height:1.3;font-weight:700;overflow-wrap:anywhere}
+.st-card small{font-size:10px;color:var(--bi-muted);line-height:1.45}
+.st-card.st-ready{border-color:var(--bi-accent-deep)}
+#toolHubPanel button:not(#toolHubToggle){
+ border:1px solid var(--bi-line);border-radius:8px;background:var(--bi-panel-raised);
+ padding:6px 10px;color:var(--bi-text);font-size:11px;font-weight:650;cursor:pointer;
+}
+#toolHubPanel button:hover{border-color:var(--bi-accent)}
+#toolHubPanel .st-card button{margin-top:5px;background:var(--bi-accent-deep);color:#fff;border-color:transparent}
+.st-workspace{display:flex;flex-direction:column;gap:10px}
+.st-work-head{padding:14px 0 0}
+.st-work-head strong{font-size:15px}
+.st-params .st-wide{grid-column:1/-1}
+.st-actions{justify-content:flex-start;flex-wrap:wrap}
+#toolHubPanel #stRun{background:var(--bi-accent-deep);color:#fff;border-color:transparent}
+.st-result{font:11px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;
+ border-radius:9px;border:1px solid var(--bi-line-soft);background:var(--bi-panel-muted);
+ padding:12px;min-height:30px;max-height:260px;overflow:auto;color:var(--bi-text)}
+.st-parts{display:flex;flex-wrap:wrap;gap:8px}
+.st-parts a{border:1px solid var(--bi-accent-deep);border-radius:8px;color:var(--bi-accent);
+ padding:7px 10px;text-decoration:none;font-size:11px}
+.st-parts a:hover{text-decoration:underline}
+body.buildit-searching #toolHubToggle{visibility:hidden!important}
+@media(max-width:600px){
+ #toolHubToggle{right:10px;width:min(230px,calc(100vw - 20px))}
+ #toolHubPanel{top:253px;right:10px;width:calc(100vw - 20px);max-height:calc(100dvh - 266px)}
+ .st-cards{grid-template-columns:1fr}
+ .st-toolbar,.st-params{grid-template-columns:1fr}
+}
