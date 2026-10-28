@@ -1393,7 +1393,7 @@ test('JSON loot migration replaces old Build It references with custom/builditlo
 
 test('server tools catalog shows 53 items, with no local-file import workflow',async({page})=>{
   const stats=await page.evaluate(()=>window.BUILD_IT_TOOLS);
-  expect(stats).toEqual({count:53,ready:13,mode:'nitrado'});
+  expect(stats).toEqual({count:53,ready:14,mode:'nitrado'});
   await page.locator('#toolHubToggle').click();
   await expect(page.locator('#toolHubPanel')).toBeVisible();
   await expect(page.locator('#stCards .st-card')).toHaveCount(53);
@@ -1617,4 +1617,19 @@ test('server Classname Finder uses existing types.xml without generating a repla
  expect(data.total).toBe(2);
  expect(data.results.map(x=>x.name)).toEqual(['Apple','AppleSeed']);
  expect(data.results[0].nominal).toBe('50');
+});
+
+
+test('Spawnable Types Adjuster changes existing attachments only and keeps comments and cargo',async({page})=>{
+ const result=await page.evaluate(()=>{
+   const source='<spawnabletypes><!-- <type name="Offroad_02_Beige"><attachments chance="0.20"><item name="A" chance="0.30"/></attachments></type> -->'+
+    '<type name="Offroad_02_Beige"><attachments chance="0.50"><item name="CarBattery" chance="0.25"/></attachments><cargo chance="0.50"><item name="Apple" chance="0.20"/></cargo></type>'+
+    '<type name="Other"><attachments chance="0.10"><item name="Lamp" chance="0.10"/></attachments></type></spawnabletypes>';
+   return window.BUILD_IT_SERVER_CORE.editSpawnableChance(source,'Offroad_02_Beige','attachments',1);
+ });
+ expect(result.changed).toBe(2);
+ expect(result.content).toContain('<!-- <type name="Offroad_02_Beige"><attachments chance="0.20"');
+ expect(result.content).toContain('<attachments chance="1.00"><item name="CarBattery" chance="1.00"/>');
+ expect(result.content).toContain('<cargo chance="0.50"><item name="Apple" chance="0.20"/>');
+ expect(result.content).toContain('<type name="Other"><attachments chance="0.10"');
 });
