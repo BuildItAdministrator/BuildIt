@@ -156,7 +156,7 @@
     '<div id="biLootReview" class="biMessage" role="status" aria-live="polite">Review your loot before publishing. New JSON files require the Worker create-file endpoint.</div>',
     '<label class="biConfirm"><input type="checkbox" id="biLootServerStopped"> My server is stopped and I reviewed the JSON.</label>',
     '<button type="button" id="biDeployLoot" class="biPrimary biFull" disabled>Back up &amp; upload loot JSON</button>',
-    '<p class="biSmall">Install both in your server mission folder. Existing cfgGameplay settings and object-spawner references are preserved. Enable cfgGameplay in Nitrado before restarting.</p></section>',
+    '<p class="biSmall">Use Review live loot JSON upload to publish both files through Nitrado once the Worker create-file handler is active. Manual download remains available. Existing cfgGameplay settings are preserved; ensure cfgGameplay is enabled before restarting.</p></section>',
     '<details class="biAdvanced" id="biAdvanced"><summary>Advanced · Manual XML / JSON tools</summary>',
     '<button type="button" id="biLoadServer" class="biFull">Reload live server XML</button>',
     '<div class="biSmall" id="biCatalog">Loading official classnames…</div>',
