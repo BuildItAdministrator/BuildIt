@@ -182,26 +182,35 @@ select.addEventListener('change',()=>{
 });
 async function saveProfile(update){
  if(locked())return message('Er loopt een serveractie. Probeer daarna opnieuw.',true);
+ const before=activeId;
+ let backup=null,createdId='';
  busy=true;
  try{
   const next=await candidate();
   const duplicate=profiles.find(p=>(!update||p.id!==activeId)&&
     p.workerUrl===next.workerUrl&&p.serverId===next.serverId);
   if(duplicate)throw Error('Deze Nitrado-service staat al onder "'+duplicate.name+'".');
+  let target;
   if(update){
    const existing=active();if(!existing)throw Error('No active profile.');
-   Object.assign(existing,next);
+   backup={...existing};Object.assign(existing,next);target=existing.id;
   }else{
    if(profiles.length>=20)throw Error('Maximum 20 profiles per browser.');
-   const added={id:crypto.randomUUID(),...next};profiles.push(added);
-   // Keep the old profile active until the new connection is verified.
-   activeId=added.id;
+   const added={id:crypto.randomUUID(),...next};
+   profiles.push(added);createdId=added.id;target=added.id;
   }
   busy=false;
-  await changeTo(activeId,{force:true});
+  await changeTo(target,{force:update});
   draw();loadForm(active());message('Profiel opgeslagen en actief.');
- }catch(e){message('Opslaan mislukt: '+e.message,true);}
- finally{busy=false;}
+ }catch(e){
+  if(createdId)profiles=profiles.filter(p=>p.id!==createdId);
+  if(backup){const previous=profiles.find(p=>p.id===backup.id);if(previous)Object.assign(previous,backup);}
+  if(before&&profiles.some(p=>p.id===before)){
+    activeId=before;storage();draw();
+    if(!locked()){try{await changeTo(before,{force:true});}catch(_){}}
+  }
+  message('Opslaan mislukt: '+e.message,true);
+ }finally{busy=false;}
 }
 $('bspAdd').addEventListener('click',()=>void saveProfile(false));
 $('bspUpdate').addEventListener('click',()=>void saveProfile(true));
@@ -216,6 +225,7 @@ $('bspDelete').addEventListener('click',async()=>{
  loadForm(active());
 });
 init();draw();
+window.BUILD_IT_EVENT_DRAFTS?.bindInitial(activeId,profiles.length===1);
 window.BUILD_IT_NITRADO_PROFILES=Object.freeze({
  current:()=>active()&&{id:active().id,name:active().name,serverId:active().serverId,serviceId:active().serviceId},
  list:()=>profiles.map(p=>({id:p.id,name:p.name,serverName:p.serverName})),
