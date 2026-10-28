@@ -1,6 +1,6 @@
 // Build It!++ PWA offline shell. No Nitrado API responses or credentials are cached.
 // Map tiles and live Nitrado information still require network access.
-const CACHE_NAME = 'buildit-shell-v20';
+const CACHE_NAME = 'buildit-shell-v21';
 const SHELL = [
   './', './index.html', './manifest.webmanifest',
   './xml-integrity.js', './format-validator.js', './loot-spawner.js', './event-manager.js', './ui-layout.js', './locations-fallback.js', './file-manager.js',
