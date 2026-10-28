@@ -171,14 +171,27 @@ async function changeTo(id,{force=false}={}){
   }));
   message('Actieve server: '+profile.name);
  }catch(e){
-  $('nitradoServer').disabled=true;
+  const previousProfile=profiles.find(p=>p.id===previous);
+  // Restore both the visible profile and its connection, not only the label.
+  if(previousProfile&&previous!==id){
+   activeId=previous;
+   draw();
+   window.BUILD_IT_NITRADO_PROFILE_EPOCH=(window.BUILD_IT_NITRADO_PROFILE_EPOCH||0)+1;
+   window.dispatchEvent(new CustomEvent('buildit:nitrado-profile-changing',
+     {detail:{profileId:previous}}));
+   try{
+    await admin.switchTo(previousProfile);
+    window.dispatchEvent(new CustomEvent('buildit:nitrado-profile-changed',
+      {detail:{profileId:previous,name:previousProfile.name}}));
+   }catch(_){$('nitradoServer').disabled=true;}
+  }else $('nitradoServer').disabled=true;
   message('Server niet geverifieerd: '+e.message,true);
   throw e;
  }
 }
 select.addEventListener('change',()=>{
  const id=select.value;
- changeTo(id).catch(e=>message(e.message,true));
+ changeTo(id).catch(e=>{select.value=activeId;message(e.message,true);});
 });
 async function saveProfile(update){
  if(locked())return message('Er loopt een serveractie. Probeer daarna opnieuw.',true);
