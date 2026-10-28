@@ -4,7 +4,7 @@
  */
 (function(){
   'use strict';
-  const ALLOWED=/^(?:(?:db|custom)\/)?[A-Za-z0-9_.-]+\.(?:xml|json|txt)$/i;
+  const ALLOWED=/^(?:(?:db|custom|env)\/)?[A-Za-z0-9_.-]+\.(?:xml|json|txt)$/i;
   const MAX_BYTES=4*1024*1024;
   const utf8=s=>new TextEncoder().encode(s).byteLength;
   const requireRequest=()=>{
@@ -59,12 +59,12 @@
   async function available(){
     const base=await mission({refresh:true});
     const results=[];
-    for(const folder of ['','db','custom']){
+    for(const folder of ['','db','custom','env']){
       const dir=base+(folder?'/'+folder:'');
       let data;
       try{data=await list(dir);}
       catch(error){
-        if(folder==='custom')continue;
+        if(folder==='custom'||folder==='env')continue;
         throw new Error('Cannot list '+(folder||'mission')+' folder: '+error.message);
       }
       for(const entry of data.entries){
