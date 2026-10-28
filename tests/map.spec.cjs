@@ -1359,3 +1359,26 @@ test('first-time loot JSON creation uses create route without overwriting existi
   expect(JSON.parse(write[0].body.content).WorldsData.objectSpawnersArr).toEqual(['custom-base.json','custom/builditlootdrop.json']);
   await expect(page.locator('#biDraftCount')).toHaveText('0 saved');
 });
+
+
+test('JSON loot migration replaces old Build It references with custom/builditlootdrop.json',async({page})=>{
+  const actual=await page.evaluate(()=>{
+    const input={
+      version:130,
+      WorldsData:{objectSpawnersArr:[
+        'custom/base.json',
+        'BuildIt_LootDrops.json',
+        'custom/BuildIt_LootDrops.json',
+        'custom/builditlootdrop.json'
+      ]},
+      PlayerData:{StaminaData:{staminaMax:100}}
+    };
+    const patched=JSON.parse(window.BUILD_IT_LOOT.gameplay(JSON.stringify(input)));
+    return {filename:window.BUILD_IT_LOOT.FILENAME,ref:window.BUILD_IT_LOOT.SPAWNER_REF,
+      spawners:patched.WorldsData.objectSpawnersArr,stamina:patched.PlayerData.StaminaData.staminaMax};
+  });
+  expect(actual.filename).toBe('builditlootdrop.json');
+  expect(actual.ref).toBe('custom/builditlootdrop.json');
+  expect(actual.spawners).toEqual(['custom/base.json','custom/builditlootdrop.json']);
+  expect(actual.stamina).toBe(100);
+});
