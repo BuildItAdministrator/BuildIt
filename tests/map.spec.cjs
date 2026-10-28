@@ -1393,7 +1393,7 @@ test('JSON loot migration replaces old Build It references with custom/builditlo
 
 test('server tools catalog shows 53 items, with no local-file import workflow',async({page})=>{
   const stats=await page.evaluate(()=>window.BUILD_IT_TOOLS);
-  expect(stats).toEqual({count:53,ready:10,mode:'nitrado'});
+  expect(stats).toEqual({count:53,ready:12,mode:'nitrado'});
   await page.locator('#toolHubToggle').click();
   await expect(page.locator('#toolHubPanel')).toBeVisible();
   await expect(page.locator('#stCards .st-card')).toHaveCount(53);
@@ -1562,3 +1562,45 @@ test('Quick Spawn validates loot height and never invents elevation',async({page
   await expect(page.locator('#qsPublish')).toBeDisabled();
   await expect(page.locator('#qsLootFields')).toContainText('Ground elevation is required');
 });
+
+
+test('server-native message generator appends once without changing existing message comments',async({page})=>{
+  const result=await page.evaluate(()=>{
+    const c=window.BUILD_IT_SERVER_CORE;
+    const xml='<?xml version="1.0" encoding="UTF-8"?>\n<messages>\n<!-- <message><repeat>5</repeat><text>Example</text></message> -->\n</messages>';
+    const result=c.addMessage(xml,'Visit discord.gg/Example & have fun!',15);
+    const doc=new DOMParser().parseFromString(result.content,'application/xml');
+    return {content:result.content,generated:doc.querySelectorAll('messages > message').length,text:doc.querySelector('messages > message > text')?.textContent};
+  });
+  expect(result.generated).toBe(1);
+  expect(result.text).toBe('Visit discord.gg/Example & have fun!');
+  expect(result.content).toContain('<!-- <message><repeat>5</repeat><text>Example</text></message> -->');
+  expect(result.content).toContain('&amp;');
+});
+
+test('server-native tier booster changes only explicitly tagged items and ignores XML comments',async({page})=>{
+  const data=await page.evaluate(()=>{
+    const xml='<types><!-- <type name="Commented"><nominal>2</nominal><value name="Tier3"/></type> -->'+
+      '<type name="Tier3Item"><nominal>10</nominal><min>3</min><value name="Tier3"/></type>'+
+      '<type name="Tier2Item"><nominal>8</nominal><value name="Tier2"/></type></types>';
+    return window.BUILD_IT_SERVER_CORE.editTypes(xml,{mode:'multiply',field:'nominal',value:3,tier:'Tier3'});
+  });
+  expect(data.changed).toBe(1);
+  expect(data.content).toContain('<type name="Commented"><nominal>2</nominal>');
+  expect(data.content).toContain('<type name="Tier3Item"><nominal>30</nominal>');
+  expect(data.content).toContain('<type name="Tier2Item"><nominal>8</nominal>');
+});
+
+test('server-native Globals Configurator safely edits one existing numeric value',async({page})=>{
+  const data=await page.evaluate(()=>{
+    const xml='<variables><!-- <var name="ZombieMaxCount" type="0" value="999"/> -->'+
+      '<var name="ZombieMaxCount" type="0" value="100"/>'+
+      '<var name="LootDamageMax" type="1" value="0.25"/></variables>';
+    return window.BUILD_IT_SERVER_CORE.editGlobal(xml,'ZombieMaxCount',250);
+  });
+  expect(data.changed).toBe(1);
+  expect(data.content).toContain('<!-- <var name="ZombieMaxCount" type="0" value="999"/> -->');
+  expect(data.content).toContain('name="ZombieMaxCount" type="0" value="250"');
+  expect(data.content).toContain('name="LootDamageMax" type="1" value="0.25"');
+});
+
