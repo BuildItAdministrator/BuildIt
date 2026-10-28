@@ -28,7 +28,7 @@
       '<div class="fm-row"><button type="button" id="fmRepairXml" class="log-btn" hidden>Fix duplicate XML header</button></div>',
       '<label class="fm-label" for="fmLocalFile">Load a local replacement into the editor</label>',
       '<input id="fmLocalFile" type="file" accept=".xml,.json,.txt">',
-      '<div class="fm-row"><button type="button" id="fmDownload" class="log-btn">Download copy</button><button type="button" id="fmSave" class="log-btn">Backup &amp; upload</button></div>',
+      '<div class="fm-row"><button type="button" id="fmDownload" class="log-btn">Download copy</button><button type="button" id="fmSave" class="log-btn" disabled>Backup &amp; upload</button></div>',
     '</div>',
     '<div id="fmStatus" class="log-auto-status" role="status" aria-live="polite">Browse your server files after the Cloudflare Worker upgrade is deployed.</div>'
   ].join('');
