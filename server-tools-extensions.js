@@ -181,40 +181,73 @@ function organizeObjects(src){
  return{content:stringify(d,src),changed:Number(original.some((v,i)=>v!==sorted[i].name+'|'+JSON.stringify(sorted[i].pos))),
         total:sorted.length};
 }
-function addSpawnPoint(src,x,z){
+function spawnGroups(source){
+ const doc=xml(source,'playerspawnpoints');
+ const generator=doc.documentElement.querySelector(':scope > fresh > generator_posbubbles');
+ if(!generator)throw Error('Fresh generator_posbubbles was not found.');
+ const groups=[...generator.children].filter(el=>el.nodeName==='group');
+ if(groups.length)return groups.map(g=>g.getAttribute('name')).filter(Boolean);
+ return ['Direct positions'];
+}
+function addSpawnPoint(src,x,z,groupName=''){
  const doc=xml(src,'playerspawnpoints');
  const fresh=doc.documentElement.querySelector(':scope > fresh');
- const group=fresh?.querySelector(':scope > generator_posbubbles');
- if(!group)throw Error('Fresh generator_posbubbles was not found. Unsupported spawn-point schema; no write.');
+ const container=fresh?.querySelector(':scope > generator_posbubbles');
+ if(!container)throw Error('Fresh generator_posbubbles was not found.');
  const xx=Number(x),zz=Number(z);
  if(x===''||z===''||!Number.isFinite(xx)||!Number.isFinite(zz)||
-    xx<0||xx>15360||zz<0||zz>15360)throw Error('X/Z must be inside Chernarus (0–15360).');
+    xx<0||xx>15360||zz<0||zz>15360)
+   throw Error('X/Z must be inside Chernarus (0–15360).');
  const X=Number(xx.toFixed(2)),Z=Number(zz.toFixed(2));
- for(const point of group.querySelectorAll('pos')){
+ for(const point of container.querySelectorAll('pos')){
    if(Math.abs(Number(point.getAttribute('x'))-X)<1&&Math.abs(Number(point.getAttribute('z'))-Z)<1)
      throw Error('A player spawn already exists within 1 meter of this position.');
  }
- const ranges=commentRanges(src);
- const matches=[];
- for(const m of src.matchAll(/<generator_posbubbles\b[^>]*>([\s\S]*?)<\/generator_posbubbles\s*>/gi)){
+ const groups=[...container.children].filter(el=>el.nodeName==='group');
+ let target;
+ if(groups.length){
+   const name=String(groupName||'');
+   if(!name||!groups.some(g=>g.getAttribute('name')===name))
+     throw Error('Select an existing fresh-spawn group before adding a position.');
+   target='group';
+ }else{
+   if(groupName&&groupName!=='Direct positions')throw Error('This spawn file has no named groups.');
+   target='generator_posbubbles';
+ }
+ const ranges=commentRanges(src),eligible=[];
+ for(const m of src.matchAll(/<generator_posbubbles\b[^>]*>[\s\S]*?<\/generator_posbubbles\s*>/gi)){
    if(!outside(ranges,m.index,m.index+m[0].indexOf('>')+1))continue;
    const outerStart=src.slice(0,m.index);
-   const lastFresh=outerStart.lastIndexOf('<fresh');
-   const lastEnd=outerStart.lastIndexOf('</fresh');
-   if(lastFresh>lastEnd)matches.push({match:m,start:m.index});
+   if(outerStart.lastIndexOf('<fresh')<=outerStart.lastIndexOf('</fresh'))continue;
+   eligible.push(m);
  }
- if(matches.length!==1)throw Error('Fresh spawn position group is ambiguous; cannot safely append.');
- const item=matches[0],closing=item.start+item.match[0].lastIndexOf('</generator_posbubbles');
- const newline=u(src).nl,indent=src.match(/(?:\r\n|\n|\r)([ \t]+)<pos\b/)?.[1]||'            ';
- const text=indent+'<pos x="'+X+'" z="'+Z+'" />'+newline;
- const before=src.slice(0,closing),content=before+(before.endsWith(newline)?'':newline)+text+src.slice(closing);
- const revised=xml(content,'playerspawnpoints');
- if(revised.documentElement.querySelector(':scope > fresh > generator_posbubbles')?.querySelectorAll('pos').length!==
-    group.querySelectorAll('pos').length+1)throw Error('Spawn-point XML validation failed.');
- return{content,changed:1,x:X,z:Z};
+ if(eligible.length!==1)throw Error('Fresh spawn group cannot be identified uniquely.');
+ const outer=eligible[0],nl=u(src).nl;
+ let begin,closing,indent;
+ if(target==='group'){
+   const groupsInSource=[];
+   for(const m of outer[0].matchAll(/<group\b[^>]*\bname\s*=\s*(["'])([^"']+)\1[^>]*>[\s\S]*?<\/group\s*>/gi)){
+     const start=outer.index+m.index;
+     if(outside(ranges,start,start+m[0].indexOf('>')+1)&&m[2]===groupName)groupsInSource.push({m,start});
+   }
+   if(groupsInSource.length!==1)throw Error('Named group could not be located safely in XML.');
+   const selected=groupsInSource[0];
+   closing=selected.start+selected.m[0].lastIndexOf('</group');
+   indent=selected.m[0].match(/(?:\r\n|\n|\r)([ \t]+)<pos\b/)?.[1]||'                ';
+ }else{
+   closing=outer.index+outer[0].lastIndexOf('</generator_posbubbles');
+   indent=outer[0].match(/(?:\r\n|\n|\r)([ \t]+)<pos\b/)?.[1]||'            ';
+ }
+ const prefix=src.slice(0,closing),entry=indent+'<pos x="'+X+'" z="'+Z+'" />'+nl;
+ const content=prefix+(prefix.endsWith(nl)?'':nl)+entry+src.slice(closing);
+ const checked=xml(content,'playerspawnpoints');
+ const after=checked.documentElement.querySelector(':scope > fresh > generator_posbubbles');
+ if(after?.querySelectorAll('pos').length!==container.querySelectorAll('pos').length+1)
+   throw Error('Player spawn count verification failed.');
+ return{content,changed:1,x:X,z:Z,group:groupName||'Direct positions'};
 }
 root.BUILD_IT_SERVER_EXTENSIONS=Object.freeze({
  GAMEPLAY_SETTINGS,gameplayEntries,changeGameplay,weatherEntries,changeWeather,
- objectList,changeObjectPosition,organizeObjects,addSpawnPoint
+ objectList,changeObjectPosition,organizeObjects,spawnGroups,addSpawnPoint
 });
 })(window);
