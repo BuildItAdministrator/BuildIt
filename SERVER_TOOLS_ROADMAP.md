@@ -1,65 +1,30 @@
-# Build It!++ — DayZ Console Tools Roadmap
+# Build It!++ — Server Tools
 
-Screenshot inventory received on 2026-10-28: **53 tools** shown in the DayZBoosterZ tools catalog.
-This is a functional roadmap, NOT a claim that all 53 tools are already implemented.
-We are independently implementing supported capabilities, not copying vendor code or branding.
+## Current live catalog: 34 tools
 
-## Server-first integration shipped (21 connected tools)
+Only implemented Nitrado-connected tools appear in the Server Tools panel. The other 19 entries from the original 53-tool screenshot inventory are hidden entirely.
 
-Server Tools now reads existing mission files directly through the authenticated Nitrado Worker, rather than asking users to upload a local file. An edit requires **Preview** and one explicit **Apply to Nitrado** confirmation. The Worker checks the file's original SHA-256, creates and verifies a backup, writes the new bytes and verifies the remote file. Read-only checkers never upload.
+### Config & gameplay
 
-Connected tools:
-
-- XML Validator — select and validate an existing Nitrado XML file.
-- JSON Validator — select and validate an existing Nitrado JSON file.
-- Types Booster — multiply a selected numeric field in live `db/types.xml`.
-- Types Reducer — reduce a selected numeric field in live `db/types.xml`.
-- Advanced Types Editor — set a selected field, optionally filtered by classname.
-- Lifetime Reducer — adjust lifetimes in live `db/types.xml`.
-- Tier Booster — multiply nominal for entries explicitly tagged Tier1–Tier4 (does not guess custom tier aliases).
-- Classname Finder — search actual live types.xml classnames and nominal/min counts.
-- Spawnable Types Adjuster — edit existing attachment/cargo chance attributes for exactly one classname without touching other entries.
-- Gameplay Generator — update supported, existing gameplay booleans and scalar settings in live `cfggameplay.json`; all unrelated config preserved.
-- Weather Manager — edit existing `cfgweather.xml` current/limits/enable attributes, with validation and original XML preserved.
-- Spawn Point Generator — add a Chernarus fresh player spawn to a verified existing `cfgplayerspawnpoints.xml` generator_posbubbles block. Choose coordinates manually or from the map.
-- SpawnObject Mover — move one existing object in a custom Object Spawner JSON, preserving its Y elevation.
-- SpawnObject Organizer — sort existing Object Spawner Objects by classname without changing object properties or coordinates.
-- SpawnObject Heatmap — visualize Object Spawner positions directly from the server in aggregated 100 m map cells without modifying server files.
-- Event Group Calculator — count event groups and spawn positions from live cfgeventspawns.xml and report repeated locations.
-- Globals Configurator — edit one existing numeric `db/globals.xml` variable, preserving type and unrelated XML.
-- Messages Generator — safely append a repeating notification to existing `db/messages.xml` or `messages.xml`.
-- Event Conflict Check — read live `db/events.xml`, detect duplicates and basic min/max mistakes.
-- Spawnable Duplicate Checker — analyze live `cfgspawnabletypes.xml`.
-- SpawnObject Duplicate Checker — analyze an existing JSON Object Spawner in the mission.
-
-**Not yet connected:** JSON Splitter. It would need to create and register multiple new files; the existing Worker has only a restricted create-file endpoint for `custom/builditlootdrop.json`. It is still available as a pure transformation helper for later use, but is not falsely advertised as an integrated tool. The other 32 catalog entries are planned or have only partial existing capability.
-
-**Current restrictions:** The deployed Worker must expose `/api/files/list`, `/api/files/read` and `/api/files/write` with the existing MAP_SYNC_KEY/MAP_WRITE_KEY protections. Only Chernarus mission paths are discovered. Build It!++ now validates server tool payloads up to 4 MB. The deployed Worker must ALSO increase `MAX_FILE_BYTES` from `512 * 1024` to `4 * 1024 * 1024`; until that deployment, files larger than 512 KB still cannot be read/edited. Keep the separate File Manager's older local editor safeguards. This does not remove Worker authentication, SHA checks, or verified backups. The tools do not restart Nitrado servers automatically. Not all DayZBoosterZ tools have meaningful PS5 equivalents; identify those explicitly rather than faking script mods.
-
-**Safety controls:** No write before confirm, no local-file imports, no unverified create operations, source-byte preservation for XML fields, comment protection, strict JSON/XML validation, fresh hash checks, automatic verified backup, and no password persistence.
-
-## Existing, partially overlapping Build It!++ capabilities
-
-- Events Organizer → existing Event Manager can compose and publish events, but is not a full events.xml organizer.
-- Build A Vehicle → existing Event Manager provides vehicle spawn placement, but not the complete vehicle-attachment builder.
-- Existing map, custom bases sync, Nitrado file manager, log viewer and filters, loot JSON generator are separate established features, not counted as the 8 fully completed screenshot tools.
-
-## Remaining screenshot inventory, by area
-
-### Configuration / gameplay
-- Day/Night Calculator
 - Weather Manager
 - Gameplay Generator
 - Messages Generator
 - Globals Configurator
-- Nitrado Settings Generator
 
-### Validation / file management
-- Mission Validator ZIP
+### Validation & files
+
+- XML Validator
+- JSON Validator
+- Event Conflict Check
 - Spawnable Duplicate Checker
 - SpawnObject Duplicate Checker
 
-### Loot / types / economy
+### Loot & economy
+
+- Types Booster
+- Types Reducer
+- Advanced Types Editor
+- Lifetime Reducer
 - Tier Booster
 - Types Organizer
 - Spawnable Types Adjuster
@@ -67,66 +32,56 @@ Connected tools:
 - Ignore List Generator
 - Loot & Proxy Calculator
 
-### Events / vehicles
-- Events Organizer (partial)
-- Build A Vehicle (partial)
+### Events & vehicles
+
+- Events Organizer
 - Event Group Calculator
-- Vehicle Event Remover
 - Gas Zone Generator
 - Horde Generator
-- NPC Generator
-- Airstrike Generator
+- Vehicle Spawn
+- Lootdrop Spawn
 
-### Map / object conversion
+### World & map
+
 - Spawn Point Generator
-- Loot Exclusion Zone Generator
-- INIT.C To ObjectSpawner
-- SpawnObject Converter
-- MapGroupPos Converter
-- MapGroupPos To SpawnObject
-- PRA Converter
-- Object To MapGroupPos Converter
 - SpawnObject Mover
 - SpawnObject Organizer
-- JSON To Init.c Converter
 - Underground Areas
-- Environment Exclusion Generator
-- Territory Zone Creator
-- MapGroupPos Organizer
 - Build Relocator
-- Sky Writing Generator
 - SpawnObject Heatmap
 
-### Equipment / effects
+### Equipment & effects
+
 - Loadout Generator
 - Weapon Blueprint Generator
 - Bag Fill Generator
-- CfgEffect Converter
 
-## Technical boundaries and acceptance criteria
+## Server-first workflow
 
-1. **Platform:** Vanilla DayZ PlayStation 5 community server, hosted on Nitrado. Do not promise arbitrary workshop mods, scripting/AI through init.c, or live server runtime spawning without an official supported configuration mechanism. PC-oriented converters may offer offline conversions but must be labeled as not deployable to PS5 when appropriate.
-2. **Format:** Use official Bohemia Interactive CE/XML and cfggameplay / Object Spawner schemas where available. Avoid made-up classname and file parameters. Object-spawner JSON paths in Nitrado console missions use `custom/<filename>.json`, e.g. `custom/builditlootdrop.json`.
-3. **Safety:** Before any live upload, validate syntax and file-specific invariants; read the current server version; hash-check before write; take and verify backups; confirm explicitly; verify post-upload bytes. Never silently replace, delete, or format unrelated server files.
-4. **UI:** Reuse one compact searchable Server Tools panel, no dead launch buttons. Mark unimplemented tools `Planned`, existing partial matches `Partly available`. Preserve mobile layout and light/dark themes.
-5. **Integration:** Prefer safe imports from the existing Nitrado File Manager for read-only preview; add audited writes only for validated, explicitly supported file types. Never put Nitrado credentials in frontend/source control.
-6. **Tests:** Add Playwright tests for conversions, malformed content, full file preservation, file size bounds, network failure and UI keyboard interaction. The initial new tests have been committed; a full browser test run is still pending.
-7. **Licensing:** Reimplement functionality independently. Do not copy DayZBoosterZ's private source, CSS, images, logo, proprietary design or text.
+Connect the existing Cloudflare Worker, select a tool, read the live file, preview, and explicitly confirm the edit while the game server is stopped. The Worker checks the current SHA-256, creates and verifies a backup, writes, and verifies the file contents. No manual XML or JSON upload is needed. Read-only analyzers never write.
 
-## Suggested next implementation batches
+## Supported scope and conditions
 
-1. Complete Mission Validator ZIP, Types Organizer, Ignore List Generator and upgrade the Worker for safe >512 KB reads/writes.
-2. Add Day/Night Calculator, Weather Manager, Gameplay Generator and full message-schedule management.
-3. Add Loadout Generator, Weapon Blueprint Generator, Bag Fill Generator and full Build A Vehicle.
-4. Build map-related object converters, SpawnObject Mover/Organizer, coordinate transforms, heatmap and relocator.
-5. Finish spawn/loot-zone management, message creator, gas effects and CE-based event tooling.
-6. Evaluate features requiring unsupported console scripts (NPC/Airstrike/INIT.C); provide explicitly labeled safe alternatives if a faithful console implementation is not possible.
+- Existing Chernarus PS5 mission files only; the worker can create the dedicated lootdrop file, but not arbitrarily named files.
+- Large files require the separately deployed Cloudflare Worker with MAX_FILE_BYTES set to 4 MB.
+- Loadout Generator edits cargo in an existing preset registered in cfggameplay.json. It does not create missing presets.
+- Gas zones clone an existing static contaminated zone. Infected hordes use an existing zombie territory type.
+- Player spawns are inserted into an existing named group, not outside it.
+- Build relocation and object placement preserve existing Y elevations; inspect terrain and avoid slopes.
+- Equipment editing confirms item and parent classnames exist in the server's types.xml.
+- This is vanilla console configuration editing, not a PlayStation Steam Workshop mod installer.
+- Some editors offer narrower scope than commercial tools, for example numeric event adjustments and one loadout cargo item.
+- Source syntax and isolated transformation tests were checked. Live Nitrado writes and the complete browser suite have not been verified in this chat.
 
-Official references:
+## Excluded entries
+
+The 19 unimplemented or unsafe options were removed from the website catalog rather than leaving misleading dead buttons. They need unsupported scripts, unverified game schemas, or worker capabilities not yet deployed.
+
+## References
+
 - https://community.bistudio.com/wiki/DayZ:Gameplay_Settings
+- https://community.bistudio.com/wiki/DayZ:Weather_Configuration
 - https://community.bistudio.com/wiki/DayZ:Object_Spawner
-- https://dayzboosterz.com/wiki/page/how-to-add-object-spawner-files
-
-## Server tools deployment note — 2026-10-28
-
-Server Tools now includes 21 Nitrado-connected operations. The dashboard continues to label unsupported/not implemented cards as planned, rather than pretending their file edits are available. Some newly linked editors operate on a supported subset of a file's settings, not an exhaustive recreation of the corresponding DayZBoosterZ product. Weather Manager requires an existing cfgweather.xml, Spawn Point Generator requires fresh/generator_posbubbles, and JSON editors require a valid Object Spawner Objects array. Cloudflare's deployed Worker must have the 4 MB MAX_FILE_BYTES update for large files. Browser regression test cases were added but not run against a real Nitrado service. Do not claim all 53 tools are complete.
+- https://community.bistudio.com/wiki/DayZ:Contaminated_Areas_Configuration
+- https://community.bistudio.com/wiki/DayZ:Spawning_Gear_Configuration
+- https://github.com/BohemiaInteractive/DayZ-Central-Economy
