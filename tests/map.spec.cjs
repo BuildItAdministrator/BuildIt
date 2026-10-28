@@ -1459,3 +1459,62 @@ test('server tools report duplicate events, invalid JSON and do not upload',asyn
     'Duplicate event name: Test'
   ]));
 });
+
+
+test('Quick Spawn vehicle chooses model, picks map point and publishes server XML without manual files',async({page})=>{
+  const base='/games/ni5774718_3/noftp';
+  const mission='/games/ni5774718_3/ftproot/dayzps_missions/dayzOffline.chernarusplus';
+  const ep=mission+'/db/events.xml',pp=mission+'/cfgeventspawns.xml';
+  const events='<?xml version="1.0" encoding="UTF-8"?>\n<events>\n</events>\n';
+  const positions='<?xml version="1.0" encoding="UTF-8"?>\n<eventposdef>\n</eventposdef>\n';
+  const calls=[];
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const url=new URL(route.request().url()),method=route.request().method();
+    calls.push({path:url.pathname,method,body:method==='POST'?route.request().postDataJSON():null});
+    let status=200,data={};
+    if(url.pathname==='/api/files/list'){
+      const dir=url.searchParams.get('dir');
+      if(!dir)data={root:base,dir:base,entries:[]};
+      else if(dir===mission)data={dir,root:base,entries:[{name:'db',path:mission+'/db',type:'directory'}]};
+      else{status=404;data={error:'Not found'};}
+    }else if(url.pathname==='/api/files/read'){
+      const path=url.searchParams.get('file');
+      if(path===ep)data={path,content:events,sha256:'a'.repeat(64)};
+      else if(path===pp)data={path,content:positions,sha256:'b'.repeat(64)};
+      else{status=404;data={error:'Not found'};}
+    }else if(url.pathname==='/api/files/write'){
+      data={verified:true,backupPath:route.request().postDataJSON().path+'.backup'};
+    }else{status=404;data={error:'Unexpected'};}
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
+  });
+  await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-access');
+  await page.locator('#biToggle').click();
+  await expect(page.locator('#quickSpawnPanel')).toBeVisible();
+  await page.locator('#qsFind').fill('Offroad_02_Beige');
+  await page.locator('#qsMatches button').first().click();
+  await page.locator('#qsPick').click();
+  await page.evaluate(()=>map.fire('click',{latlng:gameToLeaflet(4444,8888)}));
+  await expect(page.locator('#qsCoordinates')).toContainText('4444');
+  await page.locator('.qs-settings').evaluate(el=>el.open=true);
+  await page.locator('#qsWriteKey').fill('test-write-access');
+  page.on('dialog',dialog=>dialog.accept());
+  await page.locator('#qsPublish').click();
+  await expect(page.locator('#qsStatus')).toContainText('PUBLISHED');
+  await expect(page.locator('#qsStatus')).toContainText('Start the server');
+  const writes=calls.filter(call=>call.path==='/api/files/write');
+  expect(writes).toHaveLength(2);
+  expect(writes.map(call=>call.body.path)).toEqual([pp,ep]);
+  expect(writes[0].body.content).toContain('x="4444"');
+  expect(writes[0].body.content).toContain('z="8888"');
+  expect(writes[1].body.content).toContain('type="Offroad_02_Beige"');
+  expect(writes.every(call=>call.body.confirm===true&&call.body.expectedSha256)).toBe(true);
+});
+
+test('Quick Spawn validates loot height and never invents elevation',async({page})=>{
+  await page.locator('#biToggle').click();
+  await page.locator('#qsLootMode').click();
+  await expect(page.locator('#qsHeight')).toBeVisible();
+  await expect(page.locator('#qsPublish')).toBeDisabled();
+  await expect(page.locator('#qsLootFields')).toContainText('Ground elevation is required');
+});
