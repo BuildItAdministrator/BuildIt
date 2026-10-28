@@ -166,7 +166,8 @@
       const button=document.createElement('button');
       button.type='button';
       button.className='fm-entry';
-      button.textContent=(folder?'[Folder] ':'[File] ')+item.name;
+      button.textContent=item.name;
+      button.dataset.entryType=folder?'folder':'file';
       button.addEventListener('click',()=>perform(()=>folder?browse(item.path):openFile(item.path)));
       entries.appendChild(button);
     }

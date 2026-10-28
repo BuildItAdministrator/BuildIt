@@ -1117,3 +1117,113 @@ test('Unified Filters menu fits phone viewport without horizontal overflow',asyn
     expect(hasOverflow,'Unexpected horizontal overflow for '+value).toBe(false);
   }
 });
+
+
+test('Professional UI uses consistent line icons without changing controls or labels',async({page})=>{
+  await expect(page.locator('#placeSearchBox .bi-search-icon svg.bi-icon')).toHaveCount(1);
+  for(const [id,icon] of [
+    ['filterToggle','sliders'],['logToggle','logs'],['biToggle','wrench'],
+    ['nitradoSyncNow','refresh'],['nitradoFileWriteTest','shield'],
+    ['biSave','save'],['biPreviewServer','checkfile'],
+    ['biUploadServer','cloud'],['builditThemeToggle','sun']
+  ]){
+    const button=page.locator('#'+id);
+    await expect(button.locator(':scope > svg.bi-icon')).toHaveCount(1);
+    await expect(button.locator(':scope > svg.bi-icon')).toHaveAttribute('data-icon',icon);
+    await expect(button.locator(':scope > svg.bi-icon')).toHaveAttribute('aria-hidden','true');
+  }
+  await expect(page.locator('#biToggle')).toHaveText('Event Manager');
+  await expect(page.locator('#logToggle')).toHaveText('Logs');
+  await expect(page.locator('#filterToggle')).toHaveText('Filters');
+  const viewport=page.viewportSize();
+  if(viewport.width>=921){
+    await expect(page.locator('#builditBrand')).toBeVisible();
+    await expect(page.locator('#builditBrand')).toContainText('Build It!++');
+  }else{
+    await expect(page.locator('#builditBrand')).toBeHidden();
+  }
+  await page.locator('#builditThemeToggle').click();
+  await expect(page.locator('#builditThemeToggle > svg.bi-icon')).toHaveAttribute('data-icon','moon');
+  await expect(page.locator('#builditThemeToggle')).toHaveAttribute('aria-label','Switch to dark mode');
+  await expect(page.locator('#builditMapStyleToggle > svg.bi-icon')).toHaveCount(1);
+});
+
+test('Professional panel styling remains legible and functional in both themes',async({page})=>{
+  for(const theme of ['dark','light']){
+    const current=await page.locator('html').getAttribute('data-buildit-theme');
+    if(current!==theme)await page.locator('#builditThemeToggle').click();
+    await page.locator('#filterToggle').click();
+    await expect(page.locator('#filterPanel')).toBeVisible();
+    await expect(page.locator('#filterViewSelect')).toBeVisible();
+    await page.locator('#filterViewSelect').selectOption('admin');
+    await expect(page.locator('#logActions')).toBeVisible();
+    const style=await page.locator('#filterPanel').evaluate(el=>{
+      const cs=getComputedStyle(el);
+      const input=getComputedStyle(document.querySelector('#filterViewSelect'));
+      return {radius:parseFloat(cs.borderTopLeftRadius),background:cs.backgroundColor,border:cs.borderTopColor,
+        inputRadius:parseFloat(input.borderTopLeftRadius),font:cs.fontFamily};
+    });
+    expect(style.radius).toBeGreaterThanOrEqual(11);
+    expect(style.inputRadius).toBeGreaterThanOrEqual(8);
+    expect(style.font).toMatch(/Inter|Segoe UI/i);
+    await page.locator('#filterToggle').click();
+  }
+  await page.locator('#logToggle').click();
+  await expect(page.locator('#logPanel')).toBeVisible();
+  await expect(page.locator('#logActivity')).toBeVisible();
+  await page.locator('#logConnectionDetails summary').click();
+  await expect(page.locator('#nitradoWorkerUrl')).toBeVisible();
+  await page.locator('#logServerFiles summary').click();
+  await expect(page.locator('#fileManager')).toBeVisible();
+});
+
+test('File Manager and event drafting keep working with decorated controls',async({page})=>{
+  await page.locator('#biToggle').click();
+  await expect(page.locator('#biPanel')).toBeVisible();
+  await expect(page.locator('#biSave')).toHaveText('Save spawn');
+  await expect(page.locator('#biPick > svg.bi-icon')).toHaveCount(1);
+  await page.locator('#biPick').click();
+  await expect(page.locator('#biPick > svg.bi-icon')).toHaveCount(1);
+  await expect(page.locator('#biPick')).toContainText('Click a map location');
+  await page.locator('#biPick').click();
+  await expect(page.locator('#biPick')).toContainText('Pick on map');
+  await expect(page.locator('#biPick > svg.bi-icon')).toHaveCount(1);
+  const root='/games/ni123/noftp';
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const u=new URL(route.request().url());
+    const dir=u.searchParams.get('dir');
+    if(u.pathname==='/api/files/list'){
+      const body={root,dir:dir||root,entries:[{name:'db',path:root+'/db',type:'directory'},{name:'events.xml',path:root+'/events.xml',type:'file'}]};
+      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
+    }
+    await route.fulfill({status:404,contentType:'application/json',body:'{"error":"unavailable"}'});
+  });
+  await page.locator('#biClose').click();
+  await page.locator('#logToggle').click();
+  await page.locator('#logServerFiles summary').click();
+  await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test_key');
+  await page.locator('#fmBrowse').click();
+  await expect(page.locator('.fm-entry')).toHaveCount(2);
+  await expect(page.locator('.fm-entry').first()).toHaveText('db');
+  await expect(page.locator('.fm-entry').first().locator('svg.bi-icon')).toHaveAttribute('data-icon','folder');
+  await expect(page.locator('.fm-entry').last()).toHaveText('events.xml');
+  await expect(page.locator('.fm-entry').last().locator('svg.bi-icon')).toHaveAttribute('data-icon','file');
+});
+
+test('New design stays inside viewport on desktop and mobile',async({page})=>{
+  const vp=page.viewportSize();
+  for(const id of ['filterToggle','logToggle','biToggle','placeSearchBox']){
+    const b=await page.locator('#'+id).boundingBox();
+    expect(b.x,id).toBeGreaterThanOrEqual(0);
+    expect(b.x+b.width,id).toBeLessThanOrEqual(vp.width+1);
+  }
+  await page.locator('#filterToggle').click();
+  for(const option of ['map','spawns','admin','players']){
+    await page.locator('#filterViewSelect').selectOption(option);
+    const b=await page.locator('#filterPanel').boundingBox();
+    expect(b.x,option).toBeGreaterThanOrEqual(0);
+    expect(b.x+b.width,option).toBeLessThanOrEqual(vp.width+1);
+    expect(await page.locator('#filterPanel').evaluate(el=>el.scrollWidth-el.clientWidth),option).toBeLessThanOrEqual(2);
+  }
+});

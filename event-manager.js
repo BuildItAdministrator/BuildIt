@@ -86,7 +86,7 @@
   document.head.appendChild(style);
 
   const toggle = document.createElement('button');
-  toggle.id = 'biToggle'; toggle.type = 'button'; toggle.textContent = '⚙ Event Manager';
+  toggle.id = 'biToggle'; toggle.type = 'button'; toggle.textContent = 'Event Manager';
   document.body.appendChild(toggle);
   const panel = document.createElement('div');
   panel.id = 'biPanel'; panel.hidden = true;
@@ -129,10 +129,10 @@
   document.body.appendChild(panel);
   const message = (s, error) => { $('biStatus').textContent = s; $('biStatus').style.color = error ? '#ffb2a2' : '#a8d6e4'; };
   toggle.addEventListener('click', () => { panel.hidden = !panel.hidden; if (!panel.hidden) refresh(); });
-  $('biClose').addEventListener('click', () => { panel.hidden = true; placing = false; $('biPick').textContent = '📍 Pick on map'; });
+  $('biClose').addEventListener('click', () => { panel.hidden = true; placing = false; $('biPick').textContent = 'Pick on map'; });
   $('biPick').addEventListener('click', () => {
     placing = !placing;
-    $('biPick').textContent = placing ? 'Click a map location…' : '📍 Pick on map';
+    $('biPick').textContent = placing ? 'Click a map location…' : 'Pick on map';
     message(placing ? 'Click your preferred location on the map.' : 'Map selection cancelled.');
   });
   map.on('click', e => {
@@ -140,7 +140,7 @@
     const p = leafletToGame(e.latlng);
     if (!numbers(p.x, 0, 15360) || !numbers(p.z, 0, 15360)) return message('This location is outside Chernarus.', true);
     chosen = {x:Number(p.x.toFixed(2)), z:Number(p.z.toFixed(2))};
-    placing = false; $('biPick').textContent = '📍 Pick on map';
+    placing = false; $('biPick').textContent = 'Pick on map';
     $('biPoint').textContent = chosen.x + ' / ' + chosen.z;
     panel.hidden = false;
     message('Location selected. Choose an event and save the draft.');

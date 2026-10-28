@@ -13,7 +13,7 @@
   function updateButton() {
     if (!button) return;
     const isTopo=currentMapStyle==='topographic';
-    button.textContent=isTopo?'▧ Topographic':'▧ Satellite';
+    button.textContent=isTopo?'Topographic':'Satellite';
     button.setAttribute('aria-label',isTopo
       ? 'Map style: Topographic. Switch to Satellite'
       : 'Map style: Satellite. Switch to Topographic');

@@ -1,0 +1,353 @@
+/* Build It!++ — cohesive admin interface. Pure visual layer.
+ * No map tile, spawn geometry, credentials, API or persistence changes.
+ */
+:root{
+  --bi-bg:#091219;--bi-panel:#111d27;--bi-panel-raised:#182833;
+  --bi-panel-muted:#14222c;--bi-line:#304552;--bi-line-soft:#253844;
+  --bi-text:#edf5f8;--bi-muted:#9bb2bf;--bi-subtle:#7692a2;
+  --bi-accent:#52c6c9;--bi-accent-deep:#15858f;--bi-accent-ink:#041c21;
+  --bi-green:#73d4a0;--bi-red:#ff8c94;--bi-warning:#f2c675;
+  --bi-shadow:0 16px 48px rgba(1,10,16,.55),0 3px 10px rgba(1,10,16,.24);
+  --bi-radius:14px;--bi-radius-sm:9px;
+}
+html{color-scheme:dark}
+html[data-buildit-theme="light"]{
+  color-scheme:light;
+  --bi-bg:#f3f7fa;--bi-panel:#fbfdff;--bi-panel-raised:#eff5f8;
+  --bi-panel-muted:#f1f6fa;--bi-line:#bed0db;--bi-line-soft:#dce7ec;
+  #bi-text:#1b3345;--bi-muted:#547084;--bi-subtle:#67899a;
+  --bi-accent:#137c87;--bi-accent-deep:#137c87;--bi-accent-ink:#fff;
+  --bi-green:#20784e;--bi-red:#b63a46;--bi-warning:#9b6d22;
+  --bi-shadow:0 14px 42px rgba(35,65,81,.17),0 2px 8px rgba(35,65,81,.1);
+}
+html,body{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif!important}
+body{background:var(--bi-bg);color:var(--bi-text)}
+button,input,select,textarea{font:inherit}
+button{transition:background-color .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease,transform .15s ease}
+button:not(:disabled):active{transform:translateY(1px)}
+:where(button,input,select,textarea,summary):focus-visible{
+  outline:2px solid var(--bi-accent)!important;outline-offset:3px!important
+}
+:where(button,input,select,textarea):disabled{cursor:not-allowed!important;opacity:.48}
+*{scrollbar-color:var(--bi-line) transparent;scrollbar-width:thin}
+::selection{background:rgba(67,187,191,.3)}
+/* Fine-line SVGs never alter label text or hit targets. */
+.bi-icon{width:17px;height:17px;display:inline-block;flex:0 0 auto;vertical-align:middle;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+button .bi-icon{margin-right:8px}
+.bi-icon-only .bi-icon{margin:0}
+.bi-icon-leading{display:flex;align-items:center;gap:8px}
+.bi-icon-leading .bi-icon{margin-right:0}
+.bi-icon-decor{opacity:.88}
+
+/* Compact brand plaque, separate from Leaflet's native zoom controls. */
+#builditBrand{
+  position:absolute;z-index:1101;top:13px;left:64px;
+  padding:9px 14px 10px;display:flex;gap:11px;align-items:center;
+  border:1px solid rgba(132,175,192,.35);border-radius:12px;
+  background:rgba(11,23,30,.91);color:#edf9fa;
+  box-shadow:0 5px 24px rgba(0,0,0,.3);pointer-events:none;backdrop-filter:blur(14px)
+}
+#builditBrand .brand-mark{width:33px;height:33px;border-radius:9px;background:linear-gradient(145deg,#56cdd0,#137f8c);color:#051c24;display:flex;align-items:center;justify-content:center}
+#builditBrand .brand-mark .bi-icon{width:20px;height:20px;stroke-width:2.3}
+#builditBrand .brand-label{font-size:13px;font-weight:800;letter-spacing:.025em;line-height:1.2}
+#builditBrand .brand-caption{margin-top:3px;font-size:9px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:#aac5ce}
+html[data-buildit-theme="light"] #builditBrand{background:rgba(251,253,255,.93);color:#203747;border-color:#c2d5df}
+html[data-buildit-theme="light"] #builditBrand .brand-caption{color:#5a7989}
+
+/* Search and nav dock */
+#placeSearchBox{filter:drop-shadow(0 7px 16px rgba(2,13,22,.2))}
+#placeSearchInput{
+  height:43px!important;min-height:43px!important;
+  border-radius:11px!important;border:1px solid var(--bi-line)!important;
+  background:var(--bi-panel)!important;color:var(--bi-text)!important;
+  padding:10px 12px 10px 40px!important;
+  font-size:12px!important;font-weight:650!important;
+  box-shadow:0 5px 22px rgba(0,0,0,.24)!important;
+  letter-spacing:.005em
+}
+#placeSearchInput:focus{border-color:var(--bi-accent)!important;box-shadow:0 0 0 3px rgba(58,188,194,.17)!important}
+#placeSearchInput::placeholder{color:var(--bi-subtle)!important;font-weight:500!important}
+#placeSearchBox .bi-search-icon{position:absolute;top:12px;left:13px;z-index:1;display:inline-flex;color:var(--bi-muted);pointer-events:none}
+#placeSearchBox .bi-search-icon .bi-icon{width:18px;height:18px}
+#builditThemeToggle{
+  top:3px!important;right:3px!important;
+  width:33px!important;height:33px!important;
+  border-radius:8px!important;
+  background:transparent!important;color:var(--bi-muted)!important;
+  border:0!important;box-shadow:none!important;
+  display:grid!important;place-items:center!important;
+  font-size:0!important
+}
+#builditThemeToggle:hover{background:var(--bi-panel-raised)!important;color:var(--bi-accent)!important}
+#builditThemeToggle .bi-icon{width:17px;height:17px}
+body #filterToggle,body #logToggle,body #biToggle{
+  min-height:41px!important;height:41px!important;
+  display:flex!important;align-items:center!important;gap:10px!important;
+  padding:10px 13px!important;border:1px solid var(--bi-line)!important;
+  border-radius:10px!important;
+  background:var(--bi-panel)!important;color:var(--bi-text)!important;
+  box-shadow:0 4px 16px rgba(0,0,0,.24)!important;
+  font:700 12px Inter,ui-sans-serif,"Segoe UI",Arial,sans-serif!important;
+  letter-spacing:.018em!important;
+}
+body #filterToggle:hover,body #logToggle:hover,body #biToggle:hover{
+  color:var(--bi-accent)!important;
+  border-color:var(--bi-accent)!important;background:var(--bi-panel-raised)!important
+}
+body #filterToggle .bi-icon,body #logToggle .bi-icon,body #biToggle .bi-icon{width:17px;height:17px;margin-right:0}
+body #logToggle.has-data{border-color:var(--bi-accent)!important}
+#filterToggle::after,#logToggle::after,#biToggle::after{
+  content:"";display:block;margin-left:auto;width:6px;height:6px;border-radius:50%;
+  background:var(--bi-line);box-shadow:0 0 0 3px rgba(150,190,205,.04)
+}
+#logToggle.has-data::after{background:var(--bi-green);box-shadow:0 0 0 3px rgba(91,196,142,.13)}
+#placeSearchResults{background:var(--bi-panel)!important;border-color:var(--bi-line)!important;border-radius:11px!important}
+.place-search-result{border-radius:7px!important}
+.place-search-result:hover,.place-search-result.active{background:var(--bi-panel-raised)!important}
+html[data-buildit-theme="light"] .place-search-result{color:var(--bi-text)!important}
+#builditMapStyleToggle{font-family:inherit!important;font-weight:700!important;font-size:11px!important}
+
+/* Shared floating panels */
+body #filterPanel,body #logPanel,body #biPanel{
+  background:var(--bi-panel)!important;color:var(--bi-text)!important;
+  border:1px solid var(--bi-line)!important;border-radius:var(--bi-radius)!important;
+  box-shadow:var(--bi-shadow)!important;
+  padding:17px!important;backdrop-filter:blur(20px);
+  font-family:Inter,ui-sans-serif,"Segoe UI",Arial,sans-serif!important;
+  font-size:12px!important;line-height:1.5
+}
+body #filterPanel,body #logPanel{scroll-padding-top:12px}
+body #filterPanel [hidden],body #logPanel [hidden],body #biPanel [hidden]{display:none!important}
+#filterPanel h3,#logPanel h3,#biPanel h3{letter-spacing:-.025em}
+#filterPanel .filter-title,#logPanel .log-title,body #biPanel .biHeader h3{
+  color:var(--bi-text)!important;font-size:16px!important;font-weight:800!important;
+  line-height:1.35!important;letter-spacing:-.025em!important
+}
+#filterPanel .filter-title{margin:0 0 14px!important}
+#logPanel .log-head{border-color:var(--bi-line-soft)!important}
+#logPanel .log-head-note{color:var(--bi-subtle)!important}
+#logPanel .log-overview,#logPanel .log-advanced,
+#filterPanel .filter-view,#biPanel .biSection,body #biPanel .biAdvanced{
+  border-color:var(--bi-line-soft)!important
+}
+#filterPanel .filter-view{border-top:1px solid var(--bi-line-soft)!important;padding-top:9px!important}
+#filterPanel .filter-section-title{
+  color:var(--bi-muted)!important;font-size:10px!important;
+  letter-spacing:.105em!important;text-transform:uppercase!important;font-weight:800!important
+}
+#filterPanel .filter-menu-label{color:var(--bi-subtle)!important}
+#filterPanel .filter-view-select{
+  min-height:42px!important;border-radius:9px!important;
+  background:var(--bi-panel-raised)!important;
+  color:var(--bi-text)!important;border-color:var(--bi-line)!important;
+  font-size:12px!important;font-weight:700!important;
+  padding:9px 12px!important
+}
+#filterPanel .filter-row{padding:9px 8px!important;border-radius:8px!important;gap:9px!important}
+#filterPanel .filter-row:hover{background:rgba(84,190,192,.08)!important}
+#filterPanel .filter-count,#filterPanel .filter-note{color:var(--bi-muted)!important}
+#filterPanel .filter-note{font-size:11px!important}
+#filterPanel .log-actions{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}
+#filterPanel .log-check{color:var(--bi-text)!important;border-radius:6px}
+#filterPanel .log-check:hover{background:rgba(84,190,192,.07)}
+#filterPanel .log-action-count{color:var(--bi-subtle)!important}
+#filterPanel .log-action-group{color:var(--bi-muted)!important;letter-spacing:.08em!important}
+#filterPanel #logPlayers,#filterPanel .log-position-mode{
+  background:var(--bi-panel-muted)!important;border:1px solid var(--bi-line-soft)!important;
+  border-radius:9px!important
+}
+#filterPanel .log-player-row .count{color:var(--bi-subtle)!important}
+#filterPanel input[type="checkbox"],#logPanel input[type="checkbox"],#biPanel input[type="checkbox"]{
+  accent-color:var(--bi-accent-deep)!important
+}
+#filterPanel .filter-players-header label{color:var(--bi-muted)}
+
+/* Common buttons, inputs and feedback */
+body #filterPanel button,body #logPanel button,body #biPanel button{
+  background:var(--bi-panel-raised)!important;color:var(--bi-text)!important;
+  border:1px solid var(--bi-line)!important;border-radius:9px!important;
+  padding:9px 11px!important;font-size:11px!important;font-weight:700!important;
+  box-shadow:none!important
+}
+body #filterPanel button:hover:not(:disabled),
+body #logPanel button:hover:not(:disabled),
+body #biPanel button:hover:not(:disabled){
+  background:rgba(56,153,165,.15)!important;border-color:var(--bi-accent)!important;color:var(--bi-accent)!important
+}
+body #biPanel .biPrimary,body #logPanel #nitradoSyncNow,
+body #logPanel #fmSave,body #biPanel #biUploadServer{
+  background:var(--bi-accent-deep)!important;color:#fff!important;
+  border-color:var(--bi-accent-deep)!important;
+  box-shadow:0 4px 13px rgba(17,128,139,.17)!important
+}
+body #biPanel .biPrimary:hover:not(:disabled),body #logPanel #nitradoSyncNow:hover:not(:disabled),
+body #logPanel #fmSave:hover:not(:disabled){
+  background:#1d9da7!important;border-color:#1d9da7!important;color:white!important
+}
+body #biPanel button:disabled,body #logPanel button:disabled,body #filterPanel button:disabled{
+  opacity:.45!important;cursor:not-allowed!important
+}
+body #filterPanel input:not([type="checkbox"]),body #filterPanel select,
+body #logPanel input:not([type="checkbox"]):not([type="file"]),body #logPanel select,body #logPanel textarea,
+body #biPanel input:not([type="checkbox"]):not([type="file"]),body #biPanel select{
+  color:var(--bi-text)!important;background:var(--bi-panel-muted)!important;
+  border:1px solid var(--bi-line)!important;border-radius:9px!important;
+  padding:9px 11px!important;outline:none!important;
+  font-size:12px!important;box-shadow:none!important
+}
+body #filterPanel input:not([type="checkbox"]):focus,body #logPanel input:not([type="checkbox"]):focus,
+body #biPanel input:not([type="checkbox"]):focus,body #biPanel select:focus{
+  border-color:var(--bi-accent)!important;box-shadow:0 0 0 3px rgba(71,189,192,.15)!important
+}
+body #filterPanel input::placeholder,body #logPanel input::placeholder,body #biPanel input::placeholder{color:var(--bi-subtle)!important}
+#logPanel .log-overview{
+  background:linear-gradient(135deg,rgba(32,100,109,.17),rgba(34,53,66,.08))!important;
+  padding:12px!important;border-radius:11px!important
+}
+#logPanel .log-auto-status,#logPanel .log-summary{
+  background:var(--bi-panel-muted)!important;color:var(--bi-muted)!important;
+  border-color:var(--bi-line-soft)!important;line-height:1.55!important
+}
+#logPanel .log-auto-status.ok,#logPanel .log-file-test-status.ok{color:var(--bi-green)!important;border-color:rgba(105,206,160,.4)!important}
+#logPanel .log-auto-status.err,#logPanel .log-file-test-status.err{color:var(--bi-red)!important;border-color:rgba(218,93,112,.42)!important}
+#logPanel .log-overview #nitradoSyncStatus{
+  background:transparent!important;border:0!important;padding:5px 0 0!important;margin-top:5px!important;
+  overflow-wrap:anywhere;color:var(--bi-muted)!important
+}
+#logPanel .log-summary{color:var(--bi-text)!important;font-size:11px!important}
+#logPanel .log-filter-hint{color:var(--bi-muted)!important}
+#logPanel .log-activity-header{margin:16px 0 9px!important}
+#logPanel .log-subtitle{color:var(--bi-muted)!important;letter-spacing:.075em!important}
+#logPanel #logActivity{
+  border:1px solid var(--bi-line-soft)!important;border-radius:11px!important;
+  background:var(--bi-panel-muted)!important;max-height:min(45vh,390px)!important
+}
+#logPanel .log-event{border-bottom-color:var(--bi-line-soft)!important}
+#logPanel .log-event-top{gap:9px!important}
+#logPanel .log-event-text{color:var(--bi-muted)!important}
+#logPanel .log-event-time{color:var(--bi-subtle)!important;font-size:10px!important}
+#logPanel .log-event-pos{color:var(--bi-accent)!important}
+#logPanel .log-advanced{background:transparent!important;border-radius:10px!important}
+#logPanel .log-advanced summary{color:var(--bi-text)!important;font-weight:750!important}
+#logPanel .log-advanced summary:hover{background:rgba(79,171,174,.06)!important}
+#logPanel .log-compact-label,#logPanel .log-file-test-title{color:var(--bi-muted)!important}
+#logPanel .log-upload{background:var(--bi-panel-raised)!important;color:var(--bi-text)!important;border:1px dashed var(--bi-line)!important}
+#logPanel #logDrop{background:var(--bi-panel-muted)!important;color:var(--bi-muted)!important;border-color:var(--bi-line)!important}
+#logPanel .log-file-test,#logPanel #fileManager{
+  background:var(--bi-panel-muted)!important;border:1px solid var(--bi-line-soft)!important;border-radius:10px!important
+}
+#logPanel #fileManager .fm-note,#logPanel #fileManager .fm-path{color:var(--bi-muted)!important}
+#logPanel #fileManager .fm-entry{background:var(--bi-panel-raised)!important;color:var(--bi-text)!important;border-bottom-color:var(--bi-line-soft)!important}
+#logPanel #fileManager .fm-entry:hover{background:rgba(74,158,169,.17)!important}
+#logPanel #fileManager textarea{font-family:ui-monospace,SFMono-Regular,Consolas,monospace!important;font-size:11px!important;line-height:1.65!important}
+#logPanel #fmValidationStatus[data-validation="valid"]{color:var(--bi-green)!important}
+#logPanel #fmValidationStatus[data-validation="invalid"]{color:var(--bi-red)!important}
+
+/* Event Manager with calmer rhythm and clear action hierarchy */
+body #biPanel .biHeader{border-color:var(--bi-line-soft)!important;padding-bottom:13px!important}
+body #biPanel .biHeader .biSmall,body #biPanel .biSmall{color:var(--bi-muted)!important}
+body #biPanel .biSection{
+  border-radius:11px!important;padding:13px!important;margin-bottom:12px!important;
+  background:var(--bi-panel-muted)!important
+}
+body #biPanel .biSectionTitle h4{color:var(--bi-text)!important;font-size:13px!important;font-weight:800!important}
+body #biPanel .biStep{
+  background:rgba(72,180,186,.15)!important;border:1px solid rgba(82,198,201,.32)!important;
+  color:var(--bi-accent)!important;border-radius:7px!important;font:800 10px ui-sans-serif,"Segoe UI",Arial,sans-serif!important
+}
+body #biPanel .biDraft{
+  background:var(--bi-panel-raised)!important;border:1px solid var(--bi-line-soft)!important;
+  border-radius:9px!important;padding:10px!important
+}
+body #biPanel .biDraftTitle{color:var(--bi-text)!important}
+body #biPanel .biDraftDetails{color:var(--bi-muted)!important}
+body #biPanel .biMessage{
+  background:var(--bi-panel)!important;color:var(--bi-muted)!important;
+  border-color:var(--bi-line-soft)!important;
+  border-radius:9px!important;padding:11px!important
+}
+body #biPanel .biConfirm{
+  background:var(--bi-panel-raised)!important;color:var(--bi-text)!important;
+  border-radius:8px!important;padding:11px 9px!important
+}
+body #biPanel .biAdvanced{border-radius:10px!important}
+body #biPanel .biWarn{
+  background:rgba(165,119,45,.13)!important;border-color:rgba(205,158,72,.4)!important;
+  color:var(--bi-warning)!important;border-radius:9px!important
+}
+body #biPanel .biPoint{color:var(--bi-accent)!important}
+body #biPanel .biMatches{background:var(--bi-panel)!important;border-color:var(--bi-line)!important;border-radius:9px!important}
+body #biPanel .biMatches button{border-radius:0!important;text-align:left!important}
+body #biPanel .biDraftCount{color:var(--bi-subtle)!important}
+body #biPanel #biStatus{color:var(--bi-accent)!important}
+body #biPanel #biClose,body #logPanel #logClose{
+  width:31px!important;height:31px!important;padding:0!important;display:grid!important;
+  place-items:center!important;font-size:0!important;background:transparent!important;color:var(--bi-muted)!important
+}
+body #biPanel #biClose:hover,body #logPanel #logClose:hover{background:var(--bi-panel-raised)!important;color:var(--bi-text)!important}
+body #biPanel #biClose .bi-icon,body #logPanel #logClose .bi-icon{width:17px;height:17px}
+body #biPanel #biPick{display:inline-flex;align-items:center;gap:5px}
+body #biPanel #biPick .bi-icon{margin-right:0}
+
+/* Small HUD elements on the map */
+#coords,#status{
+  background:rgba(9,23,32,.88)!important;color:#e6f5fa!important;
+  border:1px solid rgba(133,182,199,.34)!important;border-radius:10px!important;
+  box-shadow:0 5px 21px rgba(1,9,15,.22)!important;
+  backdrop-filter:blur(10px);font-size:11px!important;font-weight:650!important;
+  letter-spacing:.03em
+}
+#coords{padding:9px 13px!important}
+#status{max-width:calc(100vw - 310px);text-align:center}
+html[data-buildit-theme="light"] #coords,
+html[data-buildit-theme="light"] #status{
+  background:rgba(253,255,255,.92)!important;color:#294557!important;border-color:#c4d7e2!important
+}
+.leaflet-bar a,.leaflet-control-zoom a{
+  border-radius:7px!important;color:var(--bi-text)!important;
+  background:var(--bi-panel)!important;border-color:var(--bi-line)!important;
+  font-size:17px!important
+}
+.leaflet-bar a:hover,.leaflet-control-zoom a:hover{background:var(--bi-panel-raised)!important;color:var(--bi-accent)!important}
+.leaflet-control-zoom{border:1px solid var(--bi-line)!important;border-radius:9px!important;overflow:hidden;box-shadow:0 6px 20px rgba(0,0,0,.22)}
+.leaflet-popup-content-wrapper{background:var(--bi-panel)!important;color:var(--bi-text)!important;border-radius:11px!important;border:1px solid var(--bi-line)!important;box-shadow:var(--bi-shadow)!important}
+.leaflet-popup-tip{background:var(--bi-panel)!important}
+.leaflet-popup-close-button{color:var(--bi-muted)!important}
+.leaflet-tooltip{background:var(--bi-panel)!important;color:var(--bi-text)!important;border-color:var(--bi-line)!important}
+
+/* Branded login */
+#accessGate .access-card{
+  background:var(--bi-panel)!important;color:var(--bi-text)!important;
+  border:1px solid var(--bi-line)!important;border-radius:18px!important;
+  box-shadow:0 25px 80px rgba(0,0,0,.55)!important;
+  padding:29px!important
+}
+#accessGate .access-title{font-size:24px!important;font-weight:850!important;letter-spacing:-.035em!important}
+#accessGate .access-subtitle{color:var(--bi-muted)!important}
+#accessGate #accessPassword{
+  background:var(--bi-panel-muted)!important;border:1px solid var(--bi-line)!important;
+  color:var(--bi-text)!important;border-radius:10px!important;font-size:14px!important
+}
+#accessGate #accessSubmit{
+  background:var(--bi-accent-deep)!important;color:#fff!important;
+  border-color:var(--bi-accent-deep)!important;border-radius:10px!important
+}
+#accessGate #accessSubmit:hover{background:#1997a1!important}
+#accessGate .access-note{color:var(--bi-subtle)!important}
+#accessGate #accessError{color:var(--bi-red)!important}
+
+@media(max-width:920px){
+  #builditBrand{display:none}
+  #status{top:auto;bottom:66px;max-width:calc(100vw - 35px)}
+}
+@media(max-width:600px){
+  body #filterPanel,body #logPanel,body #biPanel{padding:13px!important;border-radius:12px!important}
+  body #filterToggle,body #logToggle,body #biToggle{font-size:12px!important}
+  #filterPanel .log-action-label{font-size:11px!important}
+  #logPanel #logActivity{max-height:40vh!important}
+  #coords{bottom:12px!important;padding:8px 11px!important}
+  #status{bottom:57px!important;font-size:10px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.001ms!important;animation-duration:.001ms!important}
+}
