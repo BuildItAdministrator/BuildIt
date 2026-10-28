@@ -1216,3 +1216,60 @@ test('New design stays inside viewport on desktop and mobile',async({page})=>{
     expect(await page.locator('#filterPanel').evaluate(el=>el.scrollWidth-el.clientWidth),option).toBeLessThanOrEqual(2);
   }
 });
+
+
+test('Light mode has high-contrast readable text throughout filters, logs, events and file manager',async({page})=>{
+  await page.locator('#builditThemeToggle').click();
+  await expect(page.locator('html')).toHaveAttribute('data-buildit-theme','light');
+  const cssTokens=await page.evaluate(()=>{
+    const style=getComputedStyle(document.documentElement);
+    return {
+      foreground:style.getPropertyValue('--bi-text').trim(),
+      muted:style.getPropertyValue('--bi-muted').trim(),
+      subtle:style.getPropertyValue('--bi-subtle').trim(),
+      panel:style.getPropertyValue('--bi-panel').trim()
+    };
+  });
+  expect(cssTokens.foreground).toBe('#1b3345');
+  expect(cssTokens.muted).toBe('#425c6e');
+  expect(cssTokens.subtle).toBe('#526d7c');
+  const inspect=async(items,backgroundSelector)=>{
+    const result=await page.evaluate(({items,backgroundSelector})=>{
+      const parse=str=>{
+        const numbers=String(str).match(/[\d.]+/g);
+        return numbers?numbers.slice(0,3).map(Number):[];
+      };
+      const luminance=rgb=>{
+        const out=rgb.map(x=>{
+          x=x/255;
+          return x<=0.04045?x/12.92:Math.pow((x+0.055)/1.055,2.4);
+        });
+        return 0.2126*out[0]+0.7152*out[1]+0.0722*out[2];
+      };
+      const background=parse(getComputedStyle(document.querySelector(backgroundSelector)).backgroundColor);
+      return items.map(selector=>{
+        const element=document.querySelector(selector);
+        const color=parse(getComputedStyle(element).color);
+        const high=Math.max(luminance(background),luminance(color));
+        const low=Math.min(luminance(background),luminance(color));
+        return {selector,contrast:(high+0.05)/(low+0.05),color:getComputedStyle(element).color};
+      });
+    },{items,backgroundSelector});
+    for(const entry of result){
+      expect(entry.contrast,'Poor contrast for '+entry.selector+' ('+entry.color+')').toBeGreaterThanOrEqual(4.5);
+    }
+  };
+  await page.locator('#filterToggle').click();
+  await inspect(['#filterPanel','.filter-title','#filterPanel .filter-row','#filterPanel .filter-menu-label','#filterPanel .filter-note'],'#filterPanel');
+  await page.locator('#filterToggle').click();
+  await page.locator('#logToggle').click();
+  await inspect(['#logPanel','#logPanel .log-title','#logPanel .log-head-note','#logPanel .log-filter-hint','#logPanel .log-compact-help'],'#logPanel');
+  await page.locator('#logServerFiles summary').click();
+  await inspect(['#logPanel #fileManager','#logPanel #fileManager .fm-label','#logPanel #fileManager .fm-note','#logPanel #fileManager .fm-path'],'#logPanel');
+  await page.locator('#logToggle').click();
+  await page.locator('#biToggle').click();
+  await inspect(['#biPanel','#biPanel .biHeader .biSmall','#biPanel label[for="biName"]','#biPanel .biDraftCount'],'#biPanel');
+  await page.locator('#biToggle').click();
+  await page.locator('#builditThemeToggle').click();
+  await expect(page.locator('html')).toHaveAttribute('data-buildit-theme','dark');
+});
