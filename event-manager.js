@@ -4,6 +4,7 @@
   if (typeof map === 'undefined' || typeof L === 'undefined' || typeof gameToLeaflet !== 'function' || typeof leafletToGame !== 'function') return;
   const BASE = 'https://raw.githubusercontent.com/BohemiaInteractive/DayZ-Central-Economy/master/dayzOffline.chernarusplus/';
   const STORE = 'buildit_events_drafts_v1';
+  let activeDraftStore=STORE;
   const $ = id => document.getElementById(id);
   const safe = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const valid = v => /^[A-Za-z0-9_]{1,90}$/.test(v);
@@ -272,7 +273,7 @@
     });
   }
   function persist() {
-    try { localStorage.setItem(STORE, JSON.stringify(drafts)); }
+    try { localStorage.setItem(activeDraftStore, JSON.stringify(drafts)); }
     catch (e) { message('Browser storage failed. Check available space and privacy settings.', true); }
     renderDrafts();
   }
@@ -1044,7 +1045,41 @@
     vehicles:()=>[...vehicleNames].sort((a,b)=>String(VEHICLE_LABELS[a]||a).localeCompare(String(VEHICLE_LABELS[b]||b))).map(name=>({name,label:VEHICLE_LABELS[name]||name})),
     items:()=>[...itemNames].sort((a,b)=>a.localeCompare(b)),
     publish:quickPublish,
-    advanced:()=>{panel.hidden=false;refresh();}
+    advanced:()=>{panel.hidden=false;refresh();},
+    isBusy:()=>quickBusy||eventDeploy.loading||eventDeploy.sending||lootBusy
+  });
+
+
+  const loadDraftProfile=key=>{
+    try{
+      const raw=JSON.parse(localStorage.getItem(key)||'[]');
+      return Array.isArray(raw)?raw.filter(d=>d&&valid(d.name)&&numbers(d.x,0,15360)&&numbers(d.z,0,15360)).slice(0,150):[];
+    }catch{return[];}
+  };
+  function bindDraftProfile(profileId){
+    const key=STORE+':'+String(profileId);
+    if(key===activeDraftStore)return;
+    try{
+      localStorage.setItem(activeDraftStore,JSON.stringify(drafts));
+      if(activeDraftStore===STORE&&!localStorage.getItem(key))
+        localStorage.setItem(key,JSON.stringify(drafts));
+    }catch(e){console.warn('Could not preserve server drafts:',e.message);}
+    activeDraftStore=key;
+    drafts=loadDraftProfile(key);
+    editingIndex=-1;chosen=null;itemList=[];placing=false;
+    clearStaged();
+    eventDeploy.mission='';
+    eventDeploy.paths={};
+    eventDeploy.sources={};
+    lootStaged=null;
+    for(const key of Object.keys(files))delete files[key];
+    panel.hidden=true;
+    $('biPick').textContent='Pick on map';
+    resetForm();renderDrafts();
+  }
+  window.BUILD_IT_EVENT_DRAFTS=Object.freeze({bindInitial:bindDraftProfile});
+  window.addEventListener('buildit:nitrado-profile-changing',event=>{
+    bindDraftProfile(event.detail.profileId);
   });
 
   [['biExportEvents','events'],['biExportPositions','positions']].forEach(pair => {
