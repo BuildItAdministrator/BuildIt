@@ -896,6 +896,153 @@
       lootStaged=null;
     }finally{lootBusy=false;$('biPrepareLoot').disabled=false;}
   });
+
+  // Quick Spawn: one confirmed publish, no manual XML/JSON files or draft queue.
+  // Reuses the audited reader, append-only event formatter, checksum writes,
+  // Nitrado backups and dedicated JSON creator. No server restart is triggered.
+  let quickBusy=false;
+  function quickSelection(kind,value){
+    const set=kind==='vehicle'?vehicleNames:itemNames;
+    return set.has(value);
+  }
+  function quickCoordinates(input){
+    if(!input||!numbers(input.x,0,15360)||!numbers(input.z,0,15360))
+      throw new Error('Select a valid Chernarus position on the map.');
+    return {x:Number(Number(input.x).toFixed(2)),z:Number(Number(input.z).toFixed(2))};
+  }
+  async function quickPublish(kind,input,onProgress=()=>{}){
+    if(quickBusy||eventDeploy.sending||eventDeploy.loading||lootBusy)
+      throw new Error('Another server operation is in progress. Try again after it completes.');
+    if(kind!=='vehicle'&&kind!=='loot')throw new Error('Select a vehicle or loot drop.');
+    const coords=quickCoordinates(input),classname=String(input.classname||'').trim();
+    if(!quickSelection(kind,classname))
+      throw new Error('Select a real '+(kind==='vehicle'?'vehicle':'item')+' classname from the catalog.');
+    quickBusy=true;
+    const completed=[];
+    let changedPaths=[];
+    const update=message=>{if(typeof onProgress==='function')onProgress(message);};
+    try{
+      update('Finding the active Chernarus mission…');
+      const mission=await discoverServerMission();
+      if(kind==='vehicle'){
+        const name='BuildItQuick_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);
+        const angle=Number(input.angle??0);
+        if(!numbers(angle,0,359.99))throw new Error('Rotation must be 0–359.99 degrees.');
+        const draft={name,kind:'vehicle',vehicle:classname,...coords,a:angle};
+        const paths={events:mission+'/db/events.xml',positions:mission+'/cfgeventspawns.xml'};
+        changedPaths=[paths.events,paths.positions];
+        update('Reading live vehicle spawn files…');
+        const [events,positions]=await Promise.all([serverXmlRead(paths.events),serverXmlRead(paths.positions)]);
+        const eventClean=window.BUILD_IT_XML.repairDuplicateDeclarations(events.content,'events');
+        const positionClean=window.BUILD_IT_XML.repairDuplicateDeclarations(positions.content,'eventposdef');
+        if(eventClean.removed||positionClean.removed)
+          throw new Error('Server XML has duplicate declarations. Repair them first through the advanced editor; Quick Spawn will not silently change existing lines.');
+        const eventDoc=parseXML(events.content,'events');
+        const positionDoc=parseXML(positions.content,'eventposdef');
+        const changes=[
+          {path:paths.events,previous:events.sha256,content:appendXmlEventsWithoutReformatting(events.content,'events',[createEvent(eventDoc,draft)]),root:'events'},
+          {path:paths.positions,previous:positions.sha256,content:appendXmlEventsWithoutReformatting(positions.content,'eventposdef',[createPos(positionDoc,draft)]),root:'eventposdef'}
+        ];
+        for(const file of changes)
+          window.BUILD_IT_FORMAT.validate(file.path,file.content,{expectedRoot:file.root});
+        update('Validating files and checking Nitrado versions…');
+        for(const file of changes){
+          const latest=await serverXmlRead(file.path);
+          if(latest.sha256!==file.previous)
+            throw new Error(file.path.split('/').pop()+' changed during preparation. No files modified.');
+        }
+        // Write positions first: if the second write fails, an unreferenced
+        // position is less dangerous than an active event without its position.
+        for(const file of [changes[1],changes[0]]){
+          update('Backing up and publishing '+file.path.split('/').pop()+'…');
+          const saved=await nitradoRequest('/api/files/write',{
+            method:'POST',writeKey:true,
+            body:{path:file.path,content:file.content,expectedSha256:file.previous,confirm:true}
+          });
+          if(!saved?.verified||!saved?.backupPath)
+            throw new Error('Upload verification failed for '+file.path.split('/').pop());
+          completed.push({path:file.path,backup:saved.backupPath});
+        }
+        return {kind,classname,name,files:completed.map(x=>x.path),pendingRestart:true};
+      }
+      const elevation=Number(input.y);
+      if(input.y===null||input.y===undefined||input.y===''||!numbers(elevation,-100,1000))
+        throw new Error('Enter the real ground elevation Y for this loot drop.');
+      const qty=Number(input.quantity??1);
+      if(!Number.isInteger(qty)||qty<1||qty>20)
+        throw new Error('Quantity must be a whole number between 1 and 20.');
+      const pending=window.BUILD_IT_LOOT.build([{
+        name:'QuickLoot',kind:'loot',...coords,y:elevation,a:0,
+        spacing:1.5,items:[{name:classname,qty}]
+      }]);
+      const lootPath=mission+'/'+window.BUILD_IT_LOOT.SPAWNER_REF;
+      const gameplayPath=mission+'/cfggameplay.json';
+      changedPaths=[lootPath,gameplayPath];
+      update('Checking existing loot and cfgGameplay…');
+      const exists=await lootFileExists(mission,pending.filename);
+      const [current,gameplayLive]=await Promise.all([
+        exists?serverXmlRead(lootPath):Promise.resolve(null),
+        serverXmlRead(gameplayPath)
+      ]);
+      const existing=current?JSON.parse(current.content):{Objects:[]};
+      if(!existing||Array.isArray(existing)||!Array.isArray(existing.Objects))
+        throw new Error('Current loot JSON does not contain a valid Objects array.');
+      const merged=JSON.stringify({...existing,Objects:[
+        ...existing.Objects,...JSON.parse(pending.content).Objects
+      ]},null,2)+'\\n';
+      const gameplay=window.BUILD_IT_LOOT.gameplay(gameplayLive.content);
+      window.BUILD_IT_FORMAT.validate(lootPath,merged);
+      window.BUILD_IT_FORMAT.validate(gameplayPath,gameplay);
+      const oldRefs=JSON.parse(gameplayLive.content).WorldsData?.objectSpawnersArr||[];
+      const newRefs=JSON.parse(gameplay).WorldsData.objectSpawnersArr;
+      const updateGameplay=JSON.stringify(oldRefs)!==JSON.stringify(newRefs);
+      update('Checking Nitrado versions before upload…');
+      if(exists){
+        const recent=await serverXmlRead(lootPath);
+        if(recent.sha256!==current.sha256)throw new Error('Loot file changed. No files modified.');
+      }else if(await lootFileExists(mission,pending.filename)){
+        throw new Error('Loot file appeared during preparation. No files modified.');
+      }
+      const gameplayRecent=await serverXmlRead(gameplayPath);
+      if(gameplayRecent.sha256!==gameplayLive.sha256)
+        throw new Error('Gameplay file changed. No files modified.');
+      // First create the loot file, then register it in cfggameplay.json.
+      update('Publishing loot JSON…');
+      const saved=await nitradoRequest(exists?'/api/files/write':'/api/files/create',{
+        method:'POST',writeKey:true,
+        body:exists?
+          {path:lootPath,content:merged,expectedSha256:current.sha256,confirm:true}:
+          {path:lootPath,content:merged,expectedAbsent:true,confirm:true}
+      });
+      if(!saved?.verified||(exists?!saved.backupPath:!saved.created))
+        throw new Error('Loot file creation/upload could not be verified.');
+      completed.push({path:lootPath,backup:saved.backupPath||null,created:!exists});
+      if(updateGameplay){
+        update('Backing up and updating cfgGameplay reference…');
+        const changed=await nitradoRequest('/api/files/write',{
+          method:'POST',writeKey:true,
+          body:{path:gameplayPath,content:gameplay,expectedSha256:gameplayLive.sha256,confirm:true}
+        });
+        if(!changed?.verified||!changed?.backupPath)
+          throw new Error('cfgGameplay upload could not be verified.');
+        completed.push({path:gameplayPath,backup:changed.backupPath});
+      }
+      return {kind,classname,quantity:qty,files:completed.map(x=>x.path),pendingRestart:true};
+    }catch(error){
+      const detail=completed.length?
+        ' Partial upload: '+completed.map(f=>f.path.split('/').pop()+
+          (f.backup?' (backup: '+f.backup+')':' (new file)')).join(', ')+
+          '. Inspect and restore incomplete changes in Nitrado before retrying.':'';
+      throw new Error(error.message+detail);
+    }finally{quickBusy=false;}
+  }
+  window.BUILD_IT_SPAWN_API=Object.freeze({
+    vehicles:()=>[...vehicleNames].sort((a,b)=>String(VEHICLE_LABELS[a]||a).localeCompare(String(VEHICLE_LABELS[b]||b))).map(name=>({name,label:VEHICLE_LABELS[name]||name})),
+    items:()=>[...itemNames].sort((a,b)=>a.localeCompare(b)),
+    publish:quickPublish,
+    advanced:()=>{panel.hidden=false;refresh();}
+  });
+
   [['biExportEvents','events'],['biExportPositions','positions']].forEach(pair => {
     $(pair[0]).addEventListener('click', () => {
       try {
