@@ -1273,3 +1273,34 @@ test('Light mode has high-contrast readable text throughout filters, logs, event
   await page.locator('#builditThemeToggle').click();
   await expect(page.locator('html')).toHaveAttribute('data-buildit-theme','dark');
 });
+
+test('1.30 vehicle search has beige Humvee and all bike/boat variants',async({page})=>{
+  await page.locator('#biToggle').click();
+  await page.locator('#biVehicleSearch').fill('humvee');
+  await expect(page.locator('#biVehicleMatches')).toContainText('Offroad_02_Beige');
+  await page.locator('#biVehicleSearch').fill('Motorbike_02');
+  await expect(page.locator('#biVehicleMatches button')).toHaveCount(4);
+  await page.locator('#biVehicleSearch').fill('Boat_01');
+  await expect(page.locator('#biVehicleMatches button')).toHaveCount(4);
+});
+
+test('non-persistent JSON loot export preserves cfgGameplay references and other settings',async({page})=>{
+  await page.locator('#biToggle').click();
+  await page.locator('#biKind').selectOption('loot');
+  await expect(page.locator('#biLootY')).toBeVisible();
+  await expect(page.locator('#biExportLootJson')).toBeVisible();
+  const result=await page.evaluate(()=>{
+    const d={name:'TestLoot',kind:'loot',x:4465.78,z:10227.54,y:269.5,a:45,spacing:1.5,items:[{name:'Apple',qty:3},{name:'M4A1',qty:2}]};
+    const spawned=JSON.parse(window.BUILD_IT_LOOT.build([d]).content).Objects;
+    const cfg=JSON.parse(window.BUILD_IT_LOOT.gameplay(JSON.stringify({version:130,WorldsData:{objectSpawnersArr:['base.json']},PlayerData:{StaminaData:{staminaMax:100}}})));
+    let missingHeightRejected=false;
+    try{window.BUILD_IT_LOOT.build([{...d,y:undefined}])}catch(_){missingHeightRejected=true;}
+    return {spawned,arr:cfg.WorldsData.objectSpawnersArr,stamina:cfg.PlayerData.StaminaData.staminaMax,missingHeightRejected};
+  });
+  expect(result.spawned).toHaveLength(5);
+  expect(result.spawned.every(o=>o.enableCEPersistency===false)).toBe(true);
+  expect(new Set(result.spawned.map(o=>o.pos.join(','))).size).toBe(5);
+  expect(result.arr).toEqual(['base.json','BuildIt_LootDrops.json']);
+  expect(result.stamina).toBe(100);
+  expect(result.missingHeightRejected).toBe(true);
+});
