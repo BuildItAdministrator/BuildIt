@@ -127,7 +127,8 @@ function changeWeather(src,path,newValue){
  }else{
    const sectionRe=new RegExp('<'+outer+'\\b[^>]*>[\\s\\S]*?<\\/'+outer+'\\s*>','gi');
    for(const section of src.matchAll(sectionRe)){
-     if(!outside(ranges,section.index,section.index+section[0].length))continue;
+     const sectionOpening=section[0].indexOf('>')+1;
+     if(!outside(ranges,section.index,section.index+sectionOpening))continue;
      const subRe=new RegExp('<'+inner+'\\b[^>]*\\/?>','gi');
      for(const sub of section[0].matchAll(subRe)){
        const start=section.index+sub.index;
@@ -196,7 +197,7 @@ function addSpawnPoint(src,x,z){
  const ranges=commentRanges(src);
  const matches=[];
  for(const m of src.matchAll(/<generator_posbubbles\b[^>]*>([\s\S]*?)<\/generator_posbubbles\s*>/gi)){
-   if(!outside(ranges,m.index,m.index+m[0].length))continue;
+   if(!outside(ranges,m.index,m.index+m[0].indexOf('>')+1))continue;
    const outerStart=src.slice(0,m.index);
    const lastFresh=outerStart.lastIndexOf('<fresh');
    const lastEnd=outerStart.lastIndexOf('</fresh');
