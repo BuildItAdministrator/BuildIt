@@ -807,6 +807,8 @@ test('Event Manager shows the simplified vehicle flow and auto-syncs live XML on
   await expect(page.locator('#biExportEvents')).toBeHidden();
   await page.locator('#biPreviewServer').click();
   await expect(page.locator('#biServerPreview')).toContainText('READY');
+  await expect(page.locator('#biServerPreview')).toContainText('FORMAT VALIDATED');
+  await expect(page.locator('#biServerPreview')).toContainText('Valid XML');
   await expect(page.locator('#biServerPreview')).toContainText('VehicleQuickFlow');
   await expect(page.locator('#biUploadServer')).toBeEnabled();
   expect(calls.filter(c=>c.path==='/api/files/read')).toHaveLength(2);
@@ -921,4 +923,112 @@ test('Event Manager explicitly approves removing a pre-existing duplicate XML he
   expect(writtenEvents.content).toContain('\r\n\t<event name="VehicleRepairSafe">');
   expect(uploads.find(x=>x.path===positions).content.match(/<\?xml/g)).toHaveLength(1);
   await expect(page.locator('#biDraftCount')).toHaveText('0 saved');
+});
+
+
+test('Shared format validator accepts valid XML and JSON, rejects broken structure',async({page})=>{
+  const checks=await page.evaluate(()=>{
+    const run=(path,text)=>{
+      try{return {ok:true,...window.BUILD_IT_FORMAT.validate(path,text)}}catch(e){return {ok:false,error:e.message}}
+    };
+    return {
+      validXml:run('db/events.xml','<?xml version="1.0" encoding="UTF-8"?>\n<events><!-- hi --><event name="CarTest"/></events>'),
+      duplicateXml:run('db/events.xml','<?xml version="1.0"?>\n<?xml version="1.0"?>\n<events/>'),
+      wrongRoot:run('cfgeventspawns.xml','<events/>'),
+      malformedXml:run('db/events.xml','<events><event></events>'),
+      goodJson:run('cfgGameplay.json','{"version":130,"GeneralData":{}}'),
+      brokenJson:run('cfgGameplay.json','{"version":130,}'),
+      objectSpawn:run('custom/village.json','{"Objects":[{"name":"Land_House_1W01","pos":[4400,0,10200]}]}'),
+      invalidSpawner:run('custom/village.json','{"Objects":[{"name":"Land_House_1W01","pos":["4400",0,10200]}]}'),
+      invalidRoot:run('config.json','true'),
+      maxBytes:run('event.json','{"data":"'+ 'x'.repeat(512*1024) +'"}')
+    };
+  });
+  expect(checks.validXml.ok).toBe(true);
+  expect(checks.validXml.detail).toContain('root <events>');
+  expect(checks.duplicateXml.ok).toBe(false);
+  expect(checks.duplicateXml.error).toContain('Invalid XML');
+  expect(checks.wrongRoot.ok).toBe(false);
+  expect(checks.wrongRoot.error).toContain('Expected <eventposdef>');
+  expect(checks.malformedXml.ok).toBe(false);
+  expect(checks.goodJson.ok).toBe(true);
+  expect(checks.goodJson.format).toBe('JSON');
+  expect(checks.brokenJson.ok).toBe(false);
+  expect(checks.brokenJson.error).toContain('Invalid JSON');
+  expect(checks.objectSpawn.ok).toBe(true);
+  expect(checks.objectSpawn.detail).toContain('1 objects');
+  expect(checks.invalidSpawner.ok).toBe(false);
+  expect(checks.invalidSpawner.error).toContain('pos must contain three numeric');
+  expect(checks.invalidRoot.ok).toBe(false);
+  expect(checks.maxBytes.ok).toBe(false);
+  expect(checks.maxBytes.error).toContain('512 KB');
+});
+
+test('Nitrado File Manager clearly validates JSON and disables upload when edited JSON breaks',async({page})=>{
+  const root='/games/ni5774718_3/ftproot';
+  const file=root+'/dayzps_missions/dayzOffline.chernarusplus/cfgGameplay.json';
+  let serverContent='{"version":130,"GeneralData":{"disableBaseDamage":false}}';
+  const uploads=[];
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const u=new URL(route.request().url());
+    const path=u.searchParams.get('file');
+    let status=200,body={ok:true};
+    if(u.pathname==='/api/files/list')body={root,dir:root,entries:[{name:'cfgGameplay.json',path:file,type:'file'}]};
+    else if(u.pathname==='/api/files/read'&&path===file)
+      body={path:file,content:serverContent,sha256:'a'.repeat(64)};
+    else if(u.pathname==='/api/files/write'){
+      const content=route.request().postDataJSON();
+      uploads.push(content);
+      serverContent=content.content;
+      body={verified:true,backupPath:file+'.backup'};
+    }else{status=404;body={error:'Missing route'}}
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
+  });
+  await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-access');
+  await page.locator('#nitradoWriteKey').evaluate(el=>el.value='random-test-write-key');
+  await page.locator('#logToggle').click();
+  await page.locator('#fmBrowse').click();
+  await page.locator('.fm-entry').filter({hasText:'cfgGameplay.json'}).click();
+  await expect(page.locator('#fmValidationStatus')).toContainText('VALID');
+  await expect(page.locator('#fmSave')).toBeEnabled();
+  await page.locator('#fmEditor').fill('{"version":130,}');
+  await expect(page.locator('#fmValidationStatus')).toContainText('INVALID');
+  await expect(page.locator('#fmValidationStatus')).toContainText('Invalid JSON');
+  await expect(page.locator('#fmSave')).toBeDisabled();
+  expect(uploads).toHaveLength(0);
+  await page.locator('#fmEditor').fill('{"version":130,"GeneralData":{}}');
+  await page.locator('#fmValidate').click();
+  await expect(page.locator('#fmValidationStatus')).toContainText('VALID');
+  await expect(page.locator('#fmSave')).toBeEnabled();
+  page.on('dialog',dialog=>dialog.accept());
+  await page.locator('#fmSave').click();
+  await expect(page.locator('#fmStatus')).toContainText('Upload verified');
+  expect(uploads).toHaveLength(1);
+  expect(uploads[0].content).toBe('{"version":130,"GeneralData":{}}');
+});
+
+test('Nitrado File Manager blocks invalid XML and wrong DayZ XML root',async({page})=>{
+  const root='/games/ni123/noftp',path=root+'/db/events.xml';
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const u=new URL(route.request().url());
+    let status=200,body={ok:true};
+    if(u.pathname==='/api/files/list')body={root,dir:root,entries:[{name:'events.xml',path,type:'file'}]};
+    else if(u.pathname==='/api/files/read')body={path,sha256:'a'.repeat(64),content:'<events/>'};
+    else if(u.pathname==='/api/files/write'){throw Error('Unsafe upload attempted during test')}
+    else{status=404;body={error:'Not found'}}
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
+  });
+  await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-access');
+  await page.locator('#logToggle').click();
+  await page.locator('#fmBrowse').click();
+  await page.locator('.fm-entry').filter({hasText:'events.xml'}).click();
+  await expect(page.locator('#fmValidationStatus')).toContainText('VALID');
+  await page.locator('#fmEditor').fill('<eventposdef/>');
+  await expect(page.locator('#fmValidationStatus')).toContainText('Expected <events>');
+  await expect(page.locator('#fmSave')).toBeDisabled();
+  await page.locator('#fmEditor').fill('<?xml version="1.0"?>\n<?xml version="1.0"?>\n<events/>');
+  await expect(page.locator('#fmValidationStatus')).toContainText('INVALID');
+  await expect(page.locator('#fmSave')).toBeDisabled();
 });
