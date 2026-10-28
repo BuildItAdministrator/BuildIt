@@ -175,18 +175,31 @@
     if(window.BUILD_IT_QUICK_SPAWN?.toggle){window.BUILD_IT_QUICK_SPAWN.toggle();return;}
     panel.hidden = !panel.hidden; if (!panel.hidden) refresh();
   });
-  $('biClose').addEventListener('click', () => { panel.hidden = true; placing = false; $('biPick').textContent = 'Pick on map'; });
+  $('biClose').addEventListener('click', () => { window.BUILD_IT_UI_VISIBILITY?.cancelPick('advanced-spawn'); panel.hidden = true; placing = false; $('biPick').textContent = 'Pick on map'; });
+  function cancelAdvancedMapPick(){
+    placing=false;$('biPick').textContent='Pick on map';
+    message('Map selection cancelled.');
+  }
   $('biPick').addEventListener('click', () => {
-    placing = !placing;
-    $('biPick').textContent = placing ? 'Click a map location…' : 'Pick on map';
-    message(placing ? 'Click your preferred location on the map.' : 'Map selection cancelled.');
+    if(placing){
+      window.BUILD_IT_UI_VISIBILITY?.cancelPick('advanced-spawn');
+      cancelAdvancedMapPick();return;
+    }
+    placing=true;
+    $('biPick').textContent='Click a map location…';
+    message('Click your preferred location on the map.');
+    window.BUILD_IT_UI_VISIBILITY?.beginPick('advanced-spawn',{
+      hintText:'Choose an event spawn location on the map',
+      onCancel:cancelAdvancedMapPick
+    });
   });
   map.on('click', e => {
     if (!placing) return;
     const p = leafletToGame(e.latlng);
     if (!numbers(p.x, 0, 15360) || !numbers(p.z, 0, 15360)) return message('This location is outside Chernarus.', true);
     chosen = {x:Number(p.x.toFixed(2)), z:Number(p.z.toFixed(2))};
-    placing = false; $('biPick').textContent = 'Pick on map';
+    placing = false; window.BUILD_IT_UI_VISIBILITY?.finishPick('advanced-spawn');
+    $('biPick').textContent = 'Pick on map';
     $('biPoint').textContent = chosen.x + ' / ' + chosen.z;
     panel.hidden = false;
     message('Location selected. Choose an event and save the draft.');
@@ -1066,6 +1079,7 @@
     }catch(e){console.warn('Could not preserve server drafts:',e.message);}
     activeDraftStore=key;
     drafts=loadDraftProfile(key);
+    window.BUILD_IT_UI_VISIBILITY?.cancelPick('advanced-spawn');
     editingIndex=-1;chosen=null;itemList=[];placing=false;
     clearStaged();
     eventDeploy.mission='';
