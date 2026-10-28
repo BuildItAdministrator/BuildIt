@@ -620,7 +620,7 @@ $('stPublish').addEventListener('click',async()=>{
  }finally{setBusy(false);}
 });
 render();
-window.BUILD_IT_TOOLS=Object.freeze({count:TOOLS.length,ready:ACTIVE.size,mode:'nitrado',isBusy:()=>busy});
+window.BUILD_IT_TOOLS=Object.freeze({count:TOOLS.length,ready:ACTIVE.size,mode:'nitrado',isBusy:()=>busy,hasPreview:()=>!!preview});
 window.addEventListener('buildit:nitrado-profile-changing',()=>{
   if(busy)return;
   clearHeatmap();
