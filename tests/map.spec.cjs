@@ -760,18 +760,11 @@ test('Event Manager blocks non UTF-8 XML instead of silently rewriting encoding'
   await page.locator('#biToggle').click();
   await page.locator('#biAdvanced').evaluate(el=>el.open=true);
   await page.locator('#biLoadServer').click();
-  await expect(page.locator('#biServerPreview')).toContainText('Server XML reloaded');
-  await page.locator('#biName').fill('VehicleWrongEncoding');
-  await page.locator('#biVehicleSearch').fill('OffroadHatchback');
-  await page.locator('#biPick').click();
-  await page.evaluate(()=>map.fire('click',{latlng:L.latLng(7000/SCALE-256,5000/SCALE)}));
-  await page.locator('#biSave').click();
-  await page.locator('#biPreviewServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('Nitrado reload failed');
   await expect(page.locator('#biServerPreview')).toContainText('ISO-8859-1 encoding');
   await expect(page.locator('#biUploadServer')).toBeDisabled();
+  // Refuse the invalid original before building a replacement XML document.
 });
-
-
 
 test('Event Manager shows the simplified vehicle flow and auto-syncs live XML on Review',async({page})=>{
   const noftp='/games/ni5774718_3/noftp';
