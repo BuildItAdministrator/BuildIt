@@ -13,7 +13,7 @@ const C=[
  ['Equipment & effects',['Loadout Generator','Weapon Blueprint Generator','Bag Fill Generator','CfgEffect Converter']]
 ];
 const TOOLS=C.flatMap(([group,names])=>names.map(name=>({name,group})));
-const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker']);
+const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator']);
 const RELATED={'Events Organizer':'biToggle','Build A Vehicle':'biToggle'};
 const ROOT=document.createElement('div');ROOT.id='serverToolsRoot';
 ROOT.innerHTML=`
@@ -40,6 +40,7 @@ ROOT.innerHTML=`
      <label class="st-field st-wide"><span>Classname filter (optional)</span><input id="stClassname" type="text" placeholder="Empty applies to all types"></label>
    </div>
    <div id="stGlobalControls" class="st-params" hidden><label class="st-field"><span>Existing global</span><select id="stGlobalName"></select></label><label class="st-field"><span>New numeric value</span><input type="number" id="stGlobalValue" step="any"></label></div>
+   <div id="stMessageControls" class="st-params" hidden><label class="st-field st-wide"><span>Server message (max 160 characters)</span><textarea id="stMessageText" maxlength="160" rows="3" placeholder="Welcome to our DayZ server!"></textarea></label><label class="st-field"><span>Repeat (minutes)</span><input id="stMessageInterval" type="number" min="1" max="1440" step="1" value="30"></label></div>
    <div class="st-actions"><button id="stRun" type="button" disabled>Check / Preview</button><button id="stPublish" type="button" hidden disabled>Apply to Nitrado</button></div>
    <pre id="stResult" class="st-result" role="status" aria-live="polite"></pre>
    <details class="st-settings"><summary>Connection · MAP_WRITE_KEY</summary><p class="st-help">Use the same write key as the File Manager. This key is never saved.</p><label class="st-field"><span>Write key</span><input id="stWriteKey" type="password" autocomplete="off" placeholder="MAP_WRITE_KEY"></label></details>
@@ -61,9 +62,10 @@ const DEFAULTS={
  'Event Conflict Check':'db/events.xml',
  'Globals Configurator':'db/globals.xml',
  'Spawnable Duplicate Checker':'cfgspawnabletypes.xml',
- 'SpawnObject Duplicate Checker':'custom/builditlootdrop.json'
+ 'SpawnObject Duplicate Checker':'custom/builditlootdrop.json',
+ 'Messages Generator':'db/messages.xml'
 };
-const EDITORS=new Set(['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Globals Configurator']);
+const EDITORS=new Set(['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Globals Configurator','Messages Generator']);
 function setStatus(text,error=false){
  $('stResult').textContent=text;$('stResult').dataset.error=String(error);
 }
@@ -72,7 +74,7 @@ function invalidate(){
 }
 function setBusy(value){
  busy=value;
- for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue']){
+ for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue','stMessageText','stMessageInterval']){
    $(id).disabled=value;
  }
  $('stRun').disabled=value||!snapshot;
@@ -128,6 +130,7 @@ function toolFiles(){
    if(selected==='JSON Validator')return file.relative.endsWith('.json');
    if(selected==='XML Validator')return file.relative.endsWith('.xml');
    if(selected==='SpawnObject Duplicate Checker')return file.relative.endsWith('.json');
+   if(selected==='Messages Generator')return ['db/messages.xml','messages.xml'].includes(file.relative);
    return file.relative===DEFAULTS[selected];
  });
 }
@@ -181,6 +184,7 @@ async function choose(name){
  const types=['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer'].includes(name);
  $('stParameters').hidden=!types;
  $('stGlobalControls').hidden=name!=='Globals Configurator';
+ $('stMessageControls').hidden=name!=='Messages Generator';
  $('stValueLabel').textContent=name==='Advanced Types Editor'?'Set value':'Multiplier';
  $('stValue').value=name==='Types Reducer'||name==='Lifetime Reducer'?'0.5':
    name==='Advanced Types Editor'?'100':'2';
@@ -204,7 +208,7 @@ $('stBack').addEventListener('click',()=>{
 });
 $('stRemoteFile').addEventListener('change',()=>void loadLive());
 $('stReload').addEventListener('click',()=>void loadLive());
-for(const id of ['stField','stValue','stClassname','stGlobalValue']){
+for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval']){
  $(id).addEventListener('input',invalidate);$(id).addEventListener('change',invalidate);
 }
 $('stGlobalName').addEventListener('change',()=>{invalidate();refreshGlobal();});
@@ -226,6 +230,10 @@ function analyze(){
    return {message:'Checked '+info.total+' entries in '+snapshot.relative+
      '\n'+info.findings.length+' issue(s).'+
      (info.findings.length?'\n'+info.findings.slice(0,100).join('\n'):'\nNo conflicts detected by the basic checks.')};
+ }
+ if(selected==='Messages Generator'){
+   const changes=core.addMessage(source,$('stMessageText').value,$('stMessageInterval').value);
+   return {content:changes.content,changed:1,message:'PREVIEW — Add repeat message every '+changes.interval+' minutes to '+snapshot.relative+'\nText: '+changes.text+'\nExisting messages remain untouched.'};
  }
  if(selected==='Globals Configurator'){
    const changes=core.editGlobal(source,$('stGlobalName').value,$('stGlobalValue').value);
