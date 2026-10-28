@@ -8,12 +8,12 @@ const C=[
  ['Config & gameplay',['Weather Manager','Gameplay Generator','Messages Generator','Globals Configurator']],
  ['Validation & files',['XML Validator','JSON Validator','Event Conflict Check','Spawnable Duplicate Checker','SpawnObject Duplicate Checker']],
  ['Loot & economy',['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Tier Booster','Types Organizer','Spawnable Types Adjuster','Classname Finder','Ignore List Generator','Loot & Proxy Calculator']],
- ['Events & vehicles',['Events Organizer','Event Group Calculator','Gas Zone Generator','Horde Generator']],
+ ['Events & vehicles',['Events Organizer','Event Group Calculator','Gas Zone Generator','Horde Generator','Vehicle Spawn','Lootdrop Spawn']],
  ['World & map',['Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','Underground Areas','Build Relocator','SpawnObject Heatmap']],
  ['Equipment & effects',['Loadout Generator','Weapon Blueprint Generator','Bag Fill Generator']]
 ];
 const TOOLS=C.flatMap(([group,names])=>names.map(name=>({name,group})));
-const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','SpawnObject Heatmap','Event Group Calculator','Gas Zone Generator','Build Relocator','Weapon Blueprint Generator','Bag Fill Generator','Loot & Proxy Calculator','Horde Generator','Types Organizer','Events Organizer','Ignore List Generator','Loadout Generator','Underground Areas']);
+const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','SpawnObject Heatmap','Event Group Calculator','Gas Zone Generator','Build Relocator','Weapon Blueprint Generator','Bag Fill Generator','Loot & Proxy Calculator','Horde Generator','Types Organizer','Events Organizer','Ignore List Generator','Loadout Generator','Underground Areas','Vehicle Spawn','Lootdrop Spawn']);
 
 const ROOT=document.createElement('div');ROOT.id='serverToolsRoot';
 ROOT.innerHTML=`
