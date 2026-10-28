@@ -208,8 +208,8 @@ body #filterPanel input::placeholder,body #logPanel input::placeholder,body #biP
   background:var(--bi-panel-muted)!important;color:var(--bi-muted)!important;
   border-color:var(--bi-line-soft)!important;line-height:1.55!important
 }
-#logPanel .log-auto-status.ok,#logPanel .log-file-test-status.ok{color:var(--bi-green)!important;border-color:rgba(105,206,160,.4)!important}
-#logPanel .log-auto-status.err,#logPanel .log-file-test-status.err{color:var(--bi-red)!important;border-color:rgba(218,93,112,.42)!important}
+#logPanel .log-auto-status.ok{color:var(--bi-green)!important;border-color:rgba(105,206,160,.4)!important}
+#logPanel .log-auto-status.err{color:var(--bi-red)!important;border-color:rgba(218,93,112,.42)!important}
 #logPanel .log-overview #nitradoSyncStatus{
   background:transparent!important;border:0!important;padding:5px 0 0!important;margin-top:5px!important;
   overflow-wrap:anywhere;color:var(--bi-muted)!important
@@ -230,10 +230,10 @@ body #filterPanel input::placeholder,body #logPanel input::placeholder,body #biP
 #logPanel .log-advanced{background:transparent!important;border-radius:10px!important}
 #logPanel .log-advanced summary{color:var(--bi-text)!important;font-weight:750!important}
 #logPanel .log-advanced summary:hover{background:rgba(79,171,174,.06)!important}
-#logPanel .log-compact-label,#logPanel .log-file-test-title{color:var(--bi-muted)!important}
+#logPanel .log-compact-label{color:var(--bi-muted)!important}
 #logPanel .log-upload{background:var(--bi-panel-raised)!important;color:var(--bi-text)!important;border:1px dashed var(--bi-line)!important}
 #logPanel #logDrop{background:var(--bi-panel-muted)!important;color:var(--bi-muted)!important;border-color:var(--bi-line)!important}
-#logPanel .log-file-test,#logPanel #fileManager{
+#logPanel #fileManager{
   background:var(--bi-panel-muted)!important;border:1px solid var(--bi-line-soft)!important;border-radius:10px!important
 }
 #logPanel #fileManager .fm-note,#logPanel #fileManager .fm-path{color:var(--bi-muted)!important}
@@ -351,3 +351,6 @@ html[data-buildit-theme="light"] #status{
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{transition-duration:.001ms!important;animation-duration:.001ms!important}
 }
+
+#logPanel .log-compact-help{font-size:11px;line-height:1.5;color:var(--bi-muted);margin:11px 12px 0}
+#logPanel #fileManager{margin:12px!important}
