@@ -128,10 +128,6 @@ $('qsPublish').addEventListener('click',async()=>{
   const line=mode==='loot'?
     spec.quantity+' × '+spec.classname+' at X '+spec.x+', Z '+spec.z+', Y '+spec.y:
     spec.classname+' at X '+spec.x+', Z '+spec.z;
-  // The only confirmation in the workflow. No file export or queue step.
-  if(!window.confirm('Confirm Quick Spawn to your Nitrado mission?\\n'+line+
-    '\\n\\nYour server MUST be stopped before you continue. The spawn activates on server start/restart.'+
-    '\\n\\nAre you sure the server is stopped and you want to publish?'))return;
   const manualKey=$('qsWriteKey').value.trim();
   const existing=document.getElementById('nitradoWriteKey');
   if(manualKey.length>=8&&existing)existing.value=manualKey;
@@ -140,6 +136,10 @@ $('qsPublish').addEventListener('click',async()=>{
     setStatus('Enter your MAP_WRITE_KEY in One-time connection setup, or in Logs → Server files & uploads.',true);
     return;
   }
+  // The only confirmation in the workflow. No file export or queue step.
+  if(!window.confirm('Confirm Quick Spawn to your Nitrado mission?\n'+line+
+    '\n\nYour server MUST be stopped before you continue. The spawn activates on server start/restart.'+
+    '\n\nAre you sure the server is stopped and you want to publish?'))return;
   busy=true;refreshButton();$('qsPick').disabled=true;
   setStatus('Preparing a safe Nitrado upload…');
   try{
