@@ -40,8 +40,8 @@ export async function createDayzLootFile(request, config) {
     return respond(400,{error:'Explicit create confirmation and expectedAbsent are required'});
   const path = String(payload.path || '');
   const allowed = [
-    fileRoot+'/dayzps_missions/dayzOffline.chernarusplus/BuildIt_LootDrops.json',
-    fileRoot+'/mpmissions/dayzOffline.chernarusplus/BuildIt_LootDrops.json'
+    fileRoot+'/dayzps_missions/dayzOffline.chernarusplus/custom/builditlootdrop.json',
+    fileRoot+'/mpmissions/dayzOffline.chernarusplus/custom/builditlootdrop.json'
   ];
   if (!allowed.includes(path)) return respond(400,{error:'Path is outside the allowed DayZ loot mission file'});
   const content = payload.content;
