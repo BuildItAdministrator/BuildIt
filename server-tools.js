@@ -85,7 +85,7 @@ function render(){
       const btn=document.createElement('button');btn.type='button';btn.textContent=ready?'Open tool':'Open Event Manager';
       btn.addEventListener('click',()=>{
         if(ready)choose(tool.name);
-        else{close();document.getElementById(related)?.click();}
+        else{close();if(window.BUILD_IT_SPAWN_API?.advanced)window.BUILD_IT_SPAWN_API.advanced();else document.getElementById(related)?.click();}
       });
       box.appendChild(btn);
     }
