@@ -275,6 +275,27 @@ for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageTex
  $(id).addEventListener('input',invalidate);$(id).addEventListener('change',invalidate);
 }
 $('stGlobalName').addEventListener('change',()=>{invalidate();refreshGlobal();});
+$('stGameplayPath').addEventListener('change',()=>{invalidate();fillGameplay();});
+$('stWeatherPath').addEventListener('change',()=>{invalidate();fillWeather();});
+$('stObjectIndex').addEventListener('change',()=>{invalidate();fillObject();});
+$('stPickMap').addEventListener('click',()=>{
+ if(busy||typeof map==='undefined'||typeof leafletToGame!=='function'){
+   setStatus('Map selection unavailable.',true);return;
+ }
+ const tool=selected;
+ setStatus('Click one point on the Chernarus map. Then return here to preview the change.');
+ map.once('click',e=>{
+   if(!selected||selected!==tool||panel.hidden)return;
+   const p=leafletToGame(e.latlng);
+   if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.z)){setStatus('Invalid coordinates.',true);return;}
+   if(tool==='SpawnObject Mover'){
+     $('stObjectX').value=Number(p.x.toFixed(2));$('stObjectZ').value=Number(p.z.toFixed(2));
+   }else if(tool==='Spawn Point Generator'){
+     $('stPlayerX').value=Number(p.x.toFixed(2));$('stPlayerZ').value=Number(p.z.toFixed(2));
+   }
+   invalidate();setStatus('Map position selected. Review then publish to Nitrado.');
+ });
+});
 $('stWriteKey').addEventListener('input',()=>{
  const input=document.getElementById('nitradoWriteKey');
  if(input)input.value=$('stWriteKey').value;
@@ -293,6 +314,32 @@ function analyze(){
    return {message:'Checked '+info.total+' entries in '+snapshot.relative+
      '\n'+info.findings.length+' issue(s).'+
      (info.findings.length?'\n'+info.findings.slice(0,100).join('\n'):'\nNo conflicts detected by the basic checks.')};
+ }
+ if(selected==='Gameplay Generator'){
+   const change=ext.changeGameplay(source,$('stGameplayPath').value,$('stGameplayValue').value);
+   return {content:change.content,changed:change.changed,message:'PREVIEW — '+change.path+'\n'+
+     String(change.previous)+' → '+String(change.value)+'\nOther settings are preserved.'};
+ }
+ if(selected==='Weather Manager'){
+   const change=ext.changeWeather(source,$('stWeatherPath').value,$('stWeatherValue').value);
+   return {content:change.content,changed:change.changed,message:'PREVIEW — '+change.path+'\n'+
+     change.previous+' → '+change.value+'\nOther weather settings are preserved.'};
+ }
+ if(selected==='Spawn Point Generator'){
+   const change=ext.addSpawnPoint(source,$('stPlayerX').value,$('stPlayerZ').value);
+   return {content:change.content,changed:1,message:'PREVIEW — Add fresh spawn at X '+change.x+' / Z '+change.z+
+     '\nOriginal spawn points and all other groups are preserved.'};
+ }
+ if(selected==='SpawnObject Mover'){
+   const change=ext.changeObjectPosition(source,$('stObjectIndex').value,$('stObjectX').value,$('stObjectZ').value);
+   return {content:change.content,changed:change.changed,message:'PREVIEW — Move '+change.name+
+     '\nOld X/Y/Z: '+change.previous.join(', ')+'\nNew X/Y/Z: '+change.current.join(', ')+
+     '\nOriginal Y elevation and all other objects are retained.'};
+ }
+ if(selected==='SpawnObject Organizer'){
+   const change=ext.organizeObjects(source);
+   return {content:change.content,changed:change.changed,message:'PREVIEW — Sort '+change.total+
+     ' objects by classname. All object properties and positions remain unchanged.'};
  }
  if(selected==='Spawnable Types Adjuster'){
    const result=core.editSpawnableChance(source,$('stSpawnableName').value,$('stSpawnableSection').value,$('stSpawnableChance').value);
