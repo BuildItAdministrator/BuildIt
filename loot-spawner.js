@@ -5,6 +5,7 @@
 (function(){
   'use strict';
   const FILENAME='BuildIt_LootDrops.json';
+  const SPAWNER_REF='custom/'+FILENAME;
   const MAX_OBJECTS=200;
   function number(v,min,max,label){
     if(v===null||v===undefined||v==='')throw new Error(label+' is required.');
@@ -49,7 +50,7 @@
     else if(!Array.isArray(JSON.parse(json).Objects))throw new Error('Invalid Object Spawner JSON.');
     return Object.freeze({filename:FILENAME,content:json,count:objects.length,events:loot.length});
   }
-  function gameplay(content,filename=FILENAME){
+  function gameplay(content,filename=SPAWNER_REF){
     const data=JSON.parse(content);
     if(!data||typeof data!=='object'||Array.isArray(data)||
        !data.WorldsData||typeof data.WorldsData!=='object'||Array.isArray(data.WorldsData))
@@ -72,5 +73,5 @@
     anchor.click();anchor.remove();
     setTimeout(()=>URL.revokeObjectURL(url),5000);
   }
-  window.BUILD_IT_LOOT=Object.freeze({FILENAME,MAX_OBJECTS,build,gameplay,download});
+  window.BUILD_IT_LOOT=Object.freeze({FILENAME,SPAWNER_REF,MAX_OBJECTS,build,gameplay,download});
 })();
