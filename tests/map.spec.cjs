@@ -1,5 +1,10 @@
 const { test, expect } = require('@playwright/test');
 
+async function openAdvancedEventManager(page){
+  await openAdvancedEventManager(page);
+  await page.locator('#qsAdvanced').click();
+}
+
 test.beforeEach(async ({page}) => {
   // This is the non-secret session flag used by the existing client-side gate.
   // No real passwords, API tokens, or Cloudflare keys are used.
@@ -75,7 +80,7 @@ test('right-side menus are aligned and only one panel is open', async ({page}) =
   await page.locator('#logServerFiles').evaluate(el=>el.open=true);
   await expect(page.locator('#logPanel')).toBeVisible();
   await expect(page.locator('#filterPanel')).toBeHidden();
-  await page.locator('#biToggle').click();
+  await openAdvancedEventManager(page);
   await expect(page.locator('#biPanel')).toBeVisible();
   await expect(page.locator('#logPanel')).toBeHidden();
 });
@@ -101,7 +106,7 @@ test('mobile app manifest, icons, and offline worker are valid', async ({page,re
 });
 
 test('Event Manager panel fits phone viewport', async ({page}) => {
-  await page.locator('#biToggle').click();
+  await openAdvancedEventManager(page);
   await expect(page.locator('#biPick')).toBeVisible();
   const box=await page.locator('#biPanel').boundingBox();
   const viewport=page.viewportSize();
@@ -577,7 +582,7 @@ test('Event Manager loads live vehicle XML and previews coordinated changes with
   });
   await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='fake_key');
-  await page.locator('#biToggle').click();
+  await openAdvancedEventManager(page);
   await page.locator('#biAdvanced').evaluate(el=>el.open=true);
   await page.locator('#biLoadServer').click();
   await expect(page.locator('#biServerPreview')).toContainText('Server XML reloaded');
@@ -625,7 +630,7 @@ test('Event Manager Nitrado deploy stops with clear error if upload permission i
   });
   await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='fake_key');
-  await page.locator('#biToggle').click();
+  await openAdvancedEventManager(page);
   await page.locator('#biAdvanced').evaluate(el=>el.open=true);
   await page.locator('#biLoadServer').click();
   await expect(page.locator('#biPreviewServer')).toBeEnabled();
@@ -691,7 +696,7 @@ test('Event Manager uploads preserve exact original XML declaration, comments, i
   await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='testing-read-access');
   await page.locator('#nitradoWriteKey').evaluate(el=>el.value='testing-write-access');
-  await page.locator('#biToggle').click();
+  await openAdvancedEventManager(page);
   await page.locator('#biAdvanced').evaluate(el=>el.open=true);
   await page.locator('#biLoadServer').click();
   await expect(page.locator('#biServerPreview')).toContainText('Server XML reloaded');
@@ -760,7 +765,7 @@ test('Event Manager blocks non UTF-8 XML instead of silently rewriting encoding'
   });
   await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-key');
-  await page.locator('#biToggle').click();
+  await openAdvancedEventManager(page);
   await page.locator('#biAdvanced').evaluate(el=>el.open=true);
   await page.locator('#biLoadServer').click();
   await expect(page.locator('#biServerPreview')).toContainText('Nitrado reload failed');
@@ -799,7 +804,7 @@ test('Event Manager shows the simplified vehicle flow and auto-syncs live XML on
   await page.reload({waitUntil:'domcontentloaded'});
   await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-access');
-  await page.locator('#biToggle').click();
+  await openAdvancedEventManager(page);
   await expect(page.locator('#biPanel')).toBeVisible();
   await expect(page.locator('#biDraftCount')).toHaveText('1 saved');
   await expect(page.locator('#biSave')).toHaveText('Save spawn');
@@ -906,7 +911,7 @@ test('Event Manager explicitly approves removing a pre-existing duplicate XML he
   await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-access');
   await page.locator('#nitradoWriteKey').evaluate(el=>el.value='random-write-key');
-  await page.locator('#biToggle').click();
+  await openAdvancedEventManager(page);
   await page.locator('#biPreviewServer').click();
   await expect(page.locator('#biServerPreview')).toContainText('XML REPAIR NEEDED');
   await expect(page.locator('#biServerPreview')).toContainText('events.xml: 1 extra declaration');
@@ -1121,7 +1126,7 @@ test('Professional UI uses consistent line icons without changing controls or la
     await expect(button.locator(':scope > svg.bi-icon')).toHaveAttribute('data-icon',icon);
     await expect(button.locator(':scope > svg.bi-icon')).toHaveAttribute('aria-hidden','true');
   }
-  await expect(page.locator('#biToggle')).toHaveText('Event Manager');
+  await expect(page.locator('#biToggle')).toHaveText('Quick Spawn');
   await expect(page.locator('#logToggle')).toHaveText('Logs');
   await expect(page.locator('#filterToggle')).toHaveText('Filters');
   const viewport=page.viewportSize();
@@ -1167,7 +1172,7 @@ test('Professional panel styling remains legible and functional in both themes',
 });
 
 test('File Manager and event drafting keep working with decorated controls',async({page})=>{
-  await page.locator('#biToggle').click();
+  await openAdvancedEventManager(page);
   await expect(page.locator('#biPanel')).toBeVisible();
   await expect(page.locator('#biSave')).toHaveText('Save spawn');
   await expect(page.locator('#biPick > svg.bi-icon')).toHaveCount(1);
@@ -1267,15 +1272,17 @@ test('Light mode has high-contrast readable text throughout filters, logs, event
   await page.locator('#logServerFiles summary').click();
   await inspect(['#logPanel #fileManager','#logPanel #fileManager .fm-label','#logPanel #fileManager .fm-note','#logPanel #fileManager .fm-path'],'#logPanel');
   await page.locator('#logToggle').click();
-  await page.locator('#biToggle').click();
+  await openAdvancedEventManager(page);
   await inspect(['#biPanel','#biPanel .biHeader .biSmall','#biPanel label[for="biName"]','#biPanel .biDraftCount'],'#biPanel');
   await page.locator('#biToggle').click();
+  await expect(page.locator('#biPanel')).toBeHidden();
+  await page.locator('#qsClose').click();
   await page.locator('#builditThemeToggle').click();
   await expect(page.locator('html')).toHaveAttribute('data-buildit-theme','dark');
 });
 
 test('1.30 vehicle search has beige Humvee and all bike/boat variants',async({page})=>{
-  await page.locator('#biToggle').click();
+  await openAdvancedEventManager(page);
   await page.locator('#biVehicleSearch').fill('humvee');
   await expect(page.locator('#biVehicleMatches')).toContainText('Offroad_02_Beige');
   await page.locator('#biVehicleSearch').fill('Motorbike_02');
@@ -1285,7 +1292,7 @@ test('1.30 vehicle search has beige Humvee and all bike/boat variants',async({pa
 });
 
 test('non-persistent JSON loot export preserves cfgGameplay references and other settings',async({page})=>{
-  await page.locator('#biToggle').click();
+  await openAdvancedEventManager(page);
   await page.locator('#biKind').selectOption('loot');
   await expect(page.locator('#biLootY')).toBeVisible();
   await expect(page.locator('#biExportLootJson')).toBeVisible();
@@ -1341,7 +1348,7 @@ test('first-time loot JSON creation uses create route without overwriting existi
   await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-access');
   await page.locator('#nitradoWriteKey').evaluate(el=>el.value='test-write-access');
-  await page.locator('#biToggle').click();
+  await openAdvancedEventManager(page);
   await page.locator('#biPrepareLoot').click();
   await expect(page.locator('#biLootReview')).toContainText('READY');
   await expect(page.locator('#biLootReview')).toContainText('New loot JSON');
