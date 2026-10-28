@@ -40,6 +40,47 @@
     '#biStatus{white-space:pre-wrap;line-height:1.4;color:#a8d6e4;min-height:16px;margin:9px 0}',
     '.biPoint{font-family:monospace;color:#d8eafb;font-size:12px}',
     '.biDivider{height:1px;background:#40515c;margin:14px 0}',
+    '.biHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding-bottom:10px;border-bottom:1px solid #40515c;margin-bottom:12px}',
+    '.biHeader h3{font-size:18px!important;letter-spacing:.1px;margin:0!important}',
+    '.biHeader .biSmall{margin:4px 0 0}',
+    '#biClose{flex:0 0 auto!important;width:30px;height:30px;display:grid;place-items:center;font-size:21px;padding:0!important;border-radius:7px}',
+    '.biSection{padding:12px;margin:0 0 11px;background:rgba(255,255,255,.025);border:1px solid #405460;border-radius:10px}',
+    '.biSectionTitle{display:flex;align-items:center;gap:9px;margin:0 0 9px}',
+    '.biSectionTitle h4{flex:1;margin:0!important;font-size:13px!important;letter-spacing:.15px}',
+    '.biStep{display:grid;place-items:center;flex:0 0 auto;width:23px;height:23px;border-radius:6px;background:#2a5363;color:#d6f1fd;font:700 10px Arial,sans-serif}',
+    '.biDraftCount{flex:0 0 auto;font-size:10px!important;margin:0!important;color:#b8cbd5}',
+    '.biPickRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
+    '.biPickRow #biPick{flex:0 0 auto}',
+    '.biPoint{display:inline-flex;align-items:center;min-height:33px;min-width:0;overflow-wrap:anywhere;color:#b8d8e8}',
+    '.biActions{margin-top:12px;align-items:stretch}',
+    '#biPanel .biPrimary{background:#267b9c!important;border-color:#398eae!important;color:#fff!important;font-weight:700}',
+    '#biPanel .biPrimary:hover:not(:disabled){background:#3290b3!important}',
+    '#biPanel .biPrimary:disabled{opacity:.48!important}',
+    '#biPanel .biQuiet{background:transparent!important;color:#c0d0db!important;border-color:#516674!important}',
+    '.biActions #biSave{flex:1 1 auto!important}',
+    '.biActions #biNew{flex:0 0 auto!important}',
+    '#biPanel .biFull{display:block;width:100%;box-sizing:border-box;margin:8px 0 0;padding:10px 12px}',
+    '.biMessage{white-space:pre-wrap;word-break:break-word;line-height:1.55;font-size:11px;max-height:210px;overflow:auto;border:1px solid #445e68;background:#12232d;border-radius:8px;padding:10px;margin:10px 0}',
+    '.biConfirm{display:flex!important;align-items:flex-start;gap:9px;font-weight:400!important;line-height:1.5;background:rgba(255,255,255,.04);border-radius:7px;padding:10px 8px}',
+    '.biConfirm input{margin:2px 0 0;flex:0 0 auto}',
+    '.biAdvanced{border:1px solid #405460;border-radius:9px;padding:9px 11px;margin:12px 0;color:#b8cbd5}',
+    '.biAdvanced summary{cursor:pointer;user-select:none;font-size:11px;font-weight:700;padding:3px 0}',
+    '.biAdvanced[open] summary{margin-bottom:10px}',
+    '#biDrafts:empty::before{content:"No saved events yet.";color:#9fb1bc;font-size:11px}',
+    '#biPanel .biDraft{padding:9px 10px;margin:7px 0}',
+    '.biDraft .biDraftTitle{display:block;font-size:12px;font-weight:700;color:#eff7fc;overflow-wrap:anywhere}',
+    '.biDraft .biDraftDetails{margin-top:4px;font-size:11px;color:#b8cbd5;line-height:1.4;overflow-wrap:anywhere}',
+    '.biDraft .biRow{justify-content:flex-end;margin-top:7px}',
+    '.biDraft .biRow button{padding:4px 8px!important}',
+    'html[data-buildit-theme="light"] #biPanel .biSection,html[data-buildit-theme="light"] #biPanel .biAdvanced{background:#f5f9fc;border-color:#c6d7e2}',
+    'html[data-buildit-theme="light"] #biPanel .biMessage{background:#e6f1f7;color:#28435a;border-color:#c7dae7}',
+    'html[data-buildit-theme="light"] #biPanel .biConfirm{background:#ecf4f9;color:#2d4a5e}',
+    'html[data-buildit-theme="light"] #biPanel .biStep{background:#d9eaf4;color:#235671}',
+    'html[data-buildit-theme="light"] #biPanel .biDraftTitle{color:#20384c}',
+    'html[data-buildit-theme="light"] #biPanel .biDraftDetails{color:#49687b}',
+    'html[data-buildit-theme="light"] #biPanel .biPrimary{background:#176d90!important;color:#fff!important;border-color:#176d90!important}',
+    'html[data-buildit-theme="light"] #biPanel .biQuiet{background:#f5f9fc!important;color:#426178!important;border-color:#b5cbd8!important}',
+    'html[data-buildit-theme="light"] #biPanel .biDraftCount{color:#537082}',
     '@media(max-height:500px){#biPanel{top:65px;max-height:calc(100vh - 70px)}}'
   ].join('');
   document.head.appendChild(style);
@@ -50,38 +91,39 @@
   const panel = document.createElement('div');
   panel.id = 'biPanel'; panel.hidden = true;
   panel.innerHTML = [
-    '<div class="biRow"><h3 style="flex:1">Event Manager</h3><button type="button" id="biClose">✕</button></div>',
-    '<div class="biSmall">Select a location on the map, then configure a vehicle or loot drop. Drafts stay in this browser.</div>',
-    '<div class="biRow"><button type="button" id="biPick">📍 Pick on map</button><span id="biPoint" class="biPoint">No location selected</span></div>',
-    '<label for="biName">Unique event name</label><input id="biName" value="BuildIt_Event1" maxlength="90">',
-    '<div class="biRow"><div><label for="biKind">Type</label><select id="biKind"><option value="vehicle">Vehicle / motorcycle</option><option value="loot">Loot drop in container</option></select></div>',
+    '<div class="biHeader"><div><h3>Event Manager</h3><div class="biSmall">Place, review and publish DayZ events.</div></div><button type="button" id="biClose" title="Close" aria-label="Close Event Manager">×</button></div>',
+    '<section class="biSection"><div class="biSectionTitle"><span class="biStep">01</span><h4>Configure spawn</h4></div>',
+    '<div class="biPickRow"><button type="button" id="biPick">Pick location on map</button><span id="biPoint" class="biPoint">No location selected</span></div>',
+    '<label for="biName">Event name</label><input id="biName" value="BuildIt_Event1" maxlength="90" spellcheck="false">',
+    '<div class="biRow"><div><label for="biKind">Event type</label><select id="biKind"><option value="vehicle">Vehicle / motorcycle</option><option value="loot">Loot drop (manual XML)</option></select></div>',
     '<div><label for="biAngle">Rotation (°)</label><input id="biAngle" type="number" min="0" max="359.99" step="0.01" value="0"></div></div>',
-    '<div id="biVehicleSection"><label for="biVehicleSearch">Search vehicles (name or classname)</label><input id="biVehicleSearch" type="search" autocomplete="off" placeholder="Motorbike, Sedan, Truck ..."><div id="biVehicleMatches" class="biMatches"></div>',
-    '<p class="biSmall">Parts and their spawn probabilities are controlled by your existing cfgspawnabletypes.xml.</p></div>',
+    '<div id="biVehicleSection"><label for="biVehicleSearch">Vehicle classname</label><input id="biVehicleSearch" type="search" autocomplete="off" placeholder="Search car, truck or motorcycle…"><div id="biVehicleMatches" class="biMatches"></div>',
+    '<p class="biSmall">Vehicle parts use your existing cfgspawnabletypes.xml rules.</p></div>',
     '<div id="biLootSection" hidden><label for="biContainer">Container</label><select id="biContainer"><option>SeaChest</option><option>WoodenCrate</option><option>SmallProtectorCase</option><option>Barrel_Green</option><option>Barrel_Blue</option></select>',
-    '<label for="biItemSearch">Search items (all classnames from types.xml)</label><input id="biItemSearch" type="search" autocomplete="off" placeholder="M4, Bandage, Nail ..."><div id="biItemMatches" class="biMatches"></div>',
+    '<label for="biItemSearch">Item classname</label><input id="biItemSearch" type="search" autocomplete="off" placeholder="Search items…"><div id="biItemMatches" class="biMatches"></div>',
     '<div id="biItems"></div>',
-    '<div class="biWarn">WARNING: cfgspawnabletypes.xml applies cargo rules to an entire container classname, NOT to individual locations. Any container of the same classname may receive this cargo. Use only a container type reserved for this purpose.</div>',
-    '<label style="font-weight:400"><input type="checkbox" id="biAcknowledge"> I understand this cargo configuration applies to every container of this classname.</label></div>',
-    '<div class="biRow" style="margin-top:12px"><button type="button" id="biSave">Save draft</button><button type="button" id="biNew">New</button></div>',
-    '<div class="biDivider"></div><h4>Saved events</h4><div id="biDrafts"></div>',
-    '<div class="biDivider"></div><h4>Catalog &amp; Nitrado files</h4>',
-    '<div id="biCatalog" class="biSmall">Loading official classnames ...</div>',
-    '<label for="biFiles">Import existing XML files (recommended)</label>',
-    '<input id="biFiles" type="file" accept=".xml" multiple>',
-    '<div class="biSmall">Select db/events.xml, cfgeventspawns.xml, cfgspawnabletypes.xml and optionally db/types.xml. Existing entries are kept during export. Files remain in your browser.</div>',
-    '<div id="biImportStatus" class="biSmall">No server files imported yet.</div>',
-    '<div class="biDivider"></div><h4>Deploy vehicle events to Nitrado</h4>',
-    '<div class="biSmall">Uses your live events.xml and cfgeventspawns.xml. No manual files needed. Before uploading, stop DayZ in Nitrado and review the planned changes. Vehicles use your existing cfgspawnabletypes.xml attachment rules.</div>',
-    '<button type="button" id="biLoadServer" style="width:100%">1. Load live Nitrado XML files</button>',
-    '<button type="button" id="biPreviewServer" style="width:100%;margin-top:6px" disabled>2. Preview vehicle changes</button>',
-    '<div id="biServerPreview" class="biSmall" role="status" aria-live="polite">Not connected to live XML files yet.</div>',
-    '<label style="font-weight:400"><input type="checkbox" id="biServerStopped"> I stopped the DayZ server and reviewed these changes.</label>',
-    '<button type="button" id="biUploadServer" style="width:100%;margin-top:6px" disabled>3. Backup &amp; upload to Nitrado</button>',
-    '<div class="biRow" style="margin-top:10px"><button type="button" id="biExportEvents">events.xml</button><button type="button" id="biExportPositions">cfgeventspawns.xml</button></div>',
-    '<button type="button" id="biExportCargo" style="width:100%;margin-top:7px">cfgspawnabletypes.xml (loot)</button>',
-    '<div class="biWarn" style="margin-top:8px">Without imported source files, exports contain additions ONLY, not complete Nitrado configuration files. Never upload these additions as replacements. Back up and validate changes before uploading; a server restart is generally required.</div>',
-    '<div id="biStatus" role="status" aria-live="polite"></div>'
+    '<div class="biWarn">Loot cargo applies to every container of the same classname, not just this map location. Manual XML review is required.</div>',
+    '<label style="font-weight:400"><input type="checkbox" id="biAcknowledge"> I understand the global cargo change.</label></div>',
+    '<div class="biRow biActions"><button type="button" id="biSave" class="biPrimary">Save spawn</button><button type="button" id="biNew" class="biQuiet">Clear</button></div>',
+    '<div id="biStatus" role="status" aria-live="polite"></div></section>',
+    '<section class="biSection"><div class="biSectionTitle"><span class="biStep">02</span><h4>Queued events</h4><span id="biDraftCount" class="biSmall biDraftCount">0 saved</span></div>',
+    '<div id="biDrafts"></div></section>',
+    '<section class="biSection biPublish"><div class="biSectionTitle"><span class="biStep">03</span><h4>Publish to Nitrado</h4></div>',
+    '<p class="biSmall">Review automatically loads fresh events.xml and cfgeventspawns.xml. Original lines and comments remain untouched.</p>',
+    '<button type="button" id="biPreviewServer" class="biPrimary biFull">Review &amp; prepare changes</button>',
+    '<div id="biServerPreview" class="biMessage" role="status" aria-live="polite">Save a vehicle event, then review the changes.</div>',
+    '<label class="biConfirm"><input type="checkbox" id="biServerStopped"> My DayZ server is stopped and I have reviewed the changes.</label>',
+    '<button type="button" id="biUploadServer" class="biPrimary biFull" disabled>Back up &amp; upload</button>',
+    '<p class="biSmall">An upload requires your file-write key. Existing files are checked and backed up before replacement.</p></section>',
+    '<details class="biAdvanced" id="biAdvanced"><summary>Advanced · Manual XML tools</summary>',
+    '<button type="button" id="biLoadServer" class="biFull">Reload live server XML</button>',
+    '<div class="biSmall" id="biCatalog">Loading official classnames…</div>',
+    '<label for="biFiles">Import XML from your computer</label><input id="biFiles" type="file" accept=".xml" multiple>',
+    '<div id="biImportStatus" class="biSmall">Optional: import existing XML for offline export.</div>',
+    '<div class="biRow"><button type="button" id="biExportEvents">events.xml</button><button type="button" id="biExportPositions">cfgeventspawns.xml</button></div>',
+    '<button type="button" id="biExportCargo" class="biFull">cfgspawnabletypes.xml (loot)</button>',
+    '<div class="biWarn">Offline exports without original XML contain additions only. Never upload them as full replacements.</div>',
+    '</details>'
   ].join('');
   document.body.appendChild(panel);
   const message = (s, error) => { $('biStatus').textContent = s; $('biStatus').style.color = error ? '#ffb2a2' : '#a8d6e4'; };
@@ -138,9 +180,13 @@
     const input = $(kind === 'vehicle' ? 'biVehicleSearch' : 'biItemSearch');
     const target = $(kind === 'vehicle' ? 'biVehicleMatches' : 'biItemMatches');
     const term = input.value.toLowerCase().trim();
-    const set = kind === 'vehicle' ? vehicleNames : itemNames;
-    const matches = [...set].filter(n => !term || n.toLowerCase().includes(term)).sort((a,b) => a.localeCompare(b)).slice(0,25);
     target.replaceChildren();
+    // Empty suggestion lists used to occupy a large part of the phone panel.
+    // Keep searches compact until someone actually starts typing.
+    if(term.length<2){target.hidden=true;return;}
+    target.hidden=false;
+    const set = kind === 'vehicle' ? vehicleNames : itemNames;
+    const matches = [...set].filter(n => n.toLowerCase().includes(term)).sort((a,b) => a.localeCompare(b)).slice(0,25);
     if (!matches.length) { target.textContent = 'No matching classnames found.'; return; }
     matches.forEach(name => {
       const btn = document.createElement('button');
@@ -154,7 +200,7 @@
           else itemList.push({name,qty:1});
           input.value = ''; renderItems(); message(name + ' added.');
         }
-        target.replaceChildren();
+        target.replaceChildren();target.hidden=true;
       });
       target.appendChild(btn);
     });
@@ -199,7 +245,7 @@
     $('biName').value = 'BuildIt_Event' + (drafts.length + 1);
     $('biKind').value = 'vehicle'; $('biKind').dispatchEvent(new Event('change'));
     $('biAngle').value = '0'; $('biVehicleSearch').value = '';
-    $('biSave').textContent = 'Save draft';
+    $('biSave').textContent = 'Save spawn';
   }
   $('biNew').addEventListener('click', () => { resetForm(); message('New event. Pick a location on the map.'); });
   $('biSave').addEventListener('click', () => {
@@ -221,24 +267,37 @@
       entry.items = itemList.map(i => ({name:i.name,qty:Number(i.qty)}));
     }
     if (editingIndex < 0) drafts.push(entry); else drafts[editingIndex] = entry;
-    persist(); resetForm(); message('Draft saved. Nothing has been changed on Nitrado.');
+    clearStaged(); persist(); resetForm(); message('Spawn queued. Review changes to prepare the upload.');
   });
   function renderDrafts() {
     layer.clearLayers();
     const list = $('biDrafts'); list.replaceChildren();
-    if (!drafts.length) list.textContent = 'No saved events yet.';
+    $('biDraftCount').textContent=drafts.length+' saved';
+    if (!drafts.length){
+      const empty=document.createElement('div');empty.className='biSmall';
+      empty.textContent='No queued events. Save a spawn to add one.';
+      list.appendChild(empty);
+    }
     drafts.forEach((d,index) => {
-      const m = L.marker(gameToLeaflet(d.x,d.z), {title:d.name}).addTo(layer);
-      m.bindTooltip(d.name + ' (' + d.kind + ')');
-      m.on('click', () => { setForm(d,index); message('Event loaded: ' + d.name); });
-      const div = document.createElement('div'); div.className = 'biDraft';
-      const text = document.createElement('div'); text.textContent = d.name + ' · ' + (d.kind === 'vehicle' ? d.vehicle : d.container) + ' · X ' + d.x + ', Z ' + d.z;
-      text.style.marginBottom = '6px'; div.appendChild(text);
-      const row = document.createElement('div'); row.className = 'biRow';
-      const edit = document.createElement('button'); edit.textContent = 'Edit'; edit.addEventListener('click', () => setForm(d,index));
-      const remove = document.createElement('button'); remove.textContent = 'Delete';
-      remove.addEventListener('click', () => { if (!confirm('Event ' + d.name + ' from your saved drafts?')) return; drafts.splice(index,1); persist(); resetForm(); });
-      row.append(edit,remove); div.appendChild(row); list.appendChild(div);
+      const marker=L.marker(gameToLeaflet(d.x,d.z), {title:d.name}).addTo(layer);
+      marker.bindTooltip(d.name+' ('+d.kind+')');
+      marker.on('click', () => {setForm(d,index); message('Editing '+d.name);});
+      const card=document.createElement('div');card.className='biDraft';
+      const title=document.createElement('div');title.className='biDraftTitle';title.textContent=d.name;
+      const details=document.createElement('div');details.className='biDraftDetails';
+      details.textContent=(d.kind==='vehicle'?d.vehicle:d.container)+
+        '  ·  X '+d.x+' / Z '+d.z+'  ·  '+d.a+'°';
+      const row=document.createElement('div');row.className='biRow';
+      const edit=document.createElement('button');edit.type='button';edit.textContent='Edit';
+      edit.title='Edit queued event '+d.name;
+      edit.addEventListener('click',()=>setForm(d,index));
+      const remove=document.createElement('button');remove.type='button';remove.textContent='Remove';
+      remove.title='Remove queued event '+d.name;
+      remove.addEventListener('click',()=>{
+        if(!confirm('Remove '+d.name+' from your saved drafts?'))return;
+        drafts.splice(index,1);clearStaged();persist();resetForm();
+      });
+      row.append(edit,remove);card.append(title,details,row);list.appendChild(card);
     });
   }
   function refresh() { renderDrafts(); catalogStatus(); }
@@ -349,7 +408,7 @@
       eventIndent.includes('\t')?'\t':eventIndent.length>=2?' '.repeat(Math.min(4,eventIndent.length)):'    ';
     const insertionAt=closeStart-closeIndent.length;
     const prefix=original.slice(0,insertionAt);
-    const blocks=newNodes.map(el=>formatNewXmlNode(el,eventIndent,unit,newline)).join(newline);
+    const blocks=newNodes.map(el=>formatNewXmlNode(el,eventIndent,unit,newline)).join(newline+newline);
     const insertion=(/[\r\n]$/.test(prefix)?'':newline)+blocks+newline;
     const merged=prefix+insertion+original.slice(insertionAt);
     const resultDoc=parseXML(merged,root);
@@ -393,7 +452,18 @@
         doc.documentElement.appendChild(kind==='events'?createEvent(doc,d):createPos(doc,d));
       });
     }
-    const xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + new XMLSerializer().serializeToString(doc);
+    // For offline add-only exports, indent every new element instead of
+    // serializing the entire document onto a single unreadable line.
+    // Existing cargo imports retain the legacy manual-only exporter.
+    const xml = !original
+      ? '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
+        formatNewXmlNode(doc.documentElement,'','    ','\n')+'\n'
+      : (()=>{
+          const encoded=new XMLSerializer().serializeToString(doc);
+          const declaration=original.match(/^\uFEFF?\s*<\?xml\b[\s\S]*?\?>/i);
+          const withoutLeading=encoded.replace(/^\uFEFF?\s*<\?xml\b[\s\S]*?\?>\s*/i,'');
+          return (declaration?.[0]||'<?xml version="1.0" encoding="UTF-8"?>')+'\n'+withoutLeading;
+        })();
     return {filename: original ? filename : 'BuildIt_ADD_ONLY_' + filename,xml,complete:!!original};
   }
   // Nitrado deployment: vehicle events only. Client previews are never treated as
@@ -453,13 +523,13 @@
     deployUpload.disabled=true;
     $('biServerStopped').checked=false;
   }
-  deployLoad.addEventListener('click',async()=>{
-    if(eventDeploy.loading||eventDeploy.sending)return;
-    eventDeploy.loading=true;deployLoad.disabled=true;
-    clearStaged();deployPreview.disabled=true;
-    setDeploy('Finding mission and downloading complete live XML files…');
+  async function loadLiveXml(){
+    if(eventDeploy.loading||eventDeploy.sending)throw new Error('A Nitrado operation is already running.');
+    eventDeploy.loading=true;
+    deployLoad.disabled=true;
+    setDeploy('Reading current XML from Nitrado…');
     try{
-      if(typeof nitradoRequest!=='function')throw new Error('Nitrado connection is unavailable. Set up Logs → Automatic Nitrado Sync first.');
+      if(typeof nitradoRequest!=='function')throw new Error('Connect Nitrado in Logs before publishing.');
       const mission=await discoverServerMission();
       const paths={
         'events.xml':mission+'/db/events.xml',
@@ -476,37 +546,51 @@
       eventDeploy.signatures={'events.xml':events.sha256,'cfgeventspawns.xml':positions.sha256};
       addCatalog(parseXML(events.content,'events'),'events');
       catalogStatus();updateChoices('vehicle');
-      $('biImportStatus').textContent='Loaded complete events.xml and cfgeventspawns.xml from Nitrado.';
-      deployPreview.disabled=false;
-      setDeploy('Live XML loaded from '+mission+'. Save a vehicle draft, then click Preview vehicle changes.');
-    }catch(e){setDeploy('Could not load live Nitrado XML: '+e.message,true);}
-    finally{eventDeploy.loading=false;deployLoad.disabled=false;}
+      $('biImportStatus').textContent='Latest events.xml and cfgeventspawns.xml loaded from Nitrado.';
+    }finally{
+      eventDeploy.loading=false;
+      deployLoad.disabled=false;
+    }
+  }
+  deployLoad.addEventListener('click',async()=>{
+    if(eventDeploy.sending||eventDeploy.loading)return;
+    clearStaged();deployPreview.disabled=true;
+    try{
+      await loadLiveXml();
+      setDeploy('Server XML reloaded. Review changes to prepare an upload.');
+    }catch(e){setDeploy('Nitrado reload failed: '+e.message,true);}
+    finally{deployPreview.disabled=false;}
   });
-  deployPreview.addEventListener('click',()=>{
+  deployPreview.addEventListener('click',async()=>{
+    if(eventDeploy.sending||eventDeploy.loading)return;
     clearStaged();
+    deployPreview.disabled=true;
     try{
       const selected=vehicleDrafts();
-      if(!eventDeploy.mission)throw new Error('Load live Nitrado XML files first.');
-      // The existing composer verifies duplicates and preserves the rest of the XML.
-      const events=buildOutput('events'), positions=buildOutput('positions');
+      // Always refresh originals: an offline import or previous preview
+      // must never be used as the source of a live server replacement.
+      await loadLiveXml();
+      const events=buildOutput('events'),positions=buildOutput('positions');
       if(!events.complete||!positions.complete)
-        throw new Error('Incomplete Nitrado XML; refusing an additions-only replacement.');
+        throw new Error('Incomplete Nitrado XML. Upload refused.');
       if(new TextEncoder().encode(events.xml).byteLength>512*1024||
          new TextEncoder().encode(positions.xml).byteLength>512*1024)
-        throw new Error('Generated XML exceeds the 512 KB write limit. No upload attempted.');
+        throw new Error('Generated XML exceeds the 512 KB upload limit.');
       eventDeploy.staged={
         xml:{'events.xml':events.xml,'cfgeventspawns.xml':positions.xml},
         snapshot:deploymentSnapshot()
       };
-      const previewNames=selected.map(d=>d.name+' → '+d.vehicle+
-        ' (X '+d.x+', Z '+d.z+', rotation '+d.a+'°)').join('\n');
-      setDeploy('READY FOR REVIEW — no server files changed.\n'+
-        'Add '+selected.length+' vehicle event(s):\n'+previewNames+
-        '\n\nWill back up and replace these live files:\n'+
-        eventDeploy.paths['events.xml']+'\n'+eventDeploy.paths['cfgeventspawns.xml']+
-        '\n\nIMPORTANT: both writes must succeed. If the second fails, the first may already be updated; use the displayed backup path to restore it.');
+      const previewNames=selected.map(d=>d.name+' · '+d.vehicle+
+        ' · X '+d.x+', Z '+d.z+', '+d.a+'°').join('\n');
+      setDeploy('READY — '+selected.length+' vehicle event(s) will be added:\n\n'+previewNames+
+        '\n\nFiles: db/events.xml and cfgeventspawns.xml.'+
+        '\nOriginal XML structure, whitespace and comments will be retained.'+
+        '\nBoth files receive verified backups before replacement. If the second upload fails, restore the first from its backup.');
       deployUpload.disabled=false;
-    }catch(e){setDeploy('Preview failed: '+e.message,true);}
+    }catch(e){
+      eventDeploy.mission='';
+      setDeploy('Review failed: '+e.message,true);
+    }finally{deployPreview.disabled=false;}
   });
   deployUpload.addEventListener('click',async()=>{
     if(eventDeploy.sending)return;
@@ -542,7 +626,12 @@
         if(!result?.verified||!result?.backupPath)throw new Error(name+' was not verified by the Worker.');
         results.push({name,backup:result.backupPath});
       }
-      setDeploy('UPLOAD VERIFIED — '+drafts.length+' vehicle event(s), both files updated.\n'+
+      const deployed=drafts.length;
+      // These were queued changes, not permanent user records. Only clear them
+      // after both files have been verified on the server. This avoids trying
+      // to publish identical event names on the next upload.
+      drafts=[];persist();resetForm();
+      setDeploy('UPLOAD VERIFIED — '+deployed+' vehicle event(s) published. Queue cleared.\n'+
         results.map(r=>r.name+' backup: '+r.backup).join('\n')+
         '\nStart the DayZ server to load the new economy event configuration.');
       clearStaged();

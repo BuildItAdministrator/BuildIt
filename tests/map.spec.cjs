@@ -575,8 +575,9 @@ test('Event Manager loads live vehicle XML and previews coordinated changes with
   await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='fake_key');
   await page.locator('#biToggle').click();
+  await page.locator('#biAdvanced').evaluate(el=>el.open=true);
   await page.locator('#biLoadServer').click();
-  await expect(page.locator('#biServerPreview')).toContainText('Live XML loaded');
+  await expect(page.locator('#biServerPreview')).toContainText('Server XML reloaded');
   await page.locator('#biName').fill('VehicleBuildItTest');
   await page.locator('#biVehicleSearch').fill('OffroadHatchback');
   await page.locator('#biPick').click();
@@ -584,7 +585,7 @@ test('Event Manager loads live vehicle XML and previews coordinated changes with
   await page.locator('#biSave').click();
   await expect(page.locator('#biDrafts')).toContainText('VehicleBuildItTest');
   await page.locator('#biPreviewServer').click();
-  await expect(page.locator('#biServerPreview')).toContainText('READY FOR REVIEW');
+  await expect(page.locator('#biServerPreview')).toContainText('READY');
   await expect(page.locator('#biServerPreview')).toContainText('VehicleBuildItTest');
   await expect(page.locator('#biServerPreview')).toContainText('db/events.xml');
   await expect(page.locator('#biServerPreview')).toContainText('cfgeventspawns.xml');
@@ -622,6 +623,7 @@ test('Event Manager Nitrado deploy stops with clear error if upload permission i
   await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='fake_key');
   await page.locator('#biToggle').click();
+  await page.locator('#biAdvanced').evaluate(el=>el.open=true);
   await page.locator('#biLoadServer').click();
   await expect(page.locator('#biPreviewServer')).toBeEnabled();
   await page.locator('#biName').fill('VehiclePermissionTest');
@@ -687,19 +689,22 @@ test('Event Manager uploads preserve exact original XML declaration, comments, i
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='testing-read-access');
   await page.locator('#nitradoWriteKey').evaluate(el=>el.value='testing-write-access');
   await page.locator('#biToggle').click();
+  await page.locator('#biAdvanced').evaluate(el=>el.open=true);
   await page.locator('#biLoadServer').click();
-  await expect(page.locator('#biServerPreview')).toContainText('Live XML loaded');
+  await expect(page.locator('#biServerPreview')).toContainText('Server XML reloaded');
   await page.locator('#biName').fill('VehicleFormattingTest');
   await page.locator('#biVehicleSearch').fill('OffroadHatchback');
   await page.locator('#biPick').click();
   await page.evaluate(()=>map.fire('click',{latlng:L.latLng(7000/SCALE-256,5000/SCALE)}));
   await page.locator('#biSave').click();
   await page.locator('#biPreviewServer').click();
-  await expect(page.locator('#biServerPreview')).toContainText('READY FOR REVIEW');
+  await expect(page.locator('#biServerPreview')).toContainText('READY');
   await page.locator('#biServerStopped').check();
   page.on('dialog',d=>d.accept());
   await page.locator('#biUploadServer').click();
   await expect(page.locator('#biServerPreview')).toContainText('UPLOAD VERIFIED');
+  await expect(page.locator('#biDraftCount')).toHaveText('0 saved');
+  await expect(page.locator('#biUploadServer')).toBeDisabled();
   expect(Object.keys(uploaded).sort()).toEqual(Object.keys(originals).sort());
   for(const [path,source] of Object.entries(originals)){
     const result=uploaded[path];
@@ -753,8 +758,9 @@ test('Event Manager blocks non UTF-8 XML instead of silently rewriting encoding'
   await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
   await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-key');
   await page.locator('#biToggle').click();
+  await page.locator('#biAdvanced').evaluate(el=>el.open=true);
   await page.locator('#biLoadServer').click();
-  await expect(page.locator('#biServerPreview')).toContainText('Live XML loaded');
+  await expect(page.locator('#biServerPreview')).toContainText('Server XML reloaded');
   await page.locator('#biName').fill('VehicleWrongEncoding');
   await page.locator('#biVehicleSearch').fill('OffroadHatchback');
   await page.locator('#biPick').click();
@@ -763,4 +769,55 @@ test('Event Manager blocks non UTF-8 XML instead of silently rewriting encoding'
   await page.locator('#biPreviewServer').click();
   await expect(page.locator('#biServerPreview')).toContainText('ISO-8859-1 encoding');
   await expect(page.locator('#biUploadServer')).toBeDisabled();
+});
+
+
+
+test('Event Manager shows the simplified vehicle flow and auto-syncs live XML on Review',async({page})=>{
+  const noftp='/games/ni5774718_3/noftp';
+  const mission='/games/ni5774718_3/ftproot/dayzps_missions/dayzOffline.chernarusplus';
+  const ep=mission+'/db/events.xml',pp=mission+'/cfgeventspawns.xml';
+  const calls=[];
+  await page.addInitScript(()=>{
+    localStorage.setItem('buildit_events_drafts_v1',JSON.stringify([{
+      name:'VehicleQuickFlow',kind:'vehicle',x:3567,z:9367,a:45,vehicle:'OffroadHatchback'
+    }]));
+  });
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const url=new URL(route.request().url());
+    calls.push({path:url.pathname,method:route.request().method()});
+    let status=200,body;
+    if(url.pathname==='/api/files/list'){
+      const dir=url.searchParams.get('dir');
+      if(!dir)body={root:noftp,dir:noftp,entries:[]};
+      else if(dir===mission)body={root:noftp,dir,entries:[{name:'db',type:'directory',path:mission+'/db'}]};
+      else{status=404;body={error:'Not found'}}
+    }else if(url.pathname==='/api/files/read'){
+      const p=url.searchParams.get('file');
+      if(p===ep)body={path:p,content:'<events><event name="VehicleVanilla"><children><child type="OffroadHatchback"/></children></event></events>',sha256:'a'.repeat(64)};
+      else if(p===pp)body={path:p,content:'<eventposdef><event name="VehicleVanilla"><pos x="9" z="9" a="1"/></event></eventposdef>',sha256:'b'.repeat(64)};
+      else{status=404;body={error:'Missing'}}
+    }else{status=404;body={error:'Unavailable'}}
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
+  });
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-access');
+  await page.locator('#biToggle').click();
+  await expect(page.locator('#biPanel')).toBeVisible();
+  await expect(page.locator('#biDraftCount')).toHaveText('1 saved');
+  await expect(page.locator('#biSave')).toHaveText('Save spawn');
+  await expect(page.locator('#biPreviewServer')).toBeEnabled();
+  await expect(page.locator('#biUploadServer')).toBeDisabled();
+  await expect(page.locator('#biAdvanced')).not.toHaveAttribute('open','');
+  await expect(page.locator('#biLoadServer')).toBeHidden();
+  await expect(page.locator('#biExportEvents')).toBeHidden();
+  await page.locator('#biPreviewServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('READY');
+  await expect(page.locator('#biServerPreview')).toContainText('VehicleQuickFlow');
+  await expect(page.locator('#biUploadServer')).toBeEnabled();
+  expect(calls.filter(c=>c.path==='/api/files/read')).toHaveLength(2);
+  expect(calls.every(c=>c.method==='GET')).toBe(true);
+  await page.locator('#biAdvanced').evaluate(el=>el.open=true);
+  await expect(page.locator('#biExportEvents')).toBeVisible();
 });
