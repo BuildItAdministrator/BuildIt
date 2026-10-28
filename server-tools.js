@@ -153,7 +153,14 @@ function render(){
      const btn=document.createElement('button');btn.type='button';
      btn.textContent='Open tool';
      btn.addEventListener('click',()=>{
-       void choose(tool.name);
+       if(['Vehicle Spawn','Lootdrop Spawn'].includes(tool.name)){
+         close();
+         if(!window.BUILD_IT_QUICK_SPAWN?.open){
+           setStatus('Quick Spawn is not available. Reload the application.',true);return;
+         }
+         window.BUILD_IT_QUICK_SPAWN.open();
+         document.getElementById(tool.name==='Lootdrop Spawn'?'qsLootMode':'qsVehicleMode')?.click();
+       }else void choose(tool.name);
      });
      card.appendChild(btn);
    }
