@@ -192,5 +192,41 @@
     return {total:data.Objects.length,findings};
   }
 
-  root.BUILD_IT_SERVER_CORE=Object.freeze({validate,splitJSON,editTypes,eventConflicts,globalsList,editGlobal,spawnableDuplicates,objectDuplicates,xmlDoc});
+
+  // Append a repeat notification to an EXISTING Nitrado messages.xml.
+  // Keep all original XML bytes and comments intact.
+  function addMessage(source,message,minutes){
+    const doc=xmlDoc(source,'messages');
+    const text=String(message||'').trim();
+    const interval=Number(minutes);
+    if(!text||text.length>160)throw new Error('Message must be 1 to 160 characters.');
+    if(!Number.isInteger(interval)||interval<1||interval>1440)
+      throw new Error('Repeat interval must be between 1 and 1440 minutes.');
+    if(text.includes('#tmin'))
+      throw new Error('Countdown placeholder #tmin cannot be used in a simple repeat notification.');
+    for(const item of doc.documentElement.children){
+      if(item.nodeName!=='message')continue;
+      const old=item.getElementsByTagName('text')[0]?.textContent?.trim();
+      const repeat=item.getElementsByTagName('repeat')[0]?.textContent?.trim();
+      if(old===text&&repeat===String(interval))
+        throw new Error('Identical message and repeat interval already exist.');
+    }
+    const closing=[...source.matchAll(/<\/messages\s*>/gi)].pop();
+    if(!closing)throw new Error('messages.xml has no closing </messages> tag.');
+    const newline=source.includes('\r\n')?'\r\n':source.includes('\n')?'\n':'\r';
+    const escape=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+    const snippet='    <message>'+newline+
+      '        <repeat>'+interval+'</repeat>'+newline+
+      '        <text>'+escape(text)+'</text>'+newline+
+      '    </message>'+newline;
+    const start=source.slice(0,closing.index),end=source.slice(closing.index);
+    const updated=start+(start.endsWith(newline)?'':newline)+snippet+end;
+    const doc2=xmlDoc(updated,'messages');
+    if(doc2.getElementsByTagName('message').length!==doc.getElementsByTagName('message').length+1)
+      throw new Error('Could not safely append message.');
+    return {content:updated,changed:1,interval,text};
+  }
+
+  root.BUILD_IT_SERVER_CORE=Object.freeze({validate,splitJSON,editTypes,eventConflicts,globalsList,editGlobal,spawnableDuplicates,objectDuplicates,addMessage,xmlDoc});
 })(window);
