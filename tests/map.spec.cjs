@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 async function openAdvancedEventManager(page){
-  await openAdvancedEventManager(page);
+  await page.locator('#biToggle').click();
   await page.locator('#qsAdvanced').click();
 }
 
@@ -1834,4 +1834,88 @@ test('Server Tools links Vehicle Spawn and Lootdrop Spawn to existing direct Nit
  await page.locator('#stCards .st-card button').click();
  await expect(page.locator('#quickSpawnPanel')).toBeVisible();
  await expect(page.locator('#qsLootMode')).toHaveAttribute('aria-pressed','true');
+});
+
+
+test('multi-server profile controls are available without local file uploads',async({page})=>{
+  await expect(page.locator('#biServerProfileDock')).toBeVisible();
+  await expect(page.locator('#biServerProfileSelect option')).toHaveCount(1);
+  await page.locator('#biServerProfileManage').click();
+  await expect(page.locator('#biServerProfilePanel')).toBeVisible();
+  await expect(page.locator('#bspWorker')).toHaveValue(/workers\.dev/);
+  await expect(page.locator('#bspAccess')).toHaveAttribute('type','password');
+  await expect(page.locator('#bspDelete')).toBeDisabled();
+  await expect(page.locator('#bspMessage')).not.toContainText('MAP_WRITE_KEY is saved');
+});
+
+test('profiles test and switch between two legacy single-service Cloudflare Workers',async({page})=>{
+  const first='https://buildit-nitrado-logs.davaydresnikov.workers.dev';
+  const second='https://secondary-dayz.example.workers.dev';
+  const touched=[];
+  for(const [url,serviceId,name,username] of [
+    [first,'111','Server Alpha','ni111_1'],
+    [second,'222','Server Beta','ni222_1']
+  ]){
+    await page.route(url+'/**',async route=>{
+      const u=new URL(route.request().url());
+      touched.push({host:u.host,path:u.pathname,auth:route.request().headers()['authorization']});
+      const data=u.pathname==='/api/servers'?
+        {ok:true,endpoints:['/api/status','/api/logs','/api/files/list','/api/files/read','/api/files/write']}:
+        u.pathname==='/api/status'?{ok:true,serviceId,serverName:name,username,admLogCount:0}:
+        {error:'Not found'};
+      await route.fulfill({status:data.error?404:200,contentType:'application/json',body:JSON.stringify(data)});
+    });
+  }
+  await page.locator('#biServerProfileManage').click();
+  await page.locator('#bspName').fill('Alpha');
+  await page.locator('#bspWorker').fill(first);
+  await page.locator('#bspAccess').fill('first-read-secret');
+  await page.locator('#bspUpdate').click();
+  await expect(page.locator('#bspMessage')).toContainText('Profiel opgeslagen');
+  await expect(page.locator('#biServerProfileSelect option')).toHaveCount(1);
+
+  await page.locator('#bspName').fill('Beta');
+  await page.locator('#bspWorker').fill(second);
+  await page.locator('#bspAccess').fill('second-read-secret');
+  await page.locator('#bspAdd').click();
+  await expect(page.locator('#bspMessage')).toContainText('Profiel opgeslagen');
+  await expect(page.locator('#biServerProfileSelect option')).toHaveCount(2);
+  await expect(page.locator('#nitradoWorkerUrl')).toHaveValue(second);
+  await expect(page.locator('#nitradoAccessKey')).toHaveValue('second-read-secret');
+  await expect.poll(()=>page.evaluate(()=>window.BUILD_IT_NITRADO_PROFILES.current()?.name)).toBe('Beta');
+
+  await page.locator('#bspClose').click();
+  await page.locator('#nitradoWriteKey').evaluate(el=>el.value='write-only-secret');
+  const firstId=await page.locator('#biServerProfileSelect option').first().getAttribute('value');
+  await page.locator('#biServerProfileSelect').selectOption(firstId);
+  await expect(page.locator('#nitradoWorkerUrl')).toHaveValue(first);
+  await expect(page.locator('#nitradoWriteKey')).toHaveValue('');
+  await expect.poll(()=>page.evaluate(()=>window.BUILD_IT_NITRADO_PROFILES.current()?.name)).toBe('Alpha');
+  expect(touched.some(call=>call.host==='secondary-dayz.example.workers.dev'&&call.path==='/api/status')).toBe(true);
+});
+
+test('profile switch is blocked while a Nitrado operation is running',async({page})=>{
+  await page.locator('#biServerProfileManage').click();
+  await expect(page.locator('#biServerProfilePanel')).toBeVisible();
+  const firstId=await page.locator('#biServerProfileSelect').inputValue();
+  const current=await page.evaluate(()=>window.BUILD_IT_NITRADO_PROFILES.current()?.id);
+  expect(current).toBe(firstId);
+  await page.evaluate(()=>window.BUILD_IT_NITRADO_ACTIVE_REQUESTS=1);
+  const result=await page.evaluate(async id=>{
+    try{await window.BUILD_IT_NITRADO_PROFILES.select(id);return 'changed';}
+    catch(e){return e.message;}
+  },'not-a-real-id');
+  expect(result).toContain('geblokkeerd');
+  expect(await page.locator('#biServerProfileSelect').inputValue()).toBe(firstId);
+  await page.evaluate(()=>window.BUILD_IT_NITRADO_ACTIVE_REQUESTS=0);
+});
+
+test('legacy profile migration retains saved browser credentials but no write key',async({page})=>{
+ const profile=await page.evaluate(()=>window.BUILD_IT_NITRADO_PROFILES.list()[0]);
+ expect(profile).toHaveProperty('name');
+ expect(JSON.stringify(profile)).not.toContain('accessKey');
+ expect(JSON.stringify(profile)).not.toContain('MAP_WRITE_KEY');
+ const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('buildit_nitrado_profiles_v1')));
+ expect(stored.profiles).toHaveLength(1);
+ expect(stored.profiles[0]).not.toHaveProperty('writeKey');
 });
