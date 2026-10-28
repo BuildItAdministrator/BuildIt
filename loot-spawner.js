@@ -1,10 +1,10 @@
 /* Build It!++ vanilla DayZ object-spawner loot exporter.
  * No persistence for untouched loot; pickup switches to normal CE persistence.
- * Export only: writing a brand-new Nitrado mission file requires separate Worker support.
+ * Writes can be deployed through the connected Nitrado Worker when its create route is installed.
  */
 (function(){
   'use strict';
-  const FILENAME='BuildIt_LootDrops.json';
+  const FILENAME='builditlootdrop.json';
   const SPAWNER_REF='custom/'+FILENAME;
   const MAX_OBJECTS=200;
   function number(v,min,max,label){
@@ -59,8 +59,12 @@
       throw new Error('WorldsData.objectSpawnersArr must be an array.');
     const arr=data.WorldsData.objectSpawnersArr||[];
     if(!arr.every(v=>typeof v==='string'))throw new Error('Existing spawner entries must be strings.');
-    if(!arr.includes(filename))arr.push(filename);
-    data.WorldsData.objectSpawnersArr=arr;
+    // Retire only references created by older Build It!++ versions.
+    // This avoids spawning the same configured loot from two different files.
+    const previous=new Set(['BuildIt_LootDrops.json','custom/BuildIt_LootDrops.json']);
+    const updated=filename===SPAWNER_REF?arr.filter(ref=>!previous.has(ref)):arr.slice();
+    if(!updated.includes(filename))updated.push(filename);
+    data.WorldsData.objectSpawnersArr=updated;
     const json=JSON.stringify(data,null,2)+'\n';
     window.BUILD_IT_FORMAT?.validate('cfggameplay.json',json);
     return json;
