@@ -4,18 +4,30 @@ Screenshot inventory received on 2026-10-28: **53 tools** shown in the DayZBoost
 This is a functional roadmap, NOT a claim that all 53 tools are already implemented.
 We are independently implementing supported capabilities, not copying vendor code or branding.
 
-## Phase 1 — shipped in repository (8 functional tools)
+## Server-first integration shipped (12 connected tools)
 
-- XML Validator — checks well-formed XML and DayZ root expectations
-- JSON Validator — checks JSON; validates Object Spawner positions and flags exact-position duplicate objects
-- JSON Splitter — splits JSON arrays and vanilla DayZ Object Spawner Objects arrays, preserving metadata
-- Types Booster — multiply chosen numeric field in types.xml
-- Types Reducer — reduce chosen numeric field in types.xml
-- Advanced Types Editor — set a chosen numeric field, optionally restricted to a classname
-- Lifetime Reducer — scale lifetime of type entries
-- Event Conflict Check — report repeated event names and impossible min/max settings
+Server Tools now reads existing mission files directly through the authenticated Nitrado Worker, rather than asking users to upload a local file. An edit requires **Preview** and one explicit **Apply to Nitrado** confirmation. The Worker checks the file's original SHA-256, creates and verifies a backup, writes the new bytes and verifies the remote file. Read-only checkers never upload.
 
-These tools operate on local imported/pasted file content, not on live Nitrado. They do not automatically upload changes. Users review and upload via the existing File Manager. The editable XML operations preserve untouched source bytes, existing whitespace, and XML declarations; full XML parsing is used for validation.
+Connected tools:
+
+- XML Validator — select and validate an existing Nitrado XML file.
+- JSON Validator — select and validate an existing Nitrado JSON file.
+- Types Booster — multiply a selected numeric field in live `db/types.xml`.
+- Types Reducer — reduce a selected numeric field in live `db/types.xml`.
+- Advanced Types Editor — set a selected field, optionally filtered by classname.
+- Lifetime Reducer — adjust lifetimes in live `db/types.xml`.
+- Tier Booster — multiply nominal for entries explicitly tagged Tier1–Tier4 (does not guess custom tier aliases).
+- Globals Configurator — edit one existing numeric `db/globals.xml` variable, preserving type and unrelated XML.
+- Messages Generator — safely append a repeating notification to existing `db/messages.xml` or `messages.xml`.
+- Event Conflict Check — read live `db/events.xml`, detect duplicates and basic min/max mistakes.
+- Spawnable Duplicate Checker — analyze live `cfgspawnabletypes.xml`.
+- SpawnObject Duplicate Checker — analyze an existing JSON Object Spawner in the mission.
+
+**Not yet connected:** JSON Splitter. It would need to create and register multiple new files; the existing Worker has only a restricted create-file endpoint for `custom/builditlootdrop.json`. It is still available as a pure transformation helper for later use, but is not falsely advertised as an integrated tool. The other 40 catalog entries are planned or have only partial existing capability.
+
+**Current restrictions:** The deployed Worker must expose `/api/files/list`, `/api/files/read` and `/api/files/write` with the existing MAP_SYNC_KEY/MAP_WRITE_KEY protections. Only Chernarus mission paths are discovered. The Worker can edit existing XML/JSON files up to 512 KB. A server with larger `types.xml` files will require a separately upgraded, secure Worker API. The tools do not restart Nitrado servers automatically. Not all DayZBoosterZ tools have meaningful PS5 equivalents; identify those explicitly rather than faking script mods.
+
+**Safety controls:** No write before confirm, no local-file imports, no unverified create operations, source-byte preservation for XML fields, comment protection, strict JSON/XML validation, fresh hash checks, automatic verified backup, and no password persistence.
 
 ## Existing, partially overlapping Build It!++ capabilities
 
@@ -94,8 +106,8 @@ These tools operate on local imported/pasted file content, not on live Nitrado. 
 
 ## Suggested next implementation batches
 
-1. Complete Mission Validator ZIP, Spawnable/SpawnObject duplicate checks, Types Organizer and Ignore List Generator.
-2. Add Day/Night Calculator, Weather Manager, Globals Configurator and Gameplay Generator.
+1. Complete Mission Validator ZIP, Types Organizer, Ignore List Generator and upgrade the Worker for safe >512 KB reads/writes.
+2. Add Day/Night Calculator, Weather Manager, Gameplay Generator and full message-schedule management.
 3. Add Loadout Generator, Weapon Blueprint Generator, Bag Fill Generator and full Build A Vehicle.
 4. Build map-related object converters, SpawnObject Mover/Organizer, coordinate transforms, heatmap and relocator.
 5. Finish spawn/loot-zone management, message creator, gas effects and CE-based event tooling.
