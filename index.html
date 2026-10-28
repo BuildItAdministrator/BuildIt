@@ -1006,10 +1006,17 @@ async function nitradoRequest(path,{withServer=false,method='GET',body=null,writ
   if(!base) throw new Error('Enter the Cloudflare Worker URL first.');
 
   let requestPath=path;
-  if(withServer && nitradoWorkerMode!=='legacy'){
+  // Multi-service Workers need the explicit server for BOTH logs and files.
+  // The original single-service Worker uses its secured NITRADO_SERVICE_ID.
+  const isFileRequest=/^\/api\/(?:files\/|file-write-test)/.test(path);
+  if((withServer||isFileRequest) && nitradoWorkerMode==='multi'){
     const serverId=nitradoServer.value;
-    if(!serverId) throw new Error('Select a server first.');
+    if(!serverId) throw new Error('Choose the active Nitrado server before accessing its files.');
     requestPath += `${requestPath.includes('?')?'&':'?'}server=${encodeURIComponent(serverId)}`;
+  }else if(withServer && nitradoWorkerMode==='unknown'){
+    throw new Error('Test the server connection before loading server data.');
+  }else if(isFileRequest && nitradoWorkerMode==='unknown'){
+    throw new Error('The selected server has not been verified. Test the connection first.');
   }
 
   const headers=nitradoHeaders();
@@ -1034,14 +1041,22 @@ async function nitradoRequest(path,{withServer=false,method='GET',body=null,writ
     options.body=typeof body==='string'?body:JSON.stringify(body);
   }
 
-  const res=await fetch(base+requestPath,options);
-  let data=null;
-  try{data=await res.json()}catch(_){}
-  if(!res.ok){
-    const detail=data?.error||data?.message||`${res.status} ${res.statusText}`;
-    throw new Error(detail);
+  const activeEpoch=window.BUILD_IT_NITRADO_PROFILE_EPOCH||0;
+  window.BUILD_IT_NITRADO_ACTIVE_REQUESTS=(window.BUILD_IT_NITRADO_ACTIVE_REQUESTS||0)+1;
+  try{
+    const res=await fetch(base+requestPath,options);
+    let data=null;
+    try{data=await res.json()}catch(_){}
+    if(activeEpoch!==(window.BUILD_IT_NITRADO_PROFILE_EPOCH||0))
+      throw new Error('The active server changed during this request. Results were discarded.');
+    if(!res.ok){
+      const detail=data?.error||data?.message||`${res.status} ${res.statusText}`;
+      throw new Error(detail);
+    }
+    return data;
+  }finally{
+    window.BUILD_IT_NITRADO_ACTIVE_REQUESTS=Math.max(0,(window.BUILD_IT_NITRADO_ACTIVE_REQUESTS||1)-1);
   }
-  return data;
 }
 
 function populateNitradoServers(servers){
@@ -1216,6 +1231,45 @@ nitradoServer.addEventListener('change',()=>{
 });
 
 loadNitradoConfig();
+
+window.BUILD_IT_NITRADO_ADMIN=Object.freeze({
+  current:()=>({
+    workerUrl:normalizeWorkerUrl(nitradoWorkerUrl.value),
+    accessKey:nitradoAccessKey.value.trim(),
+    serverId:nitradoServer.value||nitradoServer.dataset.savedId||'',
+    workerMode:nitradoWorkerMode,
+    autoSync:nitradoAutoSync.checked
+  }),
+  switchTo:async profile=>{
+    // Clear the previous server's status and cached log activity before
+    // discovery. The profile manager prevents switching while active writes run.
+    nitradoWorkerMode='unknown';
+    nitradoServerList=[];
+    nitradoWorkerUrl.value=profile.workerUrl;
+    nitradoAccessKey.value=profile.accessKey;
+    nitradoServer.replaceChildren();
+    nitradoServer.disabled=true;
+    nitradoServer.dataset.savedId=profile.serverId||'';
+    nitradoAutoSync.checked=profile.autoSync!==false;
+    document.getElementById('nitradoWriteKey').value='';
+    resetLogDataOnly();
+    renderLogSummary();renderLogPlayers();renderLogMap();renderLogActivity();
+    setNitradoStatus('Verifying the selected server…');
+    saveNitradoConfig();
+    const discovered=await loadNitradoServers({quiet:true});
+    const selected=nitradoServer.value;
+    const status=await nitradoRequest('/api/status',{withServer:true});
+    if(profile.serverId && profile.serverId!=='default' && selected!==profile.serverId)
+      throw new Error('The configured server is no longer available. Check server access.');
+    if(profile.serviceId && status.serviceId && String(profile.serviceId)!==String(status.serviceId))
+      throw new Error('Worker points to a different Nitrado service than the saved profile.');
+    setNitradoStatus('Active: '+(status.serverName||status.game||profile.name||'DayZ')+'. Ready.','ok');
+    return {discovered,status};
+  },
+  save:saveNitradoConfig,
+  sync:syncNitradoLogs,
+  resetLogs:resetLogDataOnly
+});
 
 logToggle.addEventListener('click',()=>logPanel.classList.toggle('hidden'));
 logClose.addEventListener('click',()=>logPanel.classList.add('hidden'));
