@@ -834,6 +834,12 @@ window.BUILD_IT_replaceSpawnGroups=groups=>{
   for(const layer of Object.values(spawnLayers))layer.clearLayers();
   activeSpawnGroups=groups;
   addAllSpawns();
+  for(const [key,category] of Object.entries(SPAWN_CATEGORIES)){
+    if(!category.filterId)continue;
+    const counter=document.getElementById(category.filterId)?.closest('.filter-row')?.querySelector('.filter-count');
+    if(counter)counter.textContent=String(groups.reduce((sum,group)=>
+      sum+(spawnCategory(group.name)===key?group.positions.length:0),0));
+  }
   return groups.reduce((sum,group)=>sum+(Array.isArray(group.positions)?group.positions.length:0),0);
 };
 
