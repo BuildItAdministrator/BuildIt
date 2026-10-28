@@ -1393,7 +1393,7 @@ test('JSON loot migration replaces old Build It references with custom/builditlo
 
 test('server tools catalog shows 53 items, with no local-file import workflow',async({page})=>{
   const stats=await page.evaluate(()=>window.BUILD_IT_TOOLS);
-  expect(stats).toEqual({count:53,ready:14,mode:'nitrado'});
+  expect(stats).toEqual({count:53,ready:19,mode:'nitrado'});
   await page.locator('#toolHubToggle').click();
   await expect(page.locator('#toolHubPanel')).toBeVisible();
   await expect(page.locator('#stCards .st-card')).toHaveCount(53);
@@ -1632,4 +1632,51 @@ test('Spawnable Types Adjuster changes existing attachments only and keeps comme
  expect(result.content).toContain('<attachments chance="1.00"><item name="CarBattery" chance="1.00"/>');
  expect(result.content).toContain('<cargo chance="0.50"><item name="Apple" chance="0.20"/>');
  expect(result.content).toContain('<type name="Other"><attachments chance="0.10"');
+});
+
+
+test('server Gameplay Generator updates allowed settings without losing Nitrado world-spawner references',async({page})=>{
+ const actual=await page.evaluate(()=>{
+   const e=window.BUILD_IT_SERVER_EXTENSIONS;
+   const source=JSON.stringify({version:130,GeneralData:{disableBaseDamage:false,disableContainerDamage:false},PlayerData:{disablePersonalLight:true,StaminaData:{staminaMax:100,staminaMinCap:5}},WorldsData:{lightingConfig:1,objectSpawnersArr:['custom/builditlootdrop.json']},Unrelated:{preserve:4}},null,2);
+   const output=e.changeGameplay(source,'GeneralData.disableBaseDamage','true');
+   const changed=JSON.parse(output.content);
+   let rejectsUnknown=false;
+   try{e.changeGameplay(source,'GeneralData.deleteAllItems',true);}catch{rejectsUnknown=true;}
+   return {value:changed.GeneralData.disableBaseDamage,ref:changed.WorldsData.objectSpawnersArr[0],preserve:changed.Unrelated.preserve,rejectsUnknown};
+ });
+ expect(actual).toEqual({value:true,ref:'custom/builditlootdrop.json',preserve:4,rejectsUnknown:true});
+});
+
+test('server weather manager changes only an existing cfgweather attribute and retains XML comments',async({page})=>{
+ const actual=await page.evaluate(()=>{
+   const e=window.BUILD_IT_SERVER_EXTENSIONS;
+   const source='<?xml version="1.0" encoding="UTF-8"?>\n<weather enable="1"><!-- keep comment -->\n<overcast><current actual="0.25" time="120" duration="240"/><limits min="0.0" max="1.0"/></overcast><fog><current actual="0.1"/></fog></weather>';
+   const output=e.changeWeather(source,'overcast.current.actual',0.6);
+   return {changed:output.changed,hasCurrent:output.content.includes('current actual="0.6" time="120" duration="240"'),hasComment:output.content.includes('<!-- keep comment -->'),retainedFog:output.content.includes('<fog><current actual="0.1"/>')};
+ });
+ expect(actual).toEqual({changed:1,hasCurrent:true,hasComment:true,retainedFog:true});
+});
+
+test('server Spawn Point Generator adds fresh position only to a recognized existing group',async({page})=>{
+ const actual=await page.evaluate(()=>{
+   const ext=window.BUILD_IT_SERVER_EXTENSIONS;
+   const source='<playerspawnpoints><fresh><generator_posbubbles>\n  <pos x="100" z="200"/>\n</generator_posbubbles></fresh><hop><generator_posbubbles><pos x="300" z="400"/></generator_posbubbles></hop></playerspawnpoints>';
+   const result=ext.addSpawnPoint(source,4450,10200);
+   let duplicateRejected=false;try{ext.addSpawnPoint(result.content,4450,10200);}catch{duplicateRejected=true;}
+   const doc=new DOMParser().parseFromString(result.content,'application/xml');
+   return {newFresh:doc.querySelectorAll('fresh > generator_posbubbles > pos').length,hop:doc.querySelectorAll('hop > generator_posbubbles > pos').length,duplicateRejected};
+ });
+ expect(actual).toEqual({newFresh:2,hop:1,duplicateRejected:true});
+});
+
+test('server SpawnObject Mover keeps elevation and other JSON objects unchanged',async({page})=>{
+ const actual=await page.evaluate(()=>{
+   const ext=window.BUILD_IT_SERVER_EXTENSIONS;
+   const original=JSON.stringify({Version:1,Objects:[{name:'Apple',pos:[150,300,500],ypr:[0,0,0],enableCEPersistency:false},{name:'Pear',pos:[20,200,30],ypr:[0,0,0],enableCEPersistency:true}]});
+   const change=ext.changeObjectPosition(original,0,333,777),data=JSON.parse(change.content);
+   const sorted=ext.organizeObjects(JSON.stringify({Objects:[{name:'Z',pos:[1,2,3]},{name:'A',pos:[4,5,6]}]}));
+   return {moved:data.Objects[0].pos,other:data.Objects[1].pos,meta:data.Version,sorted:JSON.parse(sorted.content).Objects[0].name};
+ });
+ expect(actual).toEqual({moved:[333,300,777],other:[20,200,30],meta:1,sorted:'A'});
 });
