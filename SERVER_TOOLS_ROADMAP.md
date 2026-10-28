@@ -4,7 +4,7 @@ Screenshot inventory received on 2026-10-28: **53 tools** shown in the DayZBoost
 This is a functional roadmap, NOT a claim that all 53 tools are already implemented.
 We are independently implementing supported capabilities, not copying vendor code or branding.
 
-## Server-first integration shipped (12 connected tools)
+## Server-first integration shipped (14 connected tools)
 
 Server Tools now reads existing mission files directly through the authenticated Nitrado Worker, rather than asking users to upload a local file. An edit requires **Preview** and one explicit **Apply to Nitrado** confirmation. The Worker checks the file's original SHA-256, creates and verifies a backup, writes the new bytes and verifies the remote file. Read-only checkers never upload.
 
@@ -17,13 +17,15 @@ Connected tools:
 - Advanced Types Editor — set a selected field, optionally filtered by classname.
 - Lifetime Reducer — adjust lifetimes in live `db/types.xml`.
 - Tier Booster — multiply nominal for entries explicitly tagged Tier1–Tier4 (does not guess custom tier aliases).
+- Classname Finder — search actual live types.xml classnames and nominal/min counts.
+- Spawnable Types Adjuster — edit existing attachment/cargo chance attributes for exactly one classname without touching other entries.
 - Globals Configurator — edit one existing numeric `db/globals.xml` variable, preserving type and unrelated XML.
 - Messages Generator — safely append a repeating notification to existing `db/messages.xml` or `messages.xml`.
 - Event Conflict Check — read live `db/events.xml`, detect duplicates and basic min/max mistakes.
 - Spawnable Duplicate Checker — analyze live `cfgspawnabletypes.xml`.
 - SpawnObject Duplicate Checker — analyze an existing JSON Object Spawner in the mission.
 
-**Not yet connected:** JSON Splitter. It would need to create and register multiple new files; the existing Worker has only a restricted create-file endpoint for `custom/builditlootdrop.json`. It is still available as a pure transformation helper for later use, but is not falsely advertised as an integrated tool. The other 40 catalog entries are planned or have only partial existing capability.
+**Not yet connected:** JSON Splitter. It would need to create and register multiple new files; the existing Worker has only a restricted create-file endpoint for `custom/builditlootdrop.json`. It is still available as a pure transformation helper for later use, but is not falsely advertised as an integrated tool. The other 39 catalog entries are planned or have only partial existing capability.
 
 **Current restrictions:** The deployed Worker must expose `/api/files/list`, `/api/files/read` and `/api/files/write` with the existing MAP_SYNC_KEY/MAP_WRITE_KEY protections. Only Chernarus mission paths are discovered. The Worker can edit existing XML/JSON files up to 512 KB. A server with larger `types.xml` files will require a separately upgraded, secure Worker API. The tools do not restart Nitrado servers automatically. Not all DayZBoosterZ tools have meaningful PS5 equivalents; identify those explicitly rather than faking script mods.
 
