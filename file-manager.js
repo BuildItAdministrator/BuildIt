@@ -86,13 +86,13 @@
   document.head.appendChild(style);
   const $=id=>document.getElementById(id);
   const entries=$('fmEntries'), editor=$('fmEditor'), box=$('fmFileBox');
-  let root='',dir='',currentRoot='',storageRoots=[],selected='',sourceDigest='',running=false;
+  let root='',dir='',currentRoot='',storageRoots=[],selected='',sourceDigest='',running=false,loadedContent='';
   let validationOk=false,validationResult=null,validationTimer=null;
-  window.BUILD_IT_FILE_MANAGER=Object.freeze({isBusy:()=>running});
+  window.BUILD_IT_FILE_MANAGER=Object.freeze({isBusy:()=>running,hasUnsaved:()=>!!selected&&editor.value!==loadedContent});
   window.addEventListener('buildit:nitrado-profile-changing',()=>{
     root='';dir='';currentRoot='';storageRoots=[];selected='';sourceDigest='';
     validationOk=false;validationResult=null;clearTimeout(validationTimer);
-    editor.value='';entries.replaceChildren();
+    editor.value='';loadedContent='';entries.replaceChildren();
     box.hidden=true;
     $('fmCurrentDir').textContent='';
     $('fmSelected').textContent='';
@@ -216,7 +216,7 @@
     const result=await nitradoRequest('/api/files/read?file='+encodeURIComponent(path));
     selected=result.path;
     sourceDigest=result.sha256;
-    editor.value=result.content;
+    editor.value=result.content;loadedContent=result.content;
     $('fmSelected').textContent=selected;
     $('fmLocalFile').value='';
     box.hidden=false;
@@ -343,7 +343,7 @@
     state('Upload verified. Original backup: '+result.backupPath+'\nRestart the DayZ server when appropriate.');
     const refresh=await nitradoRequest('/api/files/read?file='+encodeURIComponent(selected));
     sourceDigest=refresh.sha256;
-    editor.value=refresh.content;
+    editor.value=refresh.content;loadedContent=refresh.content;
     refreshValidation();
   }));
 })();
