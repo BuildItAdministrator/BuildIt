@@ -620,5 +620,15 @@ $('stPublish').addEventListener('click',async()=>{
  }finally{setBusy(false);}
 });
 render();
-window.BUILD_IT_TOOLS=Object.freeze({count:TOOLS.length,ready:ACTIVE.size,mode:'nitrado'});
+window.BUILD_IT_TOOLS=Object.freeze({count:TOOLS.length,ready:ACTIVE.size,mode:'nitrado',isBusy:()=>busy});
+window.addEventListener('buildit:nitrado-profile-changing',()=>{
+  if(busy)return;
+  clearHeatmap();
+  invalidate();snapshot=null;remoteList=[];selected=null;
+  $('stRemoteFile').replaceChildren();
+  $('stFileState').textContent='New server selected. Reopen a tool to load its files.';
+  $('stResult').textContent='';
+  workspace.hidden=true;cards.hidden=false;close();
+});
+
 })();
