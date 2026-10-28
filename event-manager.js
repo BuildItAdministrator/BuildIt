@@ -467,7 +467,7 @@
     return merged;
   }
   function buildOutput(kind) {
-    if (!drafts.length) throw new Error('Create an event first.');
+    if (!drafts.some(d=>d.kind==='vehicle')) throw new Error('Create a vehicle event first.');
     if (kind === 'cargo' && !drafts.some(d => d.kind === 'loot')) throw new Error('There are no loot drops to export.');
     const filename = kind === 'events' ? 'events.xml' : kind === 'positions' ? 'cfgeventspawns.xml' : 'cfgspawnabletypes.xml';
     const root = kind === 'events' ? 'events' : kind === 'positions' ? 'eventposdef' : 'spawnabletypes';
@@ -489,11 +489,11 @@
       });
     } else {
       if(original){
-        const elements=drafts.map(d=>kind==='events'?createEvent(doc,d):createPos(doc,d));
+        const elements=drafts.filter(d=>d.kind==='vehicle').map(d=>kind==='events'?createEvent(doc,d):createPos(doc,d));
         const xml=appendXmlEventsWithoutReformatting(original,root,elements);
         return {filename,xml,complete:true};
       }
-      drafts.forEach(d=>{
+      drafts.filter(d=>d.kind==='vehicle').forEach(d=>{
         const exists=Array.from(doc.documentElement.children).some(el=>
           el.nodeName==='event' && el.getAttribute('name')?.toLowerCase()===d.name.toLowerCase());
         if(exists)throw new Error('Event "'+d.name+'" already exists in '+filename+'. Rename it before exporting.');
@@ -530,7 +530,7 @@
   }
   function deploymentSnapshot(){
     return JSON.stringify(drafts.map(d=>({
-      name:d.name,kind:d.kind,x:d.x,z:d.z,a:d.a,vehicle:d.vehicle,container:d.container,items:d.items
+      name:d.name,kind:d.kind,x:d.x,z:d.z,a:d.a,vehicle:d.vehicle,y:d.y,spacing:d.spacing,items:d.items
     })));
   }
   async function serverXmlRead(path){
@@ -562,9 +562,9 @@
   }
   function vehicleDrafts(){
     if(!drafts.length)throw new Error('Save an event draft before attempting to deploy.');
-    if(drafts.some(d=>d.kind!=='vehicle'))
-      throw new Error('Automated deployment currently supports vehicle drafts only. Download and inspect XML for loot containers.');
-    return drafts;
+    const selected=drafts.filter(d=>d.kind==='vehicle');
+    if(!selected.length)throw new Error('No vehicle events queued. Use JSON loot export below.');
+    return selected;
   }
   function clearStaged(){
     eventDeploy.staged=null;
@@ -671,7 +671,7 @@
     if(!$('biServerStopped').checked){
       setDeploy('Stop your DayZ server and check the confirmation box before uploading.',true);return;
     }
-    if(!window.confirm('Upload '+drafts.length+' vehicle event(s) to your LIVE server?\n'+
+    if(!window.confirm('Upload '+vehicleDrafts().length+' vehicle event(s) to your LIVE server?\n'+
       'This will back up and overwrite events.xml and cfgeventspawns.xml.\n'+
       'Nitrado must grant file-write permission. Continue?'))return;
     eventDeploy.sending=true;deployUpload.disabled=true;deployLoad.disabled=true;deployPreview.disabled=true;
@@ -702,11 +702,11 @@
         if(!result?.verified||!result?.backupPath)throw new Error(name+' was not verified by the Worker.');
         results.push({name,backup:result.backupPath});
       }
-      const deployed=drafts.length;
+      const deployed=vehicleDrafts().length;
       // These were queued changes, not permanent user records. Only clear them
       // after both files have been verified on the server. This avoids trying
       // to publish identical event names on the next upload.
-      drafts=[];persist();resetForm();
+      drafts=drafts.filter(d=>d.kind!=='vehicle');persist();resetForm();
       setDeploy('UPLOAD VERIFIED — '+deployed+' vehicle event(s) published. Queue cleared.\n'+
         results.map(r=>r.name+' backup: '+r.backup).join('\n')+
         '\nStart the DayZ server to load the new economy event configuration.');
@@ -732,7 +732,32 @@
     const a=document.createElement('a'); a.href=url; a.download=data.filename;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),5000);
   }
-  [['biExportEvents','events'],['biExportPositions','positions'],['biExportCargo','cargo']].forEach(pair => {
+  $('biExportLootJson').addEventListener('click',()=>{
+    try {
+      const result=window.BUILD_IT_LOOT.build(drafts);
+      window.BUILD_IT_LOOT.download(result.filename,result.content);
+      message('Downloaded '+result.filename+' with '+result.count+' non-persistent items from '+result.events+' location(s). Upload it to the mission folder and register it in cfggameplay.json.');
+    }catch(error){message('JSON loot export failed: '+error.message,true);}
+  });
+  $('biExportGameplayJson').addEventListener('click',async()=>{
+    const btn=$('biExportGameplayJson');btn.disabled=true;
+    try {
+      window.BUILD_IT_LOOT.build(drafts);
+      let original=files['cfggameplay.json'];
+      if(!original){
+        const mission=await discoverServerMission();
+        const loaded=await serverXmlRead(mission+'/cfggameplay.json');
+        original=loaded.content;
+        files['cfggameplay.json']=original;
+      }
+      const updated=window.BUILD_IT_LOOT.gameplay(original);
+      window.BUILD_IT_LOOT.download('cfggameplay.json',updated);
+      message('Updated cfggameplay.json downloaded. Existing settings and spawner entries preserved. Install both JSON files in your active mission folder, enable cfgGameplay and restart.');
+    }catch(error){
+      message('Could not prepare cfggameplay.json: '+error.message+'. If Nitrado access is unavailable, import your existing cfggameplay.json from Advanced.',true);
+    }finally{btn.disabled=false;}
+  });
+  [['biExportEvents','events'],['biExportPositions','positions']].forEach(pair => {
     $(pair[0]).addEventListener('click', () => {
       try {
         const result=buildOutput(pair[1]); downloadXML(result);
