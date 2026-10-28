@@ -75,7 +75,7 @@
     filterToggle:'sliders',logToggle:'logs',biToggle:'wrench',
     logClose:'x',biClose:'x',nitradoSyncNow:'refresh',logClear:'trash',
     nitradoTest:'shield',nitradoKeyReveal:'eye',nitradoKeyCopy:'copy',
-    nitradoFileWriteTest:'shield',fmFindMission:'folder',fmBrowse:'folder',
+    fmFindMission:'folder',fmBrowse:'folder',
     fmFtpRoot:'folder',fmBack:'folder',fmValidate:'checkfile',
     fmRepairXml:'wrench',fmDownload:'download',fmSave:'cloud',
     biPick:'pin',biSave:'save',biNew:'refresh',
