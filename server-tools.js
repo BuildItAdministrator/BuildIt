@@ -127,6 +127,7 @@ function open(){
 }
 function close(){
  if(busy)return;
+ cancelToolMapPick();
  panel.hidden=true;$('toolHubToggle').setAttribute('aria-expanded','false');
 }
 $('toolHubToggle').addEventListener('click',()=>panel.hidden?open():close());
@@ -308,6 +309,7 @@ async function loadLive(){
 }
 async function choose(name){
  if(busy)return;
+ cancelToolMapPick();
  selected=name;snapshot=null;invalidate();
  $('stRemoteFile').replaceChildren();
  cards.hidden=true;workspace.hidden=false;
@@ -390,28 +392,49 @@ $('stShowHeatmap').addEventListener('click',()=>{
    setStatus('Mapped '+objects.length+' objects in '+grid.size+' density cells. No server files changed.');
  }catch(error){setStatus(error.message,true);}
 });
+let activeToolMapListener=null;
+function cancelToolMapPick(){
+ if(activeToolMapListener){map.off('click',activeToolMapListener);activeToolMapListener=null;}
+ window.BUILD_IT_UI_VISIBILITY?.cancelPick('server-tools');
+}
 $('stPickMap').addEventListener('click',()=>{
- if(busy||typeof map==='undefined'||typeof leafletToGame!=='function'){
+ if(busy||!selected||typeof map==='undefined'||typeof leafletToGame!=='function'){
    setStatus('Map selection unavailable.',true);return;
  }
+ cancelToolMapPick();
  const tool=selected;
- setStatus('Click one point on the Chernarus map. Then return here to preview the change.');
- map.once('click',e=>{
-   if(!selected||selected!==tool||panel.hidden)return;
+ setStatus('Click a position on the Chernarus map. Escape or Cancel to go back.');
+ activeToolMapListener=e=>{
+   if(!selected||selected!==tool||panel.hidden){cancelToolMapPick();return;}
    const p=leafletToGame(e.latlng);
-   if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.z)){setStatus('Invalid coordinates.',true);return;}
-   if(tool==='SpawnObject Mover'){
-     $('stObjectX').value=Number(p.x.toFixed(2));$('stObjectZ').value=Number(p.z.toFixed(2));
-   }else if(tool==='Spawn Point Generator'){
-     $('stPlayerX').value=Number(p.x.toFixed(2));$('stPlayerZ').value=Number(p.z.toFixed(2));
-   }else if(tool==='Gas Zone Generator'){
-     $('stGasX').value=Number(p.x.toFixed(2));$('stGasZ').value=Number(p.z.toFixed(2));
-   }else if(tool==='Build Relocator'){
-     $('stRelocX').value=Number(p.x.toFixed(2));$('stRelocZ').value=Number(p.z.toFixed(2));
-   }else if(tool==='Horde Generator'){
-     $('stHordeX').value=Number(p.x.toFixed(2));$('stHordeZ').value=Number(p.z.toFixed(2));
+   if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.z)||
+      p.x<0||p.z<0||p.x>15360||p.z>15360){
+     setStatus('Please select a position inside Chernarus.',true);return;
    }
-   invalidate();setStatus('Map position selected. Review then publish to Nitrado.');
+   const X=Number(p.x.toFixed(2)),Z=Number(p.z.toFixed(2));
+   if(tool==='SpawnObject Mover'){
+     $('stObjectX').value=X;$('stObjectZ').value=Z;
+   }else if(tool==='Spawn Point Generator'){
+     $('stPlayerX').value=X;$('stPlayerZ').value=Z;
+   }else if(tool==='Gas Zone Generator'){
+     $('stGasX').value=X;$('stGasZ').value=Z;
+   }else if(tool==='Build Relocator'){
+     $('stRelocX').value=X;$('stRelocZ').value=Z;
+   }else if(tool==='Horde Generator'){
+     $('stHordeX').value=X;$('stHordeZ').value=Z;
+   }
+   map.off('click',activeToolMapListener);
+   activeToolMapListener=null;
+   window.BUILD_IT_UI_VISIBILITY?.finishPick('server-tools');
+   invalidate();setStatus('Map position selected: X '+X+' / Z '+Z+'. Review then publish to Nitrado.');
+ };
+ map.on('click',activeToolMapListener);
+ window.BUILD_IT_UI_VISIBILITY?.beginPick('server-tools',{
+   hintText:'Click on the map to place '+tool,
+   onCancel:()=>{
+     if(activeToolMapListener){map.off('click',activeToolMapListener);activeToolMapListener=null;}
+     setStatus('Map selection cancelled. No server files changed.');
+   }
  });
 });
 $('stWriteKey').addEventListener('input',()=>{
@@ -622,6 +645,7 @@ $('stPublish').addEventListener('click',async()=>{
 render();
 window.BUILD_IT_TOOLS=Object.freeze({count:TOOLS.length,ready:ACTIVE.size,mode:'nitrado',isBusy:()=>busy,hasPreview:()=>!!preview});
 window.addEventListener('buildit:nitrado-profile-changing',()=>{
+  cancelToolMapPick();
   if(busy)return;
   clearHeatmap();
   invalidate();snapshot=null;remoteList=[];selected=null;
