@@ -13,7 +13,7 @@ const C=[
  ['Equipment & effects',['Loadout Generator','Weapon Blueprint Generator','Bag Fill Generator','CfgEffect Converter']]
 ];
 const TOOLS=C.flatMap(([group,names])=>names.map(name=>({name,group})));
-const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','SpawnObject Heatmap','Event Group Calculator','Gas Zone Generator','Build Relocator','Weapon Blueprint Generator','Bag Fill Generator','Loot & Proxy Calculator']);
+const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','SpawnObject Heatmap','Event Group Calculator','Gas Zone Generator','Build Relocator','Weapon Blueprint Generator','Bag Fill Generator','Loot & Proxy Calculator','Horde Generator']);
 const RELATED={'Events Organizer':'biToggle','Build A Vehicle':'biToggle'};
 const ROOT=document.createElement('div');ROOT.id='serverToolsRoot';
 ROOT.innerHTML=`
@@ -50,6 +50,7 @@ ROOT.innerHTML=`
    <div id="stPlayerSpawnControls" class="st-params" hidden><label class="st-field"><span>Spawn X</span><input id="stPlayerX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Spawn Z</span><input id="stPlayerZ" type="number" min="0" max="15360" step="0.01"></label></div>
    <div id="stMapControls" class="st-actions" hidden><button id="stPickMap" type="button">Pick on map</button><span class="st-help">Optional map selection for X/Z.</span></div>
    <div id="stHeatmapControls" class="st-actions" hidden><button id="stShowHeatmap" type="button">Show density on map</button><button id="stClearHeatmap" type="button">Clear heatmap</button></div>
+   <div id="stHordeControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing infected event type</span><select id="stHordeType"></select></label><label class="st-field"><span>X</span><input id="stHordeX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Z</span><input id="stHordeZ" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Radius (m)</span><input id="stHordeRadius" type="number" min="10" max="300" value="80"></label><label class="st-field"><span>Minimum infected</span><input id="stHordeMin" type="number" min="1" max="75" step="1" value="10"></label><label class="st-field"><span>Maximum infected</span><input id="stHordeMax" type="number" min="1" max="75" step="1" value="20"></label></div>
    <div id="stGasControls" class="st-params" hidden><label class="st-field st-wide"><span>New zone name</span><input id="stGasName" type="text" placeholder="BuildIt_GasZone_1"></label><label class="st-field"><span>X</span><input id="stGasX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Z</span><input id="stGasZ" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Ground height Y</span><input id="stGasY" type="number" min="-100" max="1200" step="0.01" placeholder="Real terrain elevation"></label><label class="st-field"><span>Radius (m)</span><input id="stGasRadius" type="number" min="10" max="300" step="1" value="50"></label></div>
    <div id="stRelocatorControls" class="st-params" hidden><label class="st-field"><span>New center X</span><input id="stRelocX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>New center Z</span><input id="stRelocZ" type="number" min="0" max="15360" step="0.01"></label><p class="st-help st-wide">Moves every object by the same offset. Terrain Y heights are unchanged; use flat ground to avoid floating or buried objects.</p></div>
    <div id="stEquipmentControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing parent classname (weapon or container)</span><input id="stEquipParent" type="text" placeholder="e.g. M4A1 or TaloonBag_Green"></label><label class="st-field st-wide"><span>Existing attachment or cargo classname</span><input id="stEquipItem" type="text" placeholder="e.g. ACOGOptic, Apple"></label><label class="st-field"><span>Group chance (0–1)</span><input id="stEquipGroup" type="number" min="0" max="1" step="0.05" value="1"></label><label class="st-field"><span>Item chance (0–1)</span><input id="stEquipChance" type="number" min="0" max="1" step="0.05" value="1"></label></div>
@@ -91,9 +92,10 @@ const DEFAULTS={
  'Build Relocator':'custom/builditlootdrop.json',
  'Weapon Blueprint Generator':'cfgspawnabletypes.xml',
  'Bag Fill Generator':'cfgspawnabletypes.xml',
- 'Loot & Proxy Calculator':'db/types.xml'
+ 'Loot & Proxy Calculator':'db/types.xml',
+ 'Horde Generator':'env/zombie_territories.xml'
 };
-const EDITORS=new Set(['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Globals Configurator','Messages Generator','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','Gas Zone Generator','Build Relocator','Weapon Blueprint Generator','Bag Fill Generator']);
+const EDITORS=new Set(['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Globals Configurator','Messages Generator','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','Gas Zone Generator','Build Relocator','Weapon Blueprint Generator','Bag Fill Generator','Horde Generator']);
 function setStatus(text,error=false){
  $('stResult').textContent=text;$('stResult').dataset.error=String(error);
 }
@@ -102,7 +104,7 @@ function invalidate(){
 }
 function setBusy(value){
  busy=value;
- for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPickMap','stGasName','stGasX','stGasZ','stGasY','stGasRadius','stRelocX','stRelocZ','stEquipParent','stEquipItem','stEquipGroup','stEquipChance']){
+ for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPickMap','stGasName','stGasX','stGasZ','stGasY','stGasRadius','stRelocX','stRelocZ','stEquipParent','stEquipItem','stEquipGroup','stEquipChance','stHordeType','stHordeX','stHordeZ','stHordeRadius','stHordeMin','stHordeMax']){
    $(id).disabled=value;
  }
  $('stRun').disabled=value||!snapshot;
@@ -223,6 +225,12 @@ async function loadLive(){
      if(!entries.length)throw new Error('No objects to move in this JSON file.');
      fillObject();
    }
+   if(selected==='Horde Generator'){
+     const types=addons.territoryTypes(snapshot.content),select=$('stHordeType');
+     select.replaceChildren();
+     for(const t of types){const opt=document.createElement('option');opt.value=t.name;opt.textContent=t.name+' ('+t.count+' existing zones)';select.appendChild(opt);}
+     if(!types.length)throw new Error('No valid infected territory event types found.');
+   }
    if(selected==='Globals Configurator'){
      const variables=core.globalsList(snapshot.content);
      const select=$('stGlobalName');select.replaceChildren();
@@ -263,7 +271,8 @@ async function choose(name){
  $('stGasControls').hidden=name!=='Gas Zone Generator';
  $('stRelocatorControls').hidden=name!=='Build Relocator';
  $('stEquipmentControls').hidden=!['Weapon Blueprint Generator','Bag Fill Generator'].includes(name);
- $('stMapControls').hidden=!['SpawnObject Mover','Spawn Point Generator','Gas Zone Generator','Build Relocator'].includes(name);
+ $('stHordeControls').hidden=name!=='Horde Generator';
+ $('stMapControls').hidden=!['SpawnObject Mover','Spawn Point Generator','Gas Zone Generator','Build Relocator','Horde Generator'].includes(name);
  $('stValueLabel').textContent=name==='Advanced Types Editor'?'Set value':'Multiplier';
  $('stValue').value=name==='Types Reducer'||name==='Lifetime Reducer'?'0.5':
    name==='Advanced Types Editor'?'100':'2';
@@ -288,7 +297,7 @@ $('stBack').addEventListener('click',()=>{
 });
 $('stRemoteFile').addEventListener('change',()=>void loadLive());
 $('stReload').addEventListener('click',()=>void loadLive());
-for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPickMap','stGasName','stGasX','stGasZ','stGasY','stGasRadius','stRelocX','stRelocZ','stEquipParent','stEquipItem','stEquipGroup','stEquipChance']){
+for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPickMap','stGasName','stGasX','stGasZ','stGasY','stGasRadius','stRelocX','stRelocZ','stEquipParent','stEquipItem','stEquipGroup','stEquipChance','stHordeType','stHordeX','stHordeZ','stHordeRadius','stHordeMin','stHordeMax']){
  $(id).addEventListener('input',invalidate);$(id).addEventListener('change',invalidate);
 }
 $('stGlobalName').addEventListener('change',()=>{invalidate();refreshGlobal();});
@@ -336,6 +345,8 @@ $('stPickMap').addEventListener('click',()=>{
      $('stGasX').value=Number(p.x.toFixed(2));$('stGasZ').value=Number(p.z.toFixed(2));
    }else if(tool==='Build Relocator'){
      $('stRelocX').value=Number(p.x.toFixed(2));$('stRelocZ').value=Number(p.z.toFixed(2));
+   }else if(tool==='Horde Generator'){
+     $('stHordeX').value=Number(p.x.toFixed(2));$('stHordeZ').value=Number(p.z.toFixed(2));
    }
    invalidate();setStatus('Map position selected. Review then publish to Nitrado.');
  });
@@ -392,6 +403,13 @@ function analyze(){
    const change=ext.organizeObjects(source);
    return {content:change.content,changed:change.changed,message:'PREVIEW — Sort '+change.total+
      ' objects by classname. All object properties and positions remain unchanged.'};
+ }
+ if(selected==='Horde Generator'){
+   const change=addons.addHorde(source,$('stHordeType').value,$('stHordeX').value,$('stHordeZ').value,
+     $('stHordeRadius').value,$('stHordeMin').value,$('stHordeMax').value);
+   return {content:change.content,changed:1,message:'PREVIEW — New infected zone '+change.type+
+     '\nX '+change.x+' · Z '+change.z+' · radius '+change.radius+'m'+
+     '\nDynamic infected counts '+change.min+'–'+change.max+'. Actual spawns depend on server population and CE.'};
  }
  if(selected==='Gas Zone Generator'){
    const change=addons.addGasZone(source,$('stGasName').value,$('stGasX').value,
