@@ -37,6 +37,12 @@
   async function discover(){
     const initial=await list();
     const root=String(initial.root||'');
+    const expected=String(window.BUILD_IT_NITRADO_EXPECTED_USERNAME||'');
+    if(window.BUILD_IT_NITRADO_WORKER_MODE==='multi'){
+      if(!expected)throw new Error('Verify the selected multi-server Worker identity before browsing files.');
+      if(!root.startsWith('/games/'+expected+'/'))
+        throw new Error('Nitrado root does not match the selected server. File access blocked.');
+    }
     const match=root.match(/^\/games\/([A-Za-z0-9_-]{1,100})\/(?:noftp|ftproot)$/);
     if(!match)throw new Error('Nitrado root was not recognized.');
     for(const place of ['ftproot','noftp']){
@@ -51,6 +57,14 @@
     throw new Error('Active Chernarus mission not found. Confirm the mission and Nitrado server selection.');
   }
   let missionPromise=null;
+  let generation=0;
+  let activeWrites=0;
+  function resetForServer(){
+    generation++;
+    missionPromise=null;
+  }
+  window.addEventListener('buildit:nitrado-profile-changing',resetForServer);
+
   async function mission({refresh=false}={}){
     if(refresh)missionPromise=null;
     if(!missionPromise)missionPromise=discover().catch(e=>{missionPromise=null;throw e;});
@@ -79,14 +93,17 @@
   }
   async function read(relative){
     requireRequest();checkRelative(relative);
+    const version=generation;
     const base=await mission();
+    if(version!==generation)throw new Error('Server changed during the file read.');
     const path=base+'/'+relative;
     const data=await nitradoRequest('/api/files/read?file='+encodeURIComponent(path));
     if(data?.path!==path||typeof data?.content!=='string'||!/^[0-9a-f]{64}$/.test(data.sha256||''))
       throw new Error('Nitrado returned an incomplete response for '+relative+'.');
+    if(version!==generation)throw new Error('Server changed during the file read.');
     if(utf8(data.content)>MAX_BYTES)
       throw new Error(relative+' exceeds the Worker 4 MB edit limit.');
-    return Object.freeze({relative,path,content:data.content,sha256:data.sha256});
+    return Object.freeze({relative,path,content:data.content,sha256:data.sha256,serverGeneration:version});
   }
   const sameSource=(a,b)=>a?.path===b?.path&&a?.sha256===b?.sha256;
   function validateContent(path,content){
@@ -105,6 +122,10 @@
   }
   async function publish(snapshot,content){
     requireRequest();
+    if(snapshot?.serverGeneration!==generation)
+      throw new Error('Server was switched since this source was loaded; reload it before uploading.');
+    activeWrites++;
+    try{
     if(!writeKeyReady())throw new Error('Enter MAP_WRITE_KEY once under Server Tools → Connection.');
     if(!snapshot?.relative||!snapshot?.path||!snapshot?.sha256||!checkRelative(snapshot.relative))
       throw new Error('No verified server source is loaded.');
@@ -122,9 +143,13 @@
     });
     if(!result?.verified||!result?.backupPath)
       throw new Error('Upload could not be verified by Nitrado. Inspect the file before retrying.');
+    if(snapshot.serverGeneration!==generation)
+      throw new Error('Server changed during the upload, verify Nitrado before retrying.');
     return Object.freeze({path:snapshot.path,backupPath:result.backupPath,verified:true});
+    }finally{activeWrites--;}
   }
   window.BUILD_IT_SERVER_FILES=Object.freeze({
-    mission,available,read,publish,writeKeyReady,validateContent,checkRelative
+    mission,available,read,publish,writeKeyReady,validateContent,checkRelative,
+    resetForServer,isBusy:()=>activeWrites>0
   });
 })();
