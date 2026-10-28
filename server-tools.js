@@ -52,8 +52,8 @@ const $=id=>ROOT.querySelector('#'+id);
 const panel=$('toolHubPanel'),cards=$('stCards'),workspace=$('stWorkspace');
 let selected=null,sourceName='',result=null,urls=[];
 function clearDownloads(){urls.forEach(url=>URL.revokeObjectURL(url));urls=[]; $('stParts').replaceChildren();}
-function fileUrl(content){const url=URL.createObjectURL(new Blob([content],{type:'application/json;charset=utf-8'}));urls.push(url);return url;}
-function download(name,content){const a=document.createElement('a');a.href=fileUrl(content);a.download=name;document.body.appendChild(a);a.click();a.remove();}
+function fileUrl(content,name=''){const type=/\.xml$/i.test(name)?'application/xml;charset=utf-8':'application/json;charset=utf-8';const url=URL.createObjectURL(new Blob([content],{type}));urls.push(url);return url;}
+function download(name,content){const a=document.createElement('a');a.href=fileUrl(content,name);a.download=name;document.body.appendChild(a);a.click();a.remove();}
 function open(){
   panel.hidden=false;$('toolHubToggle').setAttribute('aria-expanded','true');
   const bi=document.getElementById('biPanel');if(bi)bi.hidden=true;
@@ -64,6 +64,9 @@ function close(){
 }
 $('toolHubToggle').addEventListener('click',()=>panel.hidden?open():close());
 $('toolHubClose').addEventListener('click',close);
+for(const id of ['filterToggle','logToggle','biToggle']){
+  document.getElementById(id)?.addEventListener('click',()=>{if(!panel.hidden)close();});
+}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!panel.hidden)close();});
 function render(){
   const search=$('stSearch').value.trim().toLowerCase(),category=$('stCategory').value;
@@ -140,7 +143,7 @@ $('stRun').addEventListener('click',()=>{
       const parts=core.splitJSON(source,$('stChunkSize').value);
       $('stResult').textContent='Split into '+parts.length+' file(s). Download each part below; no server files were changed.';
       for(const part of parts){
-        const a=document.createElement('a');a.href=fileUrl(part.content);a.download=part.filename;
+        const a=document.createElement('a');a.href=fileUrl(part.content,part.filename);a.download=part.filename;
         a.textContent=part.filename+' ('+part.count+' entries)';
         $('stParts').appendChild(a);
       }
