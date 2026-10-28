@@ -165,5 +165,5 @@ window.addEventListener('buildit:nitrado-profile-changing',()=>{
   if(pin){map.removeLayer(pin);pin=null;}
   refreshButton();
 });
-window.BUILD_IT_QUICK_SPAWN=Object.freeze({open,close,toggle});
+window.BUILD_IT_QUICK_SPAWN=Object.freeze({open,close,toggle,hasDraft:()=>!!chosen||!!coordinates});
 })();
