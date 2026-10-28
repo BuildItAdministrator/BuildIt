@@ -93,7 +93,7 @@ function appendEquipment(src,parent,item,kind,groupChance,itemChance){
  if(end<0)throw Error('No closing type element.');
  const nl=src.includes('\r\n')?'\r\n':'\n';
  const indent=old.match(/(?:\r\n|\n|\r)([ \t]+)<(?:attachments|cargo|damage)\b/)?.[1]||
-   src.match(/(?:\r\n|\n|\r)([ \t]+)<type\b/)?.[1]+'  '||'    ';
+   ((src.match(/(?:\r\n|\n|\r)([ \t]+)<type\b/)?.[1]||'  ')+'  ');
  const inner=indent+'  ';
  const section=nl+indent+'<'+kind+' chance="'+gc.toFixed(2)+'">'+nl+
    inner+'<item name="'+i+'" chance="'+ic.toFixed(2)+'" />'+nl+
