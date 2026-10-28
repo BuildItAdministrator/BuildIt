@@ -1382,3 +1382,73 @@ test('JSON loot migration replaces old Build It references with custom/builditlo
   expect(actual.spawners).toEqual(['custom/base.json','custom/builditlootdrop.json']);
   expect(actual.stamina).toBe(100);
 });
+
+
+test('server tool catalog lists 53 items with only functional tools actionable',async({page})=>{
+  const stats=await page.evaluate(()=>window.BUILD_IT_TOOLS);
+  expect(stats).toEqual({count:53,ready:8});
+  await page.locator('#toolHubToggle').click();
+  await expect(page.locator('#toolHubPanel')).toBeVisible();
+  await expect(page.locator('#stCards .st-card')).toHaveCount(53);
+  await page.locator('#stSearch').fill('JSON Validator');
+  await expect(page.locator('#stCards .st-card')).toHaveCount(1);
+  await page.locator('#stCards .st-card button').click();
+  await expect(page.locator('#stWorkTitle')).toHaveText('JSON Validator');
+  await page.locator('#stSource').fill('{"Objects":[{"name":"Apple","pos":[1,2,3]}]}');
+  await page.locator('#stRun').click();
+  await expect(page.locator('#stResult')).toContainText('VALID JSON');
+  await page.locator('#stBack').click();
+  await page.locator('#stSearch').fill('NPC Generator');
+  await expect(page.locator('#stCards .st-card')).toHaveCount(1);
+  await expect(page.locator('#stCards .st-card')).toContainText('Planned');
+  await expect(page.locator('#stCards .st-card button')).toHaveCount(0);
+});
+
+test('server tools preserve XML declaration and unchanged types when editing nominal',async({page})=>{
+  const xml='<?xml version="1.0" encoding="UTF-8"?>\n<types>\n  <type name="Apple"><nominal>10</nominal><min>5</min></type>\n  <type name="Pear"><nominal>20</nominal><min>2</min></type>\n</types>';
+  const result=await page.evaluate(xml=>{
+    const core=window.BUILD_IT_SERVER_CORE;
+    const result=core.editTypes(xml,{mode:'multiply',field:'nominal',value:2,classname:'Apple'});
+    return {changed:result.changed,content:result.content,valid:core.validate(result.content,'types.xml').description};
+  },xml);
+  expect(result.changed).toBe(1);
+  expect(result.content).toContain('<type name="Apple"><nominal>20</nominal><min>5</min></type>');
+  expect(result.content).toContain('<type name="Pear"><nominal>20</nominal><min>2</min></type>');
+  expect(result.content.startsWith('<?xml version="1.0" encoding="UTF-8"?>')).toBe(true);
+  expect(result.valid).toBe('Valid XML <types>');
+});
+
+test('server tools JSON splitter keeps Object Spawner positions and metadata',async({page})=>{
+  const result=await page.evaluate(()=>{
+    const core=window.BUILD_IT_SERVER_CORE;
+    const original={Version:1,Objects:[
+      {name:'Apple',pos:[4,300,5],enableCEPersistency:false},
+      {name:'Pear',pos:[6,301,7],enableCEPersistency:true},
+      {name:'Plum',pos:[8,302,9],enableCEPersistency:false}
+    ]};
+    const parts=core.splitJSON(JSON.stringify(original),2).map(p=>JSON.parse(p.content));
+    return {length:parts.length,parts};
+  });
+  expect(result.length).toBe(2);
+  expect(result.parts[0].Version).toBe(1);
+  expect(result.parts[0].Objects[0].pos).toEqual([4,300,5]);
+  expect(result.parts[1].Objects).toHaveLength(1);
+  expect(result.parts[1].Objects[0].name).toBe('Plum');
+});
+
+test('server tools report duplicate events, invalid JSON and do not upload',async({page})=>{
+  const data=await page.evaluate(()=>{
+    const core=window.BUILD_IT_SERVER_CORE;
+    const events='<events><event name="Test"><min>5</min><max>2</max></event><event name="Test"><min>1</min><max>4</max></event></events>';
+    const conflicts=core.eventConflicts(events);
+    let jsonRejected=false;
+    try{core.validate('{"broken":','input.json');}catch{jsonRejected=true;}
+    return {conflicts,jsonRejected};
+  });
+  expect(data.jsonRejected).toBe(true);
+  expect(data.conflicts.total).toBe(1);
+  expect(data.conflicts.findings).toEqual(expect.arrayContaining([
+    expect.stringContaining('min (5) exceeds max (2)'),
+    'Duplicate event name: Test'
+  ]));
+});
