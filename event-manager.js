@@ -601,7 +601,7 @@
         (repairs.length?'\n\nXML REPAIR NEEDED:\n'+repairs.join('\n')+
          '\nPlease approve the repair below before uploading.':'')+
         '\n\nFORMAT VALIDATED:\n'+
-        'events.xml — '+eventFormat.detail+'\n'+
+        'db/events.xml — '+eventFormat.detail+'\n'+
         'cfgeventspawns.xml — '+positionFormat.detail+
         '\nOriginal event entries, indentation and comments will be retained.'+
         '\nBoth files receive verified backups before replacement. If the second upload fails, restore the first from its backup.');
