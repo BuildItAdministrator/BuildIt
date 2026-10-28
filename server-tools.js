@@ -13,7 +13,7 @@ const C=[
  ['Equipment & effects',['Loadout Generator','Weapon Blueprint Generator','Bag Fill Generator','CfgEffect Converter']]
 ];
 const TOOLS=C.flatMap(([group,names])=>names.map(name=>({name,group})));
-const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator']);
+const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster']);
 const RELATED={'Events Organizer':'biToggle','Build A Vehicle':'biToggle'};
 const ROOT=document.createElement('div');ROOT.id='serverToolsRoot';
 ROOT.innerHTML=`
@@ -41,6 +41,7 @@ ROOT.innerHTML=`
    </div>
    <div id="stGlobalControls" class="st-params" hidden><label class="st-field"><span>Existing global</span><select id="stGlobalName"></select></label><label class="st-field"><span>New numeric value</span><input type="number" id="stGlobalValue" step="any"></label></div>
    <div id="stMessageControls" class="st-params" hidden><label class="st-field st-wide"><span>Server message (max 160 characters)</span><textarea id="stMessageText" maxlength="160" rows="3" placeholder="Welcome to our DayZ server!"></textarea></label><label class="st-field"><span>Repeat (minutes)</span><input id="stMessageInterval" type="number" min="1" max="1440" step="1" value="30"></label></div>
+   <div id="stTierControls" class="st-params" hidden><label class="st-field"><span>Explicit loot tier</span><select id="stTier"><option>Tier1</option><option>Tier2</option><option>Tier3</option><option>Tier4</option></select></label><label class="st-field"><span>Nominal multiplier</span><input id="stTierFactor" type="number" min="1" max="1000" step="0.1" value="2"></label></div>
    <div class="st-actions"><button id="stRun" type="button" disabled>Check / Preview</button><button id="stPublish" type="button" hidden disabled>Apply to Nitrado</button></div>
    <pre id="stResult" class="st-result" role="status" aria-live="polite"></pre>
    <details class="st-settings"><summary>Connection · MAP_WRITE_KEY</summary><p class="st-help">Use the same write key as the File Manager. This key is never saved.</p><label class="st-field"><span>Write key</span><input id="stWriteKey" type="password" autocomplete="off" placeholder="MAP_WRITE_KEY"></label></details>
@@ -63,7 +64,8 @@ const DEFAULTS={
  'Globals Configurator':'db/globals.xml',
  'Spawnable Duplicate Checker':'cfgspawnabletypes.xml',
  'SpawnObject Duplicate Checker':'custom/builditlootdrop.json',
- 'Messages Generator':'db/messages.xml'
+ 'Messages Generator':'db/messages.xml',
+ 'Tier Booster':'db/types.xml'
 };
 const EDITORS=new Set(['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Globals Configurator','Messages Generator']);
 function setStatus(text,error=false){
@@ -74,7 +76,7 @@ function invalidate(){
 }
 function setBusy(value){
  busy=value;
- for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue','stMessageText','stMessageInterval']){
+ for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor']){
    $(id).disabled=value;
  }
  $('stRun').disabled=value||!snapshot;
@@ -185,6 +187,7 @@ async function choose(name){
  $('stParameters').hidden=!types;
  $('stGlobalControls').hidden=name!=='Globals Configurator';
  $('stMessageControls').hidden=name!=='Messages Generator';
+ $('stTierControls').hidden=name!=='Tier Booster';
  $('stValueLabel').textContent=name==='Advanced Types Editor'?'Set value':'Multiplier';
  $('stValue').value=name==='Types Reducer'||name==='Lifetime Reducer'?'0.5':
    name==='Advanced Types Editor'?'100':'2';
@@ -208,7 +211,7 @@ $('stBack').addEventListener('click',()=>{
 });
 $('stRemoteFile').addEventListener('change',()=>void loadLive());
 $('stReload').addEventListener('click',()=>void loadLive());
-for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval']){
+for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor']){
  $(id).addEventListener('input',invalidate);$(id).addEventListener('change',invalidate);
 }
 $('stGlobalName').addEventListener('change',()=>{invalidate();refreshGlobal();});
@@ -230,6 +233,12 @@ function analyze(){
    return {message:'Checked '+info.total+' entries in '+snapshot.relative+
      '\n'+info.findings.length+' issue(s).'+
      (info.findings.length?'\n'+info.findings.slice(0,100).join('\n'):'\nNo conflicts detected by the basic checks.')};
+ }
+ if(selected==='Tier Booster'){
+   const factor=Number($('stTierFactor').value);
+   if(!Number.isFinite(factor)||factor<1||factor>1000)throw new Error('Tier multiplier must be between 1 and 1000.');
+   const changes=core.editTypes(source,{mode:'multiply',field:'nominal',value:factor,tier:$('stTier').value});
+   return {content:changes.content,changed:changes.changed,message:'PREVIEW — '+changes.changed+' explicit '+$('stTier').value+' entries will have nominal counts multiplied by '+factor+'.\nCustom tier aliases are not modified.'};
  }
  if(selected==='Messages Generator'){
    const changes=core.addMessage(source,$('stMessageText').value,$('stMessageInterval').value);
