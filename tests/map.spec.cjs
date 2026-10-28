@@ -644,3 +644,123 @@ test('Event Manager Nitrado deploy stops with clear error if upload permission i
   expect(attempts).toBe(1);
   await expect(page.locator('#biUploadServer')).toBeDisabled();
 });
+
+
+test('Event Manager uploads preserve exact original XML declaration, comments, indentation and line endings',async({page})=>{
+  const noftp='/games/ni5774718_3/noftp';
+  const mission='/games/ni5774718_3/ftproot/dayzps_missions/dayzOffline.chernarusplus';
+  const eventPath=mission+'/db/events.xml';
+  const positionPath=mission+'/cfgeventspawns.xml';
+  // Two real-world formatting conventions: CRLF/tabs for events and LF/spaces
+  // for the fixed spawn position file. Neither may be serialized wholesale.
+  const originals={
+    [eventPath]:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'+
+      '<!-- Custom world events: keep this exact comment &amp; spacing -->\r\n'+
+      '<events>\r\n\t<!-- Existing vehicle configuration -->\r\n'+
+      '\t<event name="VehicleVanilla">\r\n\t\t<nominal>1</nominal>\r\n'+
+      '\t\t<children><child type="OffroadHatchback"/></children>\r\n\t</event>\r\n</events>\r\n',
+    [positionPath]:'<?xml version="1.0" encoding="UTF-8"?>\n'+
+      '<!-- Position entries manually maintained -->\n'+
+      '<eventposdef>\n  <event name="VehicleVanilla">\n'+
+      '    <pos x="1100" z="5000" a="90"/>\n  </event>\n</eventposdef>\n'
+  };
+  const uploaded={};
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const req=route.request(),u=new URL(req.url()),dir=u.searchParams.get('dir');
+    let status=200,response={ok:true};
+    if(u.pathname==='/api/files/list'){
+      if(!dir)response={root:noftp,dir:noftp,entries:[]};
+      else if(dir===mission)response={root:noftp,dir,entries:[{name:'db',type:'directory',path:mission+'/db'}]};
+      else{status=404;response={error:'Missing directory'}}
+    }else if(u.pathname==='/api/files/read'){
+      const path=u.searchParams.get('file');
+      if(Object.hasOwn(originals,path))response={path,content:originals[path],sha256:(path===eventPath?'a':'b').repeat(64)};
+      else{status=404;response={error:'Missing XML'}}
+    }else if(u.pathname==='/api/files/write'){
+      const input=req.postDataJSON();
+      uploaded[input.path]=input.content;
+      response={verified:true,backupPath:input.path+'.buildit-backup-test'};
+    }else{status=404;response={error:'Unavailable'}}
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(response)});
+  });
+  await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='testing-read-access');
+  await page.locator('#nitradoWriteKey').evaluate(el=>el.value='testing-write-access');
+  await page.locator('#biToggle').click();
+  await page.locator('#biLoadServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('Live XML loaded');
+  await page.locator('#biName').fill('VehicleFormattingTest');
+  await page.locator('#biVehicleSearch').fill('OffroadHatchback');
+  await page.locator('#biPick').click();
+  await page.evaluate(()=>map.fire('click',{latlng:L.latLng(7000/SCALE-256,5000/SCALE)}));
+  await page.locator('#biSave').click();
+  await page.locator('#biPreviewServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('READY FOR REVIEW');
+  await page.locator('#biServerStopped').check();
+  page.on('dialog',d=>d.accept());
+  await page.locator('#biUploadServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('UPLOAD VERIFIED');
+  expect(Object.keys(uploaded).sort()).toEqual(Object.keys(originals).sort());
+  for(const [path,source] of Object.entries(originals)){
+    const result=uploaded[path];
+    expect(result).toBeTruthy();
+    const closing=path===eventPath?'</events>':'</eventposdef>';
+    const at=source.indexOf(closing);
+    expect(result.startsWith(source.slice(0,at))).toBe(true);
+    expect(result.endsWith(source.slice(at))).toBe(true);
+    expect((result.match(/<\?xml/g)||[]).length).toBe(1);
+    expect((result.match(/<event name="VehicleFormattingTest">/g)||[]).length).toBe(1);
+    expect((result.match(/<event name="VehicleVanilla">/g)||[]).length).toBe(1);
+    if(path===eventPath){
+      expect(result).toContain('\r\n\t<event name="VehicleFormattingTest">');
+      expect(result).toContain('\r\n\t\t<nominal>1</nominal>');
+      expect(result.replace(/\r\n/g,'')).not.toContain('\n');
+      expect(result).toContain('<!-- Existing vehicle configuration -->');
+    }else{
+      expect(result).toContain('\n  <event name="VehicleFormattingTest">');
+      expect(result).toContain('\n    <pos x="5000"');
+      expect(result).not.toContain('\r\n');
+      expect(result).toContain('<!-- Position entries manually maintained -->');
+    }
+    const parsed=await page.evaluate(({xml,root})=>{
+      const doc=new DOMParser().parseFromString(xml,'application/xml');
+      return {root:doc.documentElement.nodeName,error:!!doc.querySelector('parsererror'),events:doc.getElementsByTagName('event').length};
+    },{xml:result,root:path===eventPath?'events':'eventposdef'});
+    expect(parsed.error).toBe(false);
+    expect(parsed.root).toBe(path===eventPath?'events':'eventposdef');
+    expect(parsed.events).toBe(2);
+  }
+});
+
+test('Event Manager blocks non UTF-8 XML instead of silently rewriting encoding',async({page})=>{
+  const noftp='/games/ni5774718_3/noftp';
+  const mission='/games/ni5774718_3/ftproot/dayzps_missions/dayzOffline.chernarusplus';
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const req=route.request(),u=new URL(req.url()),dir=u.searchParams.get('dir');
+    const path=u.searchParams.get('file');
+    let status=200,response={ok:true};
+    if(u.pathname==='/api/files/list'){
+      if(!dir)response={root:noftp,dir:noftp,entries:[]};
+      else if(dir===mission)response={root:noftp,dir,entries:[{name:'db',path:mission+'/db',type:'directory'}]};
+      else{status=404;response={error:'No such folder'}}
+    }else if(u.pathname==='/api/files/read'){
+      response={path,sha256:'c'.repeat(64),content:path.endsWith('/events.xml')?
+        '<?xml version="1.0" encoding="ISO-8859-1"?><events></events>':
+        '<?xml version="1.0" encoding="UTF-8"?><eventposdef></eventposdef>'};
+    }else{status=404;response={error:'Blocked'}}
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(response)});
+  });
+  await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-key');
+  await page.locator('#biToggle').click();
+  await page.locator('#biLoadServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('Live XML loaded');
+  await page.locator('#biName').fill('VehicleWrongEncoding');
+  await page.locator('#biVehicleSearch').fill('OffroadHatchback');
+  await page.locator('#biPick').click();
+  await page.evaluate(()=>map.fire('click',{latlng:L.latLng(7000/SCALE-256,5000/SCALE)}));
+  await page.locator('#biSave').click();
+  await page.locator('#biPreviewServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('ISO-8859-1 encoding');
+  await expect(page.locator('#biUploadServer')).toBeDisabled();
+});
