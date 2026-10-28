@@ -85,11 +85,16 @@
       throw new Error('Value must be between 0 and 100,000,000.');
     if(mode==='multiply'&&value>1000)throw new Error('Multiplier must not exceed 1000.');
     const only=String(options?.classname||'').trim();
+    const tier=String(options?.tier||'');
+    if(tier&&!/^Tier[1-4]$/.test(tier))throw new Error('Select a valid DayZ loot tier.');
     if(only&&!/^[A-Za-z0-9_]+$/.test(only))throw new Error('Invalid classname filter.');
     let changed=0,skipped=0,matched=0;
     const fieldRe=new RegExp('(<'+field+'\\s*>)(\\s*)(\\d+)(\\s*)(<\\/'+field+'\\s*>)','i');
     const result=source.replace(/<type\b[^>]*\bname\s*=\s*(["'])([^"']+)\1[^>]*>[\s\S]*?<\/type\s*>/gi,(block,quote,name)=>{
       if(only&&name.toLowerCase()!==only.toLowerCase())return block;
+      // Only target entries with an explicit <value name="TierN"/>.
+      // Custom user aliases are deliberately not guessed.
+      if(tier&&!new RegExp('<value\\b[^>]*\\bname\\s*=\\s*(["\\x27])'+tier+'\\1','i').test(block))return block;
       matched++;
       if(!fieldRe.test(block)){skipped++;return block;}
       return block.replace(fieldRe,(whole,open,white,num,tail,close)=>{
@@ -101,7 +106,7 @@
         return open+white+next+tail+close;
       });
     });
-    if(!matched)throw new Error(only?'No type named '+only+' exists in this file.':'No <type> entries found.');
+    if(!matched)throw new Error(tier?'No explicit '+tier+' entries matched. Custom tier aliases are not expanded.':only?'No type named '+only+' exists in this file.':'No <type> entries found.');
     xmlDoc(result,'types');
     return {content:result,changed,skipped,matched,field,mode};
   }
