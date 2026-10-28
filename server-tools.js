@@ -163,6 +163,21 @@ async function refreshCatalog(){
  if(matches.some(f=>f.relative===DEFAULTS[selected]))select.value=DEFAULTS[selected];
  if(!matches.length)throw new Error('Required file '+(DEFAULTS[selected]||'')+' not found on Nitrado. No replacement file will be created.');
 }
+function fillGameplay(){
+ if(!snapshot)return;
+ const item=ext.gameplayEntries(snapshot.content).find(e=>e.path===$('stGameplayPath').value);
+ if(item)$('stGameplayValue').value=String(item.value);
+}
+function fillWeather(){
+ if(!snapshot)return;
+ const item=ext.weatherEntries(snapshot.content).find(e=>e.path===$('stWeatherPath').value);
+ if(item)$('stWeatherValue').value=String(item.value);
+}
+function fillObject(){
+ if(!snapshot)return;
+ const item=ext.objectList(snapshot.content).find(e=>String(e.index)===$('stObjectIndex').value);
+ if(item){$('stObjectX').value=item.pos[0];$('stObjectZ').value=item.pos[2];}
+}
 function refreshGlobal(){
  if(!snapshot)return;
  const item=core.globalsList(snapshot.content).find(x=>x.name===$('stGlobalName').value);
@@ -175,6 +190,27 @@ async function loadLive(){
    if(!relative)throw new Error('Choose a Nitrado file.');
    $('stFileState').textContent='Reading current server file…';
    snapshot=await bridge.read(relative);
+   if(selected==='Gameplay Generator'){
+     const entries=ext.gameplayEntries(snapshot.content),select=$('stGameplayPath');
+     select.replaceChildren();
+     for(const entry of entries){const o=document.createElement('option');o.value=entry.path;o.textContent=entry.label+' · '+entry.path;select.appendChild(o);}
+     if(!entries.length)throw new Error('No supported existing gameplay settings were found.');
+     fillGameplay();
+   }
+   if(selected==='Weather Manager'){
+     const entries=ext.weatherEntries(snapshot.content),select=$('stWeatherPath');
+     select.replaceChildren();
+     for(const entry of entries){const o=document.createElement('option');o.value=entry.path;o.textContent=entry.label;select.appendChild(o);}
+     if(!entries.length)throw new Error('No supported existing weather parameters found.');
+     fillWeather();
+   }
+   if(selected==='SpawnObject Mover'){
+     const entries=ext.objectList(snapshot.content),select=$('stObjectIndex');
+     select.replaceChildren();
+     for(const entry of entries){const o=document.createElement('option');o.value=String(entry.index);o.textContent=(entry.index+1)+'. '+entry.name+' ('+entry.pos[0]+', '+entry.pos[2]+')';select.appendChild(o);}
+     if(!entries.length)throw new Error('No objects to move in this JSON file.');
+     fillObject();
+   }
    if(selected==='Globals Configurator'){
      const variables=core.globalsList(snapshot.content);
      const select=$('stGlobalName');select.replaceChildren();
