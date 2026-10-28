@@ -1020,6 +1020,9 @@ async function nitradoRequest(path,{withServer=false,method='GET',body=null,writ
     throw new Error('The selected server has not been verified. Test the connection first.');
   }
 
+  if(isFileRequest && nitradoWorkerMode==='multi' &&
+     !window.BUILD_IT_NITRADO_EXPECTED_USERNAME)
+    throw new Error('Verify the multi-server Nitrado service (Test connection) before editing its files.');
   const headers=nitradoHeaders();
   if(writeKey){
     const field=document.getElementById('nitradoWriteKey');
@@ -1050,6 +1053,13 @@ async function nitradoRequest(path,{withServer=false,method='GET',body=null,writ
     try{data=await res.json()}catch(_){}
     if(activeEpoch!==(window.BUILD_IT_NITRADO_PROFILE_EPOCH||0))
       throw new Error('The active server changed during this request. Results were discarded.');
+    if(isFileRequest&&nitradoWorkerMode==='multi'){
+      const expected='/games/'+window.BUILD_IT_NITRADO_EXPECTED_USERNAME+'/';
+      if(path.startsWith('/api/files/list')&&data?.root&&!String(data.root).startsWith(expected))
+        throw new Error('File API points to a different Nitrado service. Access blocked.');
+      if(path.startsWith('/api/files/read')&&data?.path&&!String(data.path).startsWith(expected))
+        throw new Error('Nitrado read returned another server path. Access blocked.');
+    }
     if(!res.ok){
       const detail=data?.error||data?.message||`${res.status} ${res.statusText}`;
       throw new Error(detail);
@@ -1103,13 +1113,16 @@ async function loadNitradoServers({quiet=false}={}){
   // accessible default server, and do not add ?server=... to status/log requests.
   if(Array.isArray(data?.servers)){
     nitradoWorkerMode='multi';
+    window.BUILD_IT_NITRADO_WORKER_MODE='multi';
     populateNitradoServers(data.servers);
   }else if(data?.ok && Array.isArray(data?.endpoints) &&
            data.endpoints.includes('/api/status') && data.endpoints.includes('/api/logs')){
     nitradoWorkerMode='legacy';
+    window.BUILD_IT_NITRADO_WORKER_MODE='legacy';
     populateNitradoServers([{id:'default',name:'Default Server'}]);
   }else{
     nitradoWorkerMode='unknown';
+    window.BUILD_IT_NITRADO_WORKER_MODE='unknown';
     populateNitradoServers([]);
   }
 
