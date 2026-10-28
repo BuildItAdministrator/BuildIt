@@ -1393,7 +1393,7 @@ test('JSON loot migration replaces old Build It references with custom/builditlo
 
 test('server tools catalog shows 53 items, with no local-file import workflow',async({page})=>{
   const stats=await page.evaluate(()=>window.BUILD_IT_TOOLS);
-  expect(stats).toEqual({count:53,ready:19,mode:'nitrado'});
+  expect(stats).toEqual({count:53,ready:21,mode:'nitrado'});
   await page.locator('#toolHubToggle').click();
   await expect(page.locator('#toolHubPanel')).toBeVisible();
   await expect(page.locator('#stCards .st-card')).toHaveCount(53);
@@ -1679,4 +1679,23 @@ test('server SpawnObject Mover keeps elevation and other JSON objects unchanged'
    return {moved:data.Objects[0].pos,other:data.Objects[1].pos,meta:data.Version,sorted:JSON.parse(sorted.content).Objects[0].name};
  });
  expect(actual).toEqual({moved:[333,300,777],other:[20,200,30],meta:1,sorted:'A'});
+});
+
+
+test('Event Group Calculator counts live event positions and identifies duplicate coordinates',async({page})=>{
+  const result=await page.evaluate(()=>{
+    const data='<eventposdef><event name="CarSpawn"><pos x="123" z="456" a="0"/><pos x="123" z="456" a="0"/></event><event name="HeliCrash"><pos x="789" z="333" a="0"/></event></eventposdef>';
+    return window.BUILD_IT_SERVER_CORE.eventGroupStats(data);
+  });
+  expect(result.total).toBe(3);
+  expect(result.events).toEqual(expect.arrayContaining([{name:'CarSpawn',positions:2},{name:'HeliCrash',positions:1}]));
+  expect(result.warnings.some(w=>w.includes('Duplicate position'))).toBe(true);
+});
+
+test('Server Tools foregrounds live Nitrado actions and labels unsupported tools without false launch buttons',async({page})=>{
+  await page.locator('#toolHubToggle').click();
+  await expect(page.locator('#stCards .st-card').first()).toContainText('Connected to Nitrado');
+  await page.locator('#stSearch').fill('Airstrike Generator');
+  await expect(page.locator('#stCards .st-card')).toContainText('Nog in ontwikkeling');
+  await expect(page.locator('#stCards .st-card button')).toHaveCount(0);
 });
