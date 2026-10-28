@@ -5,7 +5,7 @@
   const css = document.createElement('style');
   css.id = 'buildit-right-dock-style';
   css.textContent = [
-    ':root{--bi-dock-right:12px;--bi-dock-width:264px;--bi-panel-top:213px}',
+    ':root{--bi-dock-right:12px;--bi-dock-width:264px;--bi-panel-top:259px}',
     '#placeSearchBox{position:absolute;top:12px;right:var(--bi-dock-right);left:auto;width:min(var(--bi-dock-width),calc(100vw - 24px));box-sizing:border-box;z-index:1170}',
     '#filterToggle,#logToggle,#biToggle{',
     'position:absolute!important;left:auto!important;right:var(--bi-dock-right)!important;',
@@ -28,7 +28,7 @@
     'position:absolute!important;top:var(--bi-panel-top)!important;',
     'right:var(--bi-dock-right)!important;left:auto!important;',
     'width:min(380px,calc(100vw - 24px))!important;min-width:0!important;',
-    'max-height:calc(100vh - 225px)!important;max-height:calc(100dvh - 225px)!important;',
+    'max-height:calc(100vh - 271px)!important;max-height:calc(100dvh - 271px)!important;',
     'overflow-y:auto!important;box-sizing:border-box!important;',
     'border-radius:11px!important;z-index:1160!important;',
     'scrollbar-width:thin;',
@@ -36,16 +36,16 @@
     '#biPanel[hidden],#filterPanel.hidden,#logPanel.hidden{display:none!important}',
     'body.buildit-searching #filterToggle,body.buildit-searching #logToggle,body.buildit-searching #biToggle{visibility:hidden!important}',
     '@media(max-width:600px){',
-    ':root{--bi-dock-right:10px;--bi-dock-width:230px;--bi-panel-top:210px}',
+    ':root{--bi-dock-right:10px;--bi-dock-width:230px;--bi-panel-top:259px}',
     '#filterPanel,#logPanel,#biPanel{width:calc(100vw - 20px)!important}',
     '}',
     '/* Respect iPhone safe areas in standalone Home Screen mode. */',
-    ':root{--bi-panel-top:calc(213px + env(safe-area-inset-top, 0px))}',
+    ':root{--bi-panel-top:calc(259px + env(safe-area-inset-top, 0px))}',
     '#placeSearchBox{top:calc(12px + env(safe-area-inset-top, 0px))!important}',
     '#filterToggle{top:calc(63px + env(safe-area-inset-top, 0px))!important}',
     '#logToggle{top:calc(109px + env(safe-area-inset-top, 0px))!important}',
     '#biToggle{top:calc(155px + env(safe-area-inset-top, 0px))!important}',
-    '@media(max-width:600px){:root{--bi-panel-top:calc(210px + env(safe-area-inset-top, 0px))}}',
+    '@media(max-width:600px){:root{--bi-panel-top:calc(259px + env(safe-area-inset-top, 0px))}}',
     '@media(max-height:320px){',
     '#filterPanel,#logPanel,#biPanel{max-height:95px!important}',
     '}'
