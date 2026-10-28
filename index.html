@@ -12,6 +12,12 @@ try {
 } catch (_) {
   document.documentElement.dataset.builditTheme = 'dark';
 }
+try {
+  document.documentElement.dataset.builditMenusHidden =
+    localStorage.getItem('buildit_menus_hidden_v1') === 'true' ? 'true' : 'false';
+} catch (_) {
+  document.documentElement.dataset.builditMenusHidden = 'false';
+}
 </script>
 
 <meta name="mobile-web-app-capable" content="yes">
