@@ -1056,12 +1056,12 @@
       return Array.isArray(raw)?raw.filter(d=>d&&valid(d.name)&&numbers(d.x,0,15360)&&numbers(d.z,0,15360)).slice(0,150):[];
     }catch{return[];}
   };
-  function bindDraftProfile(profileId){
+  function bindDraftProfile(profileId,{migrateLegacy=false}={}){
     const key=STORE+':'+String(profileId);
     if(key===activeDraftStore)return;
     try{
       localStorage.setItem(activeDraftStore,JSON.stringify(drafts));
-      if(activeDraftStore===STORE&&!localStorage.getItem(key))
+      if(activeDraftStore===STORE&&migrateLegacy&&!localStorage.getItem(key))
         localStorage.setItem(key,JSON.stringify(drafts));
     }catch(e){console.warn('Could not preserve server drafts:',e.message);}
     activeDraftStore=key;
@@ -1070,14 +1070,14 @@
     clearStaged();
     eventDeploy.mission='';
     eventDeploy.paths={};
-    eventDeploy.sources={};
+    eventDeploy.signatures={};eventDeploy.repairs={};
     lootStaged=null;
     for(const key of Object.keys(files))delete files[key];
     panel.hidden=true;
     $('biPick').textContent='Pick on map';
     resetForm();renderDrafts();
   }
-  window.BUILD_IT_EVENT_DRAFTS=Object.freeze({bindInitial:bindDraftProfile});
+  window.BUILD_IT_EVENT_DRAFTS=Object.freeze({bindInitial:(id,migrateLegacy=false)=>bindDraftProfile(id,{migrateLegacy})});
   window.addEventListener('buildit:nitrado-profile-changing',event=>{
     bindDraftProfile(event.detail.profileId);
   });
