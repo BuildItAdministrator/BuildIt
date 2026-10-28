@@ -1020,9 +1020,19 @@ async function nitradoRequest(path,{withServer=false,method='GET',body=null,writ
     throw new Error('The selected server has not been verified. Test the connection first.');
   }
 
+  if(isFileRequest&&window.BUILD_IT_NITRADO_PROFILES &&
+     !window.BUILD_IT_NITRADO_PROFILES.connectionMatches())
+    throw new Error('The current connection differs from the selected server profile. Use Manage to save or switch servers.');
   if(isFileRequest && nitradoWorkerMode==='multi' &&
      !window.BUILD_IT_NITRADO_EXPECTED_USERNAME)
     throw new Error('Verify the multi-server Nitrado service (Test connection) before editing its files.');
+  if(isFileRequest&&nitradoWorkerMode==='multi'){
+    const expectedRoot='/games/'+window.BUILD_IT_NITRADO_EXPECTED_USERNAME+'/';
+    const submitted=body&&typeof body==='object'?body.path:
+      path.startsWith('/api/files/read')?new URLSearchParams(path.split('?')[1]||'').get('file'):null;
+    if(submitted&&typeof submitted==='string'&&!submitted.startsWith(expectedRoot))
+      throw new Error('This file belongs to a different server. Nitrado write/read blocked.');
+  }
   const headers=nitradoHeaders();
   if(writeKey){
     const field=document.getElementById('nitradoWriteKey');
