@@ -1,0 +1,51 @@
+/* Compact browser-local server profile switcher */
+#biServerProfileDock{position:absolute;top:63px;right:var(--bi-dock-right,12px);
+ z-index:1156;width:min(var(--bi-dock-width,264px),calc(100vw - 24px));
+ height:40px;box-sizing:border-box;display:flex;align-items:center;gap:6px;
+ padding:5px 7px;border:1px solid var(--bi-line,#405864);border-radius:9px;
+ background:var(--bi-panel,rgba(17,23,28,.95));color:var(--bi-text,#f6f8fa);
+ box-shadow:var(--bi-shadow,0 3px 14px #0006);font:600 11px Arial,sans-serif}
+#biServerProfileDock label{flex:0 0 auto;white-space:nowrap;color:var(--bi-muted,#a6bfcb)}
+#biServerProfileSelect{flex:1;min-width:0;max-width:100%;height:29px;box-sizing:border-box;
+ border:1px solid var(--bi-line,#405864);border-radius:6px;padding:3px 4px;
+ background:var(--bi-panel-raised,#192e39);color:var(--bi-text,#fff);font-size:11px}
+#biServerProfileManage{flex:0 0 auto;border:1px solid var(--bi-line,#405864);border-radius:6px;
+ background:var(--bi-panel-raised,#192e39);color:var(--bi-text,#fff);height:29px;
+ padding:4px 7px;font-size:10px;font-weight:700;cursor:pointer}
+#biServerProfileManage:hover{border-color:var(--bi-accent,#46abc2)}
+#biServerProfilePanel{position:absolute;z-index:1185;
+ top:var(--bi-panel-top,305px);right:var(--bi-dock-right,12px);
+ width:min(410px,calc(100vw - 24px));max-height:calc(100dvh - 320px);overflow-y:auto;
+ box-sizing:border-box;border:1px solid var(--bi-line,#465863);border-radius:12px;
+ padding:15px;background:var(--bi-panel,#18242a);color:var(--bi-text,#e8eff3);
+ box-shadow:var(--bi-shadow,0 10px 30px #0008);font:12px/1.5 Arial,sans-serif}
+#biServerProfilePanel[hidden]{display:none!important}
+#biServerProfilePanel .bsp-header{display:flex;justify-content:space-between;align-items:center;
+ gap:8px;padding-bottom:11px;border-bottom:1px solid var(--bi-line,#44575e)}
+#biServerProfilePanel .bsp-header strong{display:block;font-size:17px}
+#biServerProfilePanel .bsp-header small{color:var(--bi-muted,#adbfc6);display:block;font-size:11px}
+#biServerProfilePanel label{display:block;font-size:11px;font-weight:700;
+ color:var(--bi-muted,#b4c4cd);margin:12px 0 4px}
+#biServerProfilePanel input,#biServerProfilePanel select{display:block;width:100%;box-sizing:border-box;
+ margin:5px 0 0;border:1px solid var(--bi-line,#455c69);border-radius:8px;
+ background:var(--bi-panel-raised,#1c3038);color:var(--bi-text,#e9f5fc);
+ padding:9px 10px;font:12px Arial,sans-serif}
+#biServerProfilePanel button{border:1px solid var(--bi-line,#546a78);border-radius:8px;
+ background:var(--bi-panel-raised,#234454);color:var(--bi-text,#fff);
+ font:700 11px Arial,sans-serif;padding:8px 10px;cursor:pointer}
+#biServerProfilePanel button:disabled{opacity:.5;cursor:default}
+#biServerProfilePanel button:hover:not(:disabled){border-color:var(--bi-accent,#69bcd9)}
+#biServerProfilePanel #bspClose{font-size:20px;padding:3px 10px}
+#biServerProfilePanel .bsp-actions{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}
+#biServerProfilePanel .bsp-actions button{flex:1;min-width:100px}
+#biServerProfilePanel #bspAdd{background:var(--bi-accent-deep,#176c80);color:#fff}
+#biServerProfilePanel .bsp-help{color:var(--bi-muted,#a8bfcb);font-size:11px;
+ line-height:1.5;margin:10px 0}
+#biServerProfilePanel #bspMessage{min-height:28px;border:1px solid var(--bi-line,#405966);
+ border-radius:8px;padding:9px 10px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px}
+#biServerProfilePanel #bspMessage[data-error=true]{color:#ee9292}
+body.buildit-searching #biServerProfileDock{visibility:hidden!important}
+@media(max-width:600px){#biServerProfileDock{right:10px;width:min(230px,calc(100vw - 20px))}
+ #biServerProfilePanel{right:10px;width:calc(100vw - 20px);
+ max-height:calc(100dvh - 318px)}}
+@supports(padding:env(safe-area-inset-top)){#biServerProfileDock{top:calc(63px + env(safe-area-inset-top,0px))}}
