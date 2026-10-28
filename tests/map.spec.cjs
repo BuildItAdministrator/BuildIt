@@ -1128,9 +1128,9 @@ test('Professional UI uses consistent line icons without changing controls or la
     ['biUploadServer','cloud'],['builditThemeToggle','sun']
   ]){
     const button=page.locator('#'+id);
-    await expect(button.locator('> svg.bi-icon')).toHaveCount(1);
-    await expect(button.locator('> svg.bi-icon')).toHaveAttribute('data-icon',icon);
-    await expect(button.locator('> svg.bi-icon')).toHaveAttribute('aria-hidden','true');
+    await expect(button.locator(':scope > svg.bi-icon')).toHaveCount(1);
+    await expect(button.locator(':scope > svg.bi-icon')).toHaveAttribute('data-icon',icon);
+    await expect(button.locator(':scope > svg.bi-icon')).toHaveAttribute('aria-hidden','true');
   }
   await expect(page.locator('#biToggle')).toHaveText('Event Manager');
   await expect(page.locator('#logToggle')).toHaveText('Logs');
