@@ -760,18 +760,11 @@ test('Event Manager blocks non UTF-8 XML instead of silently rewriting encoding'
   await page.locator('#biToggle').click();
   await page.locator('#biAdvanced').evaluate(el=>el.open=true);
   await page.locator('#biLoadServer').click();
-  await expect(page.locator('#biServerPreview')).toContainText('Server XML reloaded');
-  await page.locator('#biName').fill('VehicleWrongEncoding');
-  await page.locator('#biVehicleSearch').fill('OffroadHatchback');
-  await page.locator('#biPick').click();
-  await page.evaluate(()=>map.fire('click',{latlng:L.latLng(7000/SCALE-256,5000/SCALE)}));
-  await page.locator('#biSave').click();
-  await page.locator('#biPreviewServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('Nitrado reload failed');
   await expect(page.locator('#biServerPreview')).toContainText('ISO-8859-1 encoding');
   await expect(page.locator('#biUploadServer')).toBeDisabled();
+  // Refuse the invalid original before building a replacement XML document.
 });
-
-
 
 test('Event Manager shows the simplified vehicle flow and auto-syncs live XML on Review',async({page})=>{
   const noftp='/games/ni5774718_3/noftp';
@@ -820,4 +813,112 @@ test('Event Manager shows the simplified vehicle flow and auto-syncs live XML on
   expect(calls.every(c=>c.method==='GET')).toBe(true);
   await page.locator('#biAdvanced').evaluate(el=>el.open=true);
   await expect(page.locator('#biExportEvents')).toBeVisible();
+});
+
+
+test('Duplicate XML declarations can be repaired safely without touching original event content',async({page})=>{
+  const check=await page.evaluate(()=>{
+    const src='<?xml version="1.0" encoding="UTF-8"?>\r\n'+
+      '<?xml version="1.0"?>\r\n<events>\r\n  <!-- Keep all existing data -->\r\n  <event name="VehicleOld"/>\r\n</events>\r\n';
+    const result=window.BUILD_IT_XML.repairDuplicateDeclarations(src,'events');
+    const parsed=window.BUILD_IT_XML.validate(result.content,'events');
+    const clean='<?xml version="1.0" encoding="UTF-8"?>\r\n<events>\r\n  <!-- Keep all existing data -->\r\n  <event name="VehicleOld"/>\r\n</events>\r\n';
+    let rejected=false;
+    try{window.BUILD_IT_XML.repairDuplicateDeclarations('<?xml version="1.0"?><events><broken></events>','events')}
+    catch(e){rejected=e.message.includes('XML is invalid')}
+    return {changed:result.changed,removed:result.removed,same:result.content===clean,root:parsed.documentElement.nodeName,rejected};
+  });
+  expect(check).toEqual({changed:true,removed:1,same:true,root:'events',rejected:true});
+});
+
+test('Nitrado File Manager offers explicit duplicate header repair, no automatic upload',async({page})=>{
+  const root='/games/ni123/noftp',path=root+'/events.xml';
+  const broken='<?xml version="1.0" encoding="UTF-8"?>\n<?xml version="1.0"?>\n<events><event name="VehicleOld"/></events>';
+  const writes=[];
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const url=new URL(route.request().url());
+    let response={ok:true},status=200;
+    if(url.pathname==='/api/files/list')
+      response={root,dir:root,entries:[{name:'events.xml',path,type:'file',size:broken.length}]};
+    else if(url.pathname==='/api/files/read')
+      response={path,content:broken,sha256:'a'.repeat(64)};
+    else if(url.pathname==='/api/files/write'){
+      writes.push(route.request().postDataJSON());
+      response={verified:true,backupPath:path+'.backup'};
+    }else{status=404;response={error:'Not found'}}
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(response)});
+  });
+  await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-access');
+  await page.locator('#logToggle').click();
+  await page.locator('#fmBrowse').click();
+  await page.locator('.fm-entry').filter({hasText:'events.xml'}).click();
+  await expect(page.locator('#fmRepairXml')).toBeVisible();
+  await expect(page.locator('#fmStatus')).toContainText('Duplicate XML declaration detected');
+  expect(writes).toHaveLength(0);
+  await page.locator('#fmRepairXml').click();
+  await expect(page.locator('#fmRepairXml')).toBeHidden();
+  await expect(page.locator('#fmStatus')).toContainText('Removed 1 duplicate XML');
+  const repaired=await page.locator('#fmEditor').inputValue();
+  expect((repaired.match(/<\?xml/g)||[])).toHaveLength(1);
+  expect(repaired).toContain('VehicleOld');
+  expect(writes).toHaveLength(0);
+});
+
+test('Event Manager explicitly approves removing a pre-existing duplicate XML header before upload',async({page})=>{
+  const root='/games/ni5774718_3/noftp';
+  const mission='/games/ni5774718_3/ftproot/dayzps_missions/dayzOffline.chernarusplus';
+  const events=mission+'/db/events.xml',positions=mission+'/cfgeventspawns.xml';
+  const eventOriginal='<?xml version="1.0" encoding="UTF-8"?>\r\n<?xml version="1.0"?>\r\n'+
+    '<events>\r\n\t<!-- keep me -->\r\n\t<event name="VehicleOld"><children><child type="OffroadHatchback"/></children></event>\r\n</events>\r\n';
+  const positionOriginal='<?xml version="1.0" encoding="UTF-8"?>\n'+
+    '<eventposdef><event name="VehicleOld"><pos x="4" z="5" a="1"/></event></eventposdef>';
+  let uploads=[];
+  await page.addInitScript(()=>{
+    localStorage.setItem('buildit_events_drafts_v1',JSON.stringify([
+      {name:'VehicleRepairSafe',kind:'vehicle',x:4656,z:9111,a:0,vehicle:'OffroadHatchback'}
+    ]));
+  });
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const req=route.request(),u=new URL(req.url()),dir=u.searchParams.get('dir');
+    let status=200,data={ok:true};
+    if(u.pathname==='/api/files/list'){
+      if(!dir)data={root,dir:root,entries:[]};
+      else if(dir===mission)data={root,dir,entries:[{name:'db',type:'directory',path:mission+'/db'}]};
+      else{status=404;data={error:'Not found'}}
+    }else if(u.pathname==='/api/files/read'){
+      const path=u.searchParams.get('file');
+      data={path,content:path===events?eventOriginal:positionOriginal,sha256:(path===events?'a':'b').repeat(64)};
+    }else if(u.pathname==='/api/files/write'){
+      uploads.push(req.postDataJSON());
+      data={verified:true,backupPath:req.postDataJSON().path+'.backup'};
+    }else{status=404;data={error:'Not found'}}
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
+  });
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-access');
+  await page.locator('#nitradoWriteKey').evaluate(el=>el.value='random-write-key');
+  await page.locator('#biToggle').click();
+  await page.locator('#biPreviewServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('XML REPAIR NEEDED');
+  await expect(page.locator('#biServerPreview')).toContainText('events.xml: 1 extra declaration');
+  await expect(page.locator('#biRepairConfirm')).toBeVisible();
+  await page.locator('#biServerStopped').check();
+  await page.locator('#biUploadServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('Approve removing the duplicate XML headers');
+  expect(uploads).toHaveLength(0);
+  await page.locator('#biRepairAcknowledge').check();
+  page.on('dialog',d=>d.accept());
+  await page.locator('#biUploadServer').click();
+  await expect(page.locator('#biServerPreview')).toContainText('UPLOAD VERIFIED');
+  expect(uploads).toHaveLength(2);
+  const writtenEvents=uploads.find(x=>x.path===events);
+  expect(writtenEvents.content).toContain('<!-- keep me -->');
+  expect(writtenEvents.content).toContain('VehicleOld');
+  expect(writtenEvents.content).toContain('VehicleRepairSafe');
+  expect((writtenEvents.content.match(/<\?xml/g)||[])).toHaveLength(1);
+  expect(writtenEvents.content).toContain('\r\n\t<event name="VehicleRepairSafe">');
+  expect(uploads.find(x=>x.path===positions).content.match(/<\?xml/g)).toHaveLength(1);
+  await expect(page.locator('#biDraftCount')).toHaveText('0 saved');
 });

@@ -112,6 +112,7 @@
     '<p class="biSmall">Review automatically loads fresh events.xml and cfgeventspawns.xml. Original lines and comments remain untouched.</p>',
     '<button type="button" id="biPreviewServer" class="biPrimary biFull">Review &amp; prepare changes</button>',
     '<div id="biServerPreview" class="biMessage" role="status" aria-live="polite">Save a vehicle event, then review the changes.</div>',
+    '<label class="biConfirm" id="biRepairConfirm" hidden><input type="checkbox" id="biRepairAcknowledge"> I approve removing the duplicate XML declarations detected in the server files.</label>',
     '<label class="biConfirm"><input type="checkbox" id="biServerStopped"> My DayZ server is stopped and I have reviewed the changes.</label>',
     '<button type="button" id="biUploadServer" class="biPrimary biFull" disabled>Back up &amp; upload</button>',
     '<p class="biSmall">An upload requires your file-write key. Existing files are checked and backed up before replacement.</p></section>',
@@ -470,7 +471,7 @@
   // replacements unless BOTH matching complete server files were loaded first.
   // Each POST goes through the Worker with MAP_WRITE_KEY + checksum and backup.
   const eventDeploy = {
-    mission:'', paths:{}, signatures:{}, staged:null, loading:false, sending:false
+    mission:'', paths:{}, signatures:{}, repairs:{}, staged:null, loading:false, sending:false
   };
   const deploySummary = $('biServerPreview');
   const deployLoad = $('biLoadServer');
@@ -522,6 +523,8 @@
     eventDeploy.staged=null;
     deployUpload.disabled=true;
     $('biServerStopped').checked=false;
+    $('biRepairAcknowledge').checked=false;
+    $('biRepairConfirm').hidden=true;
   }
   async function loadLiveXml(){
     if(eventDeploy.loading||eventDeploy.sending)throw new Error('A Nitrado operation is already running.');
@@ -538,13 +541,17 @@
       const [events,positions]=await Promise.all([
         serverXmlRead(paths['events.xml']),serverXmlRead(paths['cfgeventspawns.xml'])
       ]);
-      parseXML(events.content,'events');parseXML(positions.content,'eventposdef');
-      files['events.xml']=events.content;
-      files['cfgeventspawns.xml']=positions.content;
+      // Repair ONLY repeated XML declarations directly at the top.
+      // The live server files remain unchanged until the user authorizes an upload.
+      const eventClean=window.BUILD_IT_XML.repairDuplicateDeclarations(events.content,'events');
+      const positionClean=window.BUILD_IT_XML.repairDuplicateDeclarations(positions.content,'eventposdef');
+      files['events.xml']=eventClean.content;
+      files['cfgeventspawns.xml']=positionClean.content;
+      eventDeploy.repairs={'events.xml':eventClean.removed,'cfgeventspawns.xml':positionClean.removed};
       eventDeploy.mission=mission;
       eventDeploy.paths=paths;
       eventDeploy.signatures={'events.xml':events.sha256,'cfgeventspawns.xml':positions.sha256};
-      addCatalog(parseXML(events.content,'events'),'events');
+      addCatalog(parseXML(eventClean.content,'events'),'events');
       catalogStatus();updateChoices('vehicle');
       $('biImportStatus').textContent='Latest events.xml and cfgeventspawns.xml loaded from Nitrado.';
     }finally{
@@ -576,15 +583,25 @@
       if(new TextEncoder().encode(events.xml).byteLength>512*1024||
          new TextEncoder().encode(positions.xml).byteLength>512*1024)
         throw new Error('Generated XML exceeds the 512 KB upload limit.');
+      // Revalidate the final text, not only the source files. Never upload a
+      // duplicate <?xml...?> or another malformed XML document.
+      window.BUILD_IT_XML.validate(events.xml,'events');
+      window.BUILD_IT_XML.validate(positions.xml,'eventposdef');
       eventDeploy.staged={
         xml:{'events.xml':events.xml,'cfgeventspawns.xml':positions.xml},
         snapshot:deploymentSnapshot()
       };
+      const repairs=Object.entries(eventDeploy.repairs)
+        .filter(([,count])=>count>0)
+        .map(([file,count])=>file+': '+count+' extra declaration(s) removed');
+      $('biRepairConfirm').hidden=repairs.length===0;
       const previewNames=selected.map(d=>d.name+' · '+d.vehicle+
         ' · X '+d.x+', Z '+d.z+', '+d.a+'°').join('\n');
       setDeploy('READY — '+selected.length+' vehicle event(s) will be added:\n\n'+previewNames+
+        (repairs.length?'\n\nXML REPAIR NEEDED:\n'+repairs.join('\n')+
+         '\nPlease approve the repair below before uploading.':'')+
         '\n\nFiles: db/events.xml and cfgeventspawns.xml.'+
-        '\nOriginal XML structure, whitespace and comments will be retained.'+
+        '\nOriginal event entries, indentation and comments will be retained.'+
         '\nBoth files receive verified backups before replacement. If the second upload fails, restore the first from its backup.');
       deployUpload.disabled=false;
     }catch(e){
@@ -598,6 +615,9 @@
     if(!staged){setDeploy('Preview the changes first.',true);return;}
     if(staged.snapshot!==deploymentSnapshot()){
       clearStaged();setDeploy('Drafts changed since preview. Preview again before uploading.',true);return;
+    }
+    if(!$('biRepairConfirm').hidden && !$('biRepairAcknowledge').checked){
+      setDeploy('Approve removing the duplicate XML headers before uploading.',true);return;
     }
     if(!$('biServerStopped').checked){
       setDeploy('Stop your DayZ server and check the confirmation box before uploading.',true);return;
@@ -615,6 +635,8 @@
           throw new Error(name+' changed on Nitrado since loading. Reload both files and preview again. No uploads started.');
       }
       for(const name of changes){
+        const expectedRoot=name==='events.xml'?'events':'eventposdef';
+        window.BUILD_IT_XML.validate(staged.xml[name],expectedRoot);
         setDeploy('Creating verified backup and uploading '+name+' ('+(results.length+1)+'/2)…');
         const result=await nitradoRequest('/api/files/write',{
           method:'POST',writeKey:true,

@@ -24,6 +24,7 @@
       '<label class="fm-label" for="fmEditor">Selected server file</label>',
       '<div id="fmSelected" class="fm-path"></div>',
       '<textarea id="fmEditor" spellcheck="false" rows="12" aria-label="Server file editor"></textarea>',
+      '<div class="fm-row"><button type="button" id="fmRepairXml" class="log-btn" hidden>Fix duplicate XML header</button></div>',
       '<label class="fm-label" for="fmLocalFile">Load a local replacement into the editor</label>',
       '<input id="fmLocalFile" type="file" accept=".xml,.json,.txt">',
       '<div class="fm-row"><button type="button" id="fmDownload" class="log-btn">Download copy</button><button type="button" id="fmSave" class="log-btn">Backup &amp; upload</button></div>',
@@ -108,6 +109,7 @@
       $('fmBack').disabled=!dir || dir===currentRoot;
       $('fmSave').disabled=!selected;
       $('fmDownload').disabled=!selected;
+      $('fmRepairXml').disabled=!selected || !/\.xml$/i.test(selected);
     }
   }
   function discoverRoots(serverRoot){
@@ -202,15 +204,35 @@
     $('fmSelected').textContent=selected;
     $('fmLocalFile').value='';
     box.hidden=false;
-    state('File opened. A backup will be verified before any upload.');
+    refreshRepairButton();
+    if($('fmRepairXml').hidden)
+      state('File opened. A backup will be verified before any upload.');
+    else
+      state('Duplicate XML declaration detected. Click Fix duplicate XML header to repair the editor copy. No server file has been changed.',true);
   }
+  function refreshRepairButton(){
+    const btn=$('fmRepairXml');
+    btn.hidden=!selected || !/\.xml$/i.test(selected);
+    if(btn.hidden)return;
+    // Only offer repair if we can prove the extra header is directly after
+    // the first, without any other XML content between them.
+    btn.hidden=!/^\uFEFF?<\?xml\s+[^?]*\?>[ \t\r\n]+<\?xml\s+[^?]*\?>/i.test(editor.value);
+  }
+  editor.addEventListener('input',refreshRepairButton);
+  $('fmRepairXml').addEventListener('click',()=>{
+    if(!selected || !/\.xml$/i.test(selected))return;
+    try{
+      const repaired=window.BUILD_IT_XML.repairDuplicateDeclarations(editor.value);
+      if(!repaired.removed)throw new Error('No duplicate XML declaration found. No changes made.');
+      editor.value=repaired.content;
+      refreshRepairButton();
+      state('Removed '+repaired.removed+' duplicate XML declaration(s) from the EDITOR COPY. Review the text and use Backup & upload to save it to Nitrado. No files were uploaded.');
+    }catch(e){state('XML repair not possible: '+e.message,true);}
+  });
   function validateText(path,text){
     if(new Blob([text]).size>512*1024)throw new Error('File exceeds 512 KB.');
     if(/\.json$/i.test(path)) JSON.parse(text);
-    if(/\.xml$/i.test(path)){
-      const parsed=new DOMParser().parseFromString(text,'application/xml');
-      if(parsed.querySelector('parsererror'))throw new Error('XML is not well-formed. Upload cancelled.');
-    }
+    if(/\.xml$/i.test(path))window.BUILD_IT_XML.validate(text);
   }
   $('fmBrowse').addEventListener('click',()=>perform(async()=>{
     if(!root)await browse();
@@ -243,7 +265,7 @@
     }
     if(file.size>512*1024){state('Local file exceeds 512 KB.',true);return}
     const text=await file.text();
-    try {validateText(selected,text);editor.value=text;state('Local replacement loaded into editor. Not yet uploaded.')}
+    try {validateText(selected,text);editor.value=text;refreshRepairButton();state('Local replacement loaded into editor. Not yet uploaded.')}
     catch(e){state(e.message,true)}
   });
   $('fmSave').addEventListener('click',()=>perform(async()=>{
