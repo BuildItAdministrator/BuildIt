@@ -24,6 +24,8 @@
       '<label class="fm-label" for="fmEditor">Selected server file</label>',
       '<div id="fmSelected" class="fm-path"></div>',
       '<textarea id="fmEditor" spellcheck="false" rows="12" aria-label="Server file editor"></textarea>',
+      '<div id="fmValidationStatus" class="fm-validation" role="status" aria-live="polite">Validation not run.</div>',
+      '<div class="fm-row"><button type="button" id="fmValidate" class="log-btn">Validate XML / JSON</button></div>',
       '<div class="fm-row"><button type="button" id="fmRepairXml" class="log-btn" hidden>Fix duplicate XML header</button></div>',
       '<label class="fm-label" for="fmLocalFile">Load a local replacement into the editor</label>',
       '<input id="fmLocalFile" type="file" accept=".xml,.json,.txt">',
@@ -87,12 +89,18 @@
     '#fileManager .fm-entry{background:#1c2c35;color:#e8f0f4;border:0;border-bottom:1px solid #3c4c55;text-align:left;width:100%;padding:9px 7px;cursor:pointer;display:block;overflow-wrap:anywhere}',
     '#fileManager .fm-entry:hover{background:#304c58}',
     '#fileManager button:disabled{opacity:.5;cursor:not-allowed}',
-    '#fmStatus{white-space:pre-wrap;line-height:1.45}'
+    '#fmStatus{white-space:pre-wrap;line-height:1.45}',
+    '#fmValidationStatus{padding:8px 10px;margin:8px 0;border:1px solid #50616a;border-radius:6px;font-size:11px;line-height:1.5;overflow-wrap:anywhere;white-space:pre-wrap}',
+    '#fmValidationStatus[data-validation="valid"]{border-color:#4c9870;color:#9fe0b5;background:rgba(29,97,66,.12)}',
+    '#fmValidationStatus[data-validation="invalid"]{border-color:#b45d5d;color:#ffb4b4;background:rgba(126,28,28,.12)}',
+    'html[data-buildit-theme="light"] #fmValidationStatus[data-validation="valid"]{color:#176940}',
+    'html[data-buildit-theme="light"] #fmValidationStatus[data-validation="invalid"]{color:#9a2525}'
   ].join('\n');
   document.head.appendChild(style);
   const $=id=>document.getElementById(id);
   const entries=$('fmEntries'), editor=$('fmEditor'), box=$('fmFileBox');
   let root='',dir='',currentRoot='',storageRoots=[],selected='',sourceDigest='',running=false;
+  let validationOk=false,validationResult=null,validationTimer=null;
   const state=(message,error=false)=>{
     $('fmStatus').textContent=message;
     $('fmStatus').style.color=error?'#ffadad':'#a8d6e4';
@@ -107,8 +115,9 @@
       running=false;
       controls.forEach(b=>b.disabled=false);
       $('fmBack').disabled=!dir || dir===currentRoot;
-      $('fmSave').disabled=!selected;
+      $('fmSave').disabled=!selected || !validationOk;
       $('fmDownload').disabled=!selected;
+      $('fmValidate').disabled=!selected;
       $('fmRepairXml').disabled=!selected || !/\.xml$/i.test(selected);
     }
   }
@@ -145,6 +154,11 @@
     entries.replaceChildren();
     selected='';
     sourceDigest='';
+    validationOk=false;
+    validationResult=null;
+    clearTimeout(validationTimer);
+    $('fmValidationStatus').textContent='Validation not run.';
+    $('fmValidationStatus').dataset.validation='';
     box.hidden=true;
     for(const item of items){
       const folder=['dir','directory','folder'].includes(String(item.type).toLowerCase());
@@ -205,6 +219,7 @@
     $('fmLocalFile').value='';
     box.hidden=false;
     refreshRepairButton();
+    refreshValidation();
     if($('fmRepairXml').hidden)
       state('File opened. A backup will be verified before any upload.');
     else
@@ -218,7 +233,47 @@
     // the first, without any other XML content between them.
     btn.hidden=!/^\uFEFF?<\?xml\s+[^?]*\?>[ \t\r\n]+<\?xml\s+[^?]*\?>/i.test(editor.value);
   }
-  editor.addEventListener('input',refreshRepairButton);
+  function refreshValidation(){
+    clearTimeout(validationTimer);
+    validationOk=false;
+    validationResult=null;
+    const label=$('fmValidationStatus');
+    if(!selected){
+      label.textContent='Open a server file to validate it.';
+      label.dataset.validation='';
+      $('fmSave').disabled=true;
+      return false;
+    }
+    try{
+      if(!window.BUILD_IT_FORMAT?.validate)
+        throw new Error('Validator unavailable. Reload Build It!++ before uploading.');
+      validationResult=window.BUILD_IT_FORMAT.validate(selected,editor.value);
+      validationOk=true;
+      label.dataset.validation='valid';
+      label.textContent='VALID — '+validationResult.detail+' ('+validationResult.bytes+' bytes). Ready for backup and upload.';
+    }catch(error){
+      label.dataset.validation='invalid';
+      label.textContent='INVALID — '+String(error.message||error)+'. Upload blocked.';
+    }
+    $('fmSave').disabled=running||!validationOk;
+    return validationOk;
+  }
+  function scheduleValidation(){
+    clearTimeout(validationTimer);
+    validationOk=false;
+    $('fmSave').disabled=true;
+    $('fmValidationStatus').dataset.validation='';
+    $('fmValidationStatus').textContent='Checking edited file…';
+    validationTimer=setTimeout(refreshValidation,180);
+  }
+  editor.addEventListener('input',()=>{
+    refreshRepairButton();
+    scheduleValidation();
+  });
+  $('fmValidate').addEventListener('click',()=>{
+    if(refreshValidation())state('File format validated. No file was uploaded.');
+    else state('File validation failed. Correct the highlighted issue before uploading.',true);
+  });
   $('fmRepairXml').addEventListener('click',()=>{
     if(!selected || !/\.xml$/i.test(selected))return;
     try{
@@ -226,14 +281,10 @@
       if(!repaired.removed)throw new Error('No duplicate XML declaration found. No changes made.');
       editor.value=repaired.content;
       refreshRepairButton();
+      refreshValidation();
       state('Removed '+repaired.removed+' duplicate XML declaration(s) from the EDITOR COPY. Review the text and use Backup & upload to save it to Nitrado. No files were uploaded.');
     }catch(e){state('XML repair not possible: '+e.message,true);}
   });
-  function validateText(path,text){
-    if(new Blob([text]).size>512*1024)throw new Error('File exceeds 512 KB.');
-    if(/\.json$/i.test(path)) JSON.parse(text);
-    if(/\.xml$/i.test(path))window.BUILD_IT_XML.validate(text);
-  }
   $('fmBrowse').addEventListener('click',()=>perform(async()=>{
     if(!root)await browse();
     else await browse(storageRoots[1]);
@@ -265,23 +316,32 @@
     }
     if(file.size>512*1024){state('Local file exceeds 512 KB.',true);return}
     const text=await file.text();
-    try {validateText(selected,text);editor.value=text;refreshRepairButton();state('Local replacement loaded into editor. Not yet uploaded.')}
-    catch(e){state(e.message,true)}
+    editor.value=text;
+    refreshRepairButton();
+    const ok=refreshValidation();
+    state(ok
+      ? 'Local replacement loaded and validated. Not yet uploaded.'
+      : 'Local replacement loaded, but its format is INVALID. Correct it in the editor before uploading.',!ok);
   });
   $('fmSave').addEventListener('click',()=>perform(async()=>{
     if(!selected||!sourceDigest)throw new Error('Open a server file first.');
     const key=$('nitradoWriteKey').value.trim();
     if(key.length<8)throw new Error('Enter the separate MAP_WRITE_KEY (at least 8 characters).');
-    validateText(selected,editor.value);
+    const preparedContent=editor.value;
+    const verified=window.BUILD_IT_FORMAT.validate(selected,preparedContent);
+    refreshValidation();
+    if(!validationOk)throw new Error('File format validation failed. Upload blocked.');
     if(!window.confirm('Overwrite '+selected.split('/').pop()+' on your LIVE DayZ server?\n\nA backup must be created and verified before the upload proceeds. Continue?')){
       state('Upload cancelled.');return;
     }
     state('Creating and verifying server backup before uploading…');
     const result=await nitradoRequest('/api/files/write',{
-      method:'POST',body:{path:selected,content:editor.value,expectedSha256:sourceDigest,confirm:true},writeKey:true
+      method:'POST',body:{path:selected,content:preparedContent,expectedSha256:sourceDigest,confirm:true},writeKey:true
     });
     state('Upload verified. Original backup: '+result.backupPath+'\nRestart the DayZ server when appropriate.');
     const refresh=await nitradoRequest('/api/files/read?file='+encodeURIComponent(selected));
     sourceDigest=refresh.sha256;
+    editor.value=refresh.content;
+    refreshValidation();
   }));
 })();

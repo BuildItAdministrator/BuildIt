@@ -583,10 +583,10 @@
       if(new TextEncoder().encode(events.xml).byteLength>512*1024||
          new TextEncoder().encode(positions.xml).byteLength>512*1024)
         throw new Error('Generated XML exceeds the 512 KB upload limit.');
-      // Revalidate the final text, not only the source files. Never upload a
-      // duplicate <?xml...?> or another malformed XML document.
-      window.BUILD_IT_XML.validate(events.xml,'events');
-      window.BUILD_IT_XML.validate(positions.xml,'eventposdef');
+      // Validate BOTH generated files before enabling a single upload.
+      // Incorrect XML, a duplicate declaration or the wrong root must block.
+      const eventFormat=window.BUILD_IT_FORMAT.validate(eventDeploy.paths['events.xml'],events.xml,{expectedRoot:'events'});
+      const positionFormat=window.BUILD_IT_FORMAT.validate(eventDeploy.paths['cfgeventspawns.xml'],positions.xml,{expectedRoot:'eventposdef'});
       eventDeploy.staged={
         xml:{'events.xml':events.xml,'cfgeventspawns.xml':positions.xml},
         snapshot:deploymentSnapshot()
@@ -600,7 +600,9 @@
       setDeploy('READY — '+selected.length+' vehicle event(s) will be added:\n\n'+previewNames+
         (repairs.length?'\n\nXML REPAIR NEEDED:\n'+repairs.join('\n')+
          '\nPlease approve the repair below before uploading.':'')+
-        '\n\nFiles: db/events.xml and cfgeventspawns.xml.'+
+        '\n\nFORMAT VALIDATED:\n'+
+        'db/events.xml — '+eventFormat.detail+'\n'+
+        'cfgeventspawns.xml — '+positionFormat.detail+
         '\nOriginal event entries, indentation and comments will be retained.'+
         '\nBoth files receive verified backups before replacement. If the second upload fails, restore the first from its backup.');
       deployUpload.disabled=false;
@@ -634,9 +636,14 @@
         if(latest.sha256!==eventDeploy.signatures[name])
           throw new Error(name+' changed on Nitrado since loading. Reload both files and preview again. No uploads started.');
       }
+      // Validate the full two-file transaction BEFORE starting either write.
+      // This prevents uploading events.xml successfully and only then
+      // discovering that cfgeventspawns.xml has invalid XML.
       for(const name of changes){
         const expectedRoot=name==='events.xml'?'events':'eventposdef';
-        window.BUILD_IT_XML.validate(staged.xml[name],expectedRoot);
+        window.BUILD_IT_FORMAT.validate(eventDeploy.paths[name],staged.xml[name],{expectedRoot});
+      }
+      for(const name of changes){
         setDeploy('Creating verified backup and uploading '+name+' ('+(results.length+1)+'/2)…');
         const result=await nitradoRequest('/api/files/write',{
           method:'POST',writeKey:true,
