@@ -119,5 +119,56 @@ function economyStats(src){
  }
  return{totalTypes:types.length,nominalTotal:total,categories:[...byCategory.values()].sort((a,b)=>b.nominal-a.nominal)};
 }
-root.BUILD_IT_SERVER_ADDONS=Object.freeze({moveBuild,staticZones,addGasZone,appendEquipment,economyStats});
+
+function territoryTypes(src){
+ const doc=new DOMParser().parseFromString(src,'application/xml');
+ if(doc.querySelector('parsererror')||doc.documentElement?.nodeName!=='territory-type')
+  throw Error('Expected vanilla <territory-type> zombie_territories.xml.');
+ const names=new Map();
+ for(const zone of doc.documentElement.querySelectorAll('territory > zone')){
+   const name=zone.getAttribute('name')||'';
+   if(!/^[A-Za-z0-9_]+$/.test(name))continue;
+   names.set(name,(names.get(name)||0)+1);
+ }
+ return[...names].map(([name,count])=>({name,count})).sort((a,b)=>a.name.localeCompare(b.name));
+}
+function addHorde(src,type,x,z,radius,minCount,maxCount){
+ const available=territoryTypes(src),classname=String(type||'').trim();
+ if(!available.some(e=>e.name===classname))
+  throw Error('Choose an existing infected event type from zombie_territories.xml.');
+ const [X,Z]=location(x,z);
+ const radiusN=Number(radius),min=Number(minCount),max=Number(maxCount);
+ if(radius===''||!Number.isFinite(radiusN)||radiusN<10||radiusN>300)
+  throw Error('Horde radius must be 10–300 meters.');
+ if(minCount===''||maxCount===''||!Number.isInteger(min)||!Number.isInteger(max)||min<1||max>75||min>max)
+  throw Error('Infected min/max must be whole numbers between 1 and 75, min ≤ max.');
+ const re=/<territory\b[^>]*>[\s\S]*?<\/territory\s*>/gi;
+ const comments=tagRanges(src);
+ let parent=null;
+ for(const match of src.matchAll(re)){
+   if(comments.some(([a,b])=>match.index>=a&&match.index<b))continue;
+   const group=new DOMParser().parseFromString('<territory-type>'+match[0]+'</territory-type>','application/xml');
+   if(group.querySelector('parsererror'))continue;
+   const zones=[...group.querySelectorAll('territory > zone')];
+   if(!zones.some(e=>e.getAttribute('name')===classname))continue;
+   if(zones.some(e=>e.getAttribute('name')===classname &&
+      Math.hypot(Number(e.getAttribute('x'))-X,Number(e.getAttribute('z'))-Z)<20))
+     throw Error('An infected zone of the same type already exists within 20 m.');
+   parent=match;break;
+ }
+ if(!parent)throw Error('Could not locate one existing territory group for '+classname+'.');
+ const closing=parent.index+parent[0].lastIndexOf('</territory');
+ const nl=src.includes('\r\n')?'\r\n':'\n';
+ const indent=parent[0].match(/(?:\r\n|\n|\r)([ \t]+)<zone\b/)?.[1]||'    ';
+ const text=indent+'<zone name="'+classname+'" smin="0" smax="0" dmin="'+min+
+   '" dmax="'+max+'" x="'+X+'" z="'+Z+'" r="'+Number(radiusN.toFixed(2))+'" />'+nl;
+ const before=src.slice(0,closing);
+ const updated=before+(before.endsWith(nl)?'':nl)+text+src.slice(closing);
+ const after=territoryTypes(updated);
+ if(after.find(e=>e.name===classname)?.count!==available.find(e=>e.name===classname).count+1)
+   throw Error('The generated zombie territory did not validate.');
+ return{content:updated,changed:1,type:classname,x:X,z:Z,min,max,radius:radiusN};
+}
+
+root.BUILD_IT_SERVER_ADDONS=Object.freeze({moveBuild,staticZones,addGasZone,appendEquipment,economyStats,territoryTypes,addHorde});
 })(window);
