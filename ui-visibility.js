@@ -22,6 +22,13 @@ cancel.innerHTML='<span id="builditMapPickHint">Click a position on the map</spa
 document.body.appendChild(cancel);
 const hint=cancel.querySelector('#builditMapPickHint');
 function refresh(){
+ if(manuallyHidden||active){
+  // Close autocomplete so an old search dropdown cannot keep the dock
+  // hidden after the menu-toggle restores its normal state.
+  const results=document.getElementById('placeSearchResults');
+  results?.classList.add('hidden');
+  if(document.activeElement?.id==='placeSearchInput')document.activeElement.blur();
+ }
  root.dataset.builditMenusHidden=String(manuallyHidden);
  root.dataset.builditMapPicking=String(!!active);
  cancel.hidden=!active;
