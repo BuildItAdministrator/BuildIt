@@ -1281,7 +1281,8 @@ window.BUILD_IT_NITRADO_ADMIN=Object.freeze({
     nitradoServer.disabled=true;
     nitradoServer.dataset.savedId=profile.serverId||'';
     nitradoAutoSync.checked=profile.autoSync!==false;
-    document.getElementById('nitradoWriteKey').value='';
+    const writeField=document.getElementById('nitradoWriteKey');
+    if(writeField){writeField.value='';writeField.dispatchEvent(new Event('input',{bubbles:true}));}
     resetLogDataOnly();
     renderLogSummary();renderLogPlayers();renderLogMap();renderLogActivity();
     setNitradoStatus('Verifying the selected server…');
