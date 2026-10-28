@@ -14,7 +14,7 @@ const C=[
 ];
 const TOOLS=C.flatMap(([group,names])=>names.map(name=>({name,group})));
 const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','SpawnObject Heatmap','Event Group Calculator','Gas Zone Generator','Build Relocator','Weapon Blueprint Generator','Bag Fill Generator','Loot & Proxy Calculator','Horde Generator','Types Organizer','Events Organizer','Ignore List Generator','Loadout Generator','Underground Areas']);
-const RELATED={};
+
 const ROOT=document.createElement('div');ROOT.id='serverToolsRoot';
 ROOT.innerHTML=`
 <button type="button" id="toolHubToggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="toolHubPanel">Server Tools <span class="st-count">${TOOLS.length} connected</span></button>
@@ -143,7 +143,7 @@ function render(){
    if(category&&tool.group!==category)continue;
    if(search&&!tool.name.toLowerCase().includes(search)&&!tool.group.toLowerCase().includes(search))continue;
    shown++;
-   const ready=true,related=null;
+   const ready=true;
    const card=document.createElement('div');card.className='st-card'+(ready?' st-ready':'');
    const title=document.createElement('strong');title.textContent=tool.name;
    const meta=document.createElement('small');
@@ -171,7 +171,7 @@ function toolFiles(){
    if(selected==='Weather Manager')return file.relative==='cfgweather.xml';
    if(selected==='Messages Generator')return ['db/messages.xml','messages.xml'].includes(file.relative);
    if(selected==='Loadout Generator')return gearPresets.includes(file.relative);
-   return file.relative===DEFAULTS[selected];
+   return file.relative.toLowerCase()===String(DEFAULTS[selected]||'').toLowerCase();
  });
 }
 async function refreshCatalog(){
@@ -189,7 +189,8 @@ async function refreshCatalog(){
    option.textContent=file.relative+(file.size?' · '+Math.ceil(file.size/1024)+' KB':'');
    select.appendChild(option);
  }
- if(matches.some(f=>f.relative===DEFAULTS[selected]))select.value=DEFAULTS[selected];
+ const preferred=matches.find(f=>f.relative.toLowerCase()===String(DEFAULTS[selected]||'').toLowerCase());
+ if(preferred)select.value=preferred.relative;
  if(!matches.length)throw new Error('Required file '+(DEFAULTS[selected]||'')+' not found on Nitrado. No replacement file will be created.');
 }
 function fillGameplay(){
@@ -315,7 +316,6 @@ async function choose(name){
  $('stWeatherControls').hidden=name!=='Weather Manager';
  $('stObjectMoveControls').hidden=name!=='SpawnObject Mover';
  $('stPlayerSpawnControls').hidden=name!=='Spawn Point Generator';
- $('stMapControls').hidden=!['SpawnObject Mover','Spawn Point Generator'].includes(name);
  $('stHeatmapControls').hidden=name!=='SpawnObject Heatmap';
  $('stGasControls').hidden=name!=='Gas Zone Generator';
  $('stRelocatorControls').hidden=name!=='Build Relocator';
