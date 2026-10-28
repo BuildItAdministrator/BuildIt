@@ -1,30 +1,30 @@
 /* Build It!++ — compact DayZ console tools hub.
- * 53-item roadmap; only working tools have an action.
+ * Only verified and server-integrated tools are visible. No planned cards.
  * Server-connected tools use the shared authenticated read/write bridge.
  */
 (function(){
 'use strict';
 const C=[
- ['Config & gameplay',['Day/Night Calculator','Weather Manager','Gameplay Generator','Messages Generator','Globals Configurator','Nitrado Settings Generator']],
- ['Validation & files',['XML Validator','JSON Validator','JSON Splitter','Mission Validator ZIP','Event Conflict Check','Spawnable Duplicate Checker','SpawnObject Duplicate Checker']],
+ ['Config & gameplay',['Weather Manager','Gameplay Generator','Messages Generator','Globals Configurator']],
+ ['Validation & files',['XML Validator','JSON Validator','Event Conflict Check','Spawnable Duplicate Checker','SpawnObject Duplicate Checker']],
  ['Loot & economy',['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Tier Booster','Types Organizer','Spawnable Types Adjuster','Classname Finder','Ignore List Generator','Loot & Proxy Calculator']],
- ['Events & vehicles',['Events Organizer','Build A Vehicle','Event Group Calculator','Vehicle Event Remover','Gas Zone Generator','Horde Generator','NPC Generator','Airstrike Generator']],
- ['World & map',['Spawn Point Generator','Loot Exclusion Zone Generator','INIT.C To ObjectSpawner','SpawnObject Converter','MapGroupPos Converter','MapGroupPos To SpawnObject','PRA Converter','Object To MapGroupPos Converter','SpawnObject Mover','SpawnObject Organizer','JSON To Init.c Converter','Underground Areas','Environment Exclusion Generator','Territory Zone Creator','MapGroupPos Organizer','Build Relocator','Sky Writing Generator','SpawnObject Heatmap']],
- ['Equipment & effects',['Loadout Generator','Weapon Blueprint Generator','Bag Fill Generator','CfgEffect Converter']]
+ ['Events & vehicles',['Events Organizer','Event Group Calculator','Gas Zone Generator','Horde Generator']],
+ ['World & map',['Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','Underground Areas','Build Relocator','SpawnObject Heatmap']],
+ ['Equipment & effects',['Loadout Generator','Weapon Blueprint Generator','Bag Fill Generator']]
 ];
 const TOOLS=C.flatMap(([group,names])=>names.map(name=>({name,group})));
 const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','SpawnObject Heatmap','Event Group Calculator','Gas Zone Generator','Build Relocator','Weapon Blueprint Generator','Bag Fill Generator','Loot & Proxy Calculator','Horde Generator','Types Organizer','Events Organizer','Ignore List Generator','Loadout Generator','Underground Areas']);
-const RELATED={'Build A Vehicle':'biToggle'};
+const RELATED={};
 const ROOT=document.createElement('div');ROOT.id='serverToolsRoot';
 ROOT.innerHTML=`
-<button type="button" id="toolHubToggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="toolHubPanel">Server Tools <span class="st-count">${ACTIVE.size} connected · ${TOOLS.length} listed</span></button>
+<button type="button" id="toolHubToggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="toolHubPanel">Server Tools <span class="st-count">${TOOLS.length} connected</span></button>
 <section id="toolHubPanel" hidden role="dialog" aria-label="DayZ Server Tools">
  <header class="st-header">
-   <div><strong>Server Tools</strong><small>Console configuration studio · ${TOOLS.length} catalogued</small></div>
+   <div><strong>Server Tools</strong><small>${TOOLS.length} live Nitrado tools</small></div>
    <button type="button" id="toolHubClose" aria-label="Close Server Tools">×</button>
  </header>
  <div class="st-toolbar">
-   <label class="st-field"><span>Find a tool</span><input id="stSearch" type="search" autocomplete="off" placeholder="Search all ${TOOLS.length} tools…"></label>
+   <label class="st-field"><span>Find a tool</span><input id="stSearch" type="search" autocomplete="off" placeholder="Search ${TOOLS.length} live tools…"></label>
    <label class="st-field"><span>Category</span><select id="stCategory"><option value="">All categories</option>${C.map(([name])=>'<option>'+name+'</option>').join('')}</select></label>
  </div>
  <div class="st-summary">Every active tool reads your Nitrado server files directly. Changes are previewed, checked and backed up before being published. No manual imports or exports.</div>
@@ -139,22 +139,21 @@ function render(){
  const search=$('stSearch').value.trim().toLowerCase(),category=$('stCategory').value;
  cards.replaceChildren();
  let shown=0;
- for(const tool of TOOLS.slice().sort((a,b)=>Number(ACTIVE.has(b.name))-Number(ACTIVE.has(a.name)))){
+ for(const tool of TOOLS){
    if(category&&tool.group!==category)continue;
    if(search&&!tool.name.toLowerCase().includes(search)&&!tool.group.toLowerCase().includes(search))continue;
    shown++;
-   const ready=ACTIVE.has(tool.name),related=RELATED[tool.name];
+   const ready=true,related=null;
    const card=document.createElement('div');card.className='st-card'+(ready?' st-ready':'');
    const title=document.createElement('strong');title.textContent=tool.name;
    const meta=document.createElement('small');
-   meta.textContent=tool.group+' · '+(ready?'Connected to Nitrado':related?'Partial in Advanced Events':'Nog in ontwikkeling · nog niet beschikbaar');
+   meta.textContent=tool.group+' · Server-connected';
    card.append(title,meta);
-   if(ready||related){
+   if(ready){
      const btn=document.createElement('button');btn.type='button';
-     btn.textContent=ready?'Open tool':'Advanced editor';
+     btn.textContent='Open tool';
      btn.addEventListener('click',()=>{
-       if(ready)void choose(tool.name);
-       else{close();window.BUILD_IT_SPAWN_API?.advanced?.();}
+       void choose(tool.name);
      });
      card.appendChild(btn);
    }
