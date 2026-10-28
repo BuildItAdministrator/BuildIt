@@ -264,10 +264,14 @@ for(const id of ['nitradoWorkerUrl','nitradoAccessKey','nitradoServer']){
  });
 }
 const now=admin.current(),profile=active();
-if(profile&&(profile.workerUrl!==now.workerUrl||profile.accessKey!==now.accessKey||
- (profile.serverId!=='default'&&profile.serverId!==now.serverId))){
+if(profile&&profile.accessKey.length>=8){
+ let attempts=0;
  const activate=()=>{
-  if((window.BUILD_IT_NITRADO_ACTIVE_REQUESTS||0)>0){setTimeout(activate,100);return;}
+  if(locked()){
+   if(++attempts<120)setTimeout(activate,150);
+   else message('Startup server verification is still blocked by an active request. Use the server selector to retry.',true);
+   return;
+  }
   changeTo(profile.id,{force:true}).catch(e=>message(e.message,true));
  };
  setTimeout(activate,0);
