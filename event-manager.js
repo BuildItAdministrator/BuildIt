@@ -127,15 +127,15 @@
     '<section class="biSection"><div class="biSectionTitle"><span class="biStep">01</span><h4>Configure spawn</h4></div>',
     '<div class="biPickRow"><button type="button" id="biPick">Pick location on map</button><span id="biPoint" class="biPoint">No location selected</span></div>',
     '<label for="biName">Event name</label><input id="biName" value="BuildIt_Event1" maxlength="90" spellcheck="false">',
-    '<div class="biRow"><div><label for="biKind">Event type</label><select id="biKind"><option value="vehicle">Vehicles / motorbikes / boats</option><option value="loot">Loot drop (manual XML)</option></select></div>',
+    '<div class="biRow"><div><label for="biKind">Event type</label><select id="biKind"><option value="vehicle">Vehicles / motorbikes / boats</option><option value="loot">Loot items (.json)</option></select></div>',
     '<div><label for="biAngle">Rotation (°)</label><input id="biAngle" type="number" min="0" max="359.99" step="0.01" value="0"></div></div>',
     '<div id="biVehicleSection"><label for="biVehicleSearch">Vehicle classname</label><input id="biVehicleSearch" type="search" autocomplete="off" placeholder="Search car, Humvee, bike or boat…"><div id="biVehicleMatches" class="biMatches"></div>',
     '<p class="biSmall">Vehicle parts use your existing cfgspawnabletypes.xml rules.</p></div>',
-    '<div id="biLootSection" hidden><label for="biContainer">Container</label><select id="biContainer"><option>SeaChest</option><option>WoodenCrate</option><option>SmallProtectorCase</option><option>Barrel_Green</option><option>Barrel_Blue</option></select>',
+    '<div id="biLootSection" hidden><label for="biLootY">Terrain height Y (metres)</label><input id="biLootY" type="number" min="-100" max="1000" step="0.01" placeholder="Enter ground elevation">',
     '<label for="biItemSearch">Item classname</label><input id="biItemSearch" type="search" autocomplete="off" placeholder="Search items…"><div id="biItemMatches" class="biMatches"></div>',
-    '<div id="biItems"></div>',
-    '<div class="biWarn">Loot cargo applies to every container of the same classname, not just this map location. Manual XML review is required.</div>',
-    '<label style="font-weight:400"><input type="checkbox" id="biAcknowledge"> I understand the global cargo change.</label></div>',
+    '<div id="biItems"></div><label for="biLootSpacing">Item spacing (metres)</label><input id="biLootSpacing" type="number" min="0.5" max="10" step="0.5" value="1.5">',
+    '<div class="biSmall">Items spawn as separate objects around the selected location. Enter the real terrain height (Y); map selection supplies X and Z only. Loot left behind does not persist; taken loot follows normal CE rules.</div>',
+    '</div>',
     '<div class="biRow biActions"><button type="button" id="biSave" class="biPrimary">Save spawn</button><button type="button" id="biNew" class="biQuiet">Clear</button></div>',
     '<div id="biStatus" role="status" aria-live="polite"></div></section>',
     '<section class="biSection"><div class="biSectionTitle"><span class="biStep">02</span><h4>Queued events</h4><span id="biDraftCount" class="biSmall biDraftCount">0 saved</span></div>',
@@ -143,18 +143,23 @@
     '<section class="biSection biPublish"><div class="biSectionTitle"><span class="biStep">03</span><h4>Publish to Nitrado</h4></div>',
     '<p class="biSmall">Review automatically loads fresh events.xml and cfgeventspawns.xml. Original lines and comments remain untouched.</p>',
     '<button type="button" id="biPreviewServer" class="biPrimary biFull">Review &amp; prepare changes</button>',
-    '<div id="biServerPreview" class="biMessage" role="status" aria-live="polite">Save a vehicle event, then review the changes.</div>',
+    '<div id="biServerPreview" class="biMessage" role="status" aria-live="polite">Vehicle events publish as XML. Use the JSON loot tools below for loose items.</div>',
     '<label class="biConfirm" id="biRepairConfirm" hidden><input type="checkbox" id="biRepairAcknowledge"> I approve removing the duplicate XML declarations detected in the server files.</label>',
     '<label class="biConfirm"><input type="checkbox" id="biServerStopped"> My DayZ server is stopped and I have reviewed the changes.</label>',
     '<button type="button" id="biUploadServer" class="biPrimary biFull" disabled>Back up &amp; upload</button>',
     '<p class="biSmall">An upload requires your file-write key. Existing files are checked and backed up before replacement.</p></section>',
-    '<details class="biAdvanced" id="biAdvanced"><summary>Advanced · Manual XML tools</summary>',
+    '<section class="biSection" id="biJsonLootPublish"><div class="biSectionTitle"><h4>JSON loot spawner</h4></div>',
+    '<p class="biSmall">Non-persistent loot, generated with the vanilla DayZ Object Spawner. After each restart the locations are populated again.</p>',
+    '<button type="button" id="biExportLootJson" class="biPrimary biFull">Download loot JSON</button>',
+    '<button type="button" id="biExportGameplayJson" class="biFull">Download updated cfggameplay.json</button>',
+    '<p class="biSmall">Install both in your server mission folder. Existing cfgGameplay settings and object-spawner references are preserved. Enable cfgGameplay in Nitrado before restarting.</p></section>',
+    '<details class="biAdvanced" id="biAdvanced"><summary>Advanced · Manual XML / JSON tools</summary>',
     '<button type="button" id="biLoadServer" class="biFull">Reload live server XML</button>',
     '<div class="biSmall" id="biCatalog">Loading official classnames…</div>',
-    '<label for="biFiles">Import XML from your computer</label><input id="biFiles" type="file" accept=".xml" multiple>',
+    '<label for="biFiles">Import XML or existing cfggameplay.json</label><input id="biFiles" type="file" accept=".xml,.json" multiple>',
     '<div id="biImportStatus" class="biSmall">Optional: import existing XML for offline export.</div>',
     '<div class="biRow"><button type="button" id="biExportEvents">events.xml</button><button type="button" id="biExportPositions">cfgeventspawns.xml</button></div>',
-    '<button type="button" id="biExportCargo" class="biFull">cfgspawnabletypes.xml (loot)</button>',
+    '<p class="biSmall">XML exports are for vehicle events. Loot is handled through JSON above.</p>',
     '<div class="biWarn">Offline exports without original XML contain additions only. Never upload them as full replacements.</div>',
     '</details>'
   ].join('');
@@ -268,14 +273,15 @@
     chosen = {x:d.x,z:d.z}; $('biPoint').textContent = d.x + ' / ' + d.z;
     $('biName').value = d.name; $('biKind').value = d.kind; $('biKind').dispatchEvent(new Event('change'));
     $('biAngle').value = d.a; $('biVehicleSearch').value = d.vehicle || '';
-    $('biContainer').value = d.container || 'SeaChest';
+    $('biLootY').value = d.y ?? '';
+    $('biLootSpacing').value = d.spacing ?? 1.5;
     itemList = (d.items || []).map(i => ({name:i.name,qty:i.qty})); renderItems();
-    $('biAcknowledge').checked = false;
     $('biSave').textContent = 'Save changes';
     panel.hidden = false;
   }
   function resetForm() {
-    editingIndex = -1; chosen = null; itemList = []; renderItems(); $('biAcknowledge').checked = false;
+    editingIndex = -1; chosen = null; itemList = []; renderItems();
+    $('biLootY').value=''; $('biLootSpacing').value='1.5';
     $('biPoint').textContent = 'No location selected';
     $('biName').value = 'BuildIt_Event' + (drafts.length + 1);
     $('biKind').value = 'vehicle'; $('biKind').dispatchEvent(new Event('change'));
@@ -297,8 +303,9 @@
     } else {
       if (!itemList.length) return message('Add at least one item first.', true);
       if (!itemList.every(i => itemNames.has(i.name) && numbers(i.qty,1,20))) return message('An item or quantity is invalid.', true);
-      if (!$('biAcknowledge').checked) return message('Acknowledge the global cargo warning first.', true);
-      entry.container = $('biContainer').value;
+      if ($('biLootY').value.trim()==='' || !numbers($('biLootY').value,-100,1000)) return message('Enter the actual terrain elevation Y (-100 to 1000 metres).', true);
+      if (!numbers($('biLootSpacing').value,0.5,10)) return message('Spacing must be between 0.5 and 10 metres.',true);
+      entry.y=Number($('biLootY').value); entry.spacing=Number($('biLootSpacing').value);
       entry.items = itemList.map(i => ({name:i.name,qty:Number(i.qty)}));
     }
     if (editingIndex < 0) drafts.push(entry); else drafts[editingIndex] = entry;
@@ -320,7 +327,7 @@
       const card=document.createElement('div');card.className='biDraft';
       const title=document.createElement('div');title.className='biDraftTitle';title.textContent=d.name;
       const details=document.createElement('div');details.className='biDraftDetails';
-      details.textContent=(d.kind==='vehicle'?d.vehicle:d.container)+
+      details.textContent=(d.kind==='vehicle'?d.vehicle:('JSON loot · '+(d.items||[]).reduce((n,i)=>n+Number(i.qty||0),0)+' items · Y '+(d.y??'missing')))+
         '  ·  X '+d.x+' / Z '+d.z+'  ·  '+d.a+'°';
       const row=document.createElement('div');row.className='biRow';
       const edit=document.createElement('button');edit.type='button';edit.textContent='Edit';
@@ -341,13 +348,19 @@
     let imported = 0;
     for (const file of evt.target.files) {
       const name = file.name.toLowerCase(), type = ({'types.xml':'types','events.xml':'events','cfgeventspawns.xml':'eventposdef','cfgspawnabletypes.xml':'spawnabletypes'})[name];
-      if (!type) { message('Unrecognized file skipped: ' + file.name, true); continue; }
+      if (!type && name!=='cfggameplay.json') { message('Unrecognized file skipped: ' + file.name, true); continue; }
       try {
-        const content = await file.text(), doc = parseXML(content,type);
-        files[name] = content;
-        if (name === 'types.xml') addCatalog(doc,'types');
-        if (name === 'events.xml') addCatalog(doc,'events');
-        if (name === 'cfgspawnabletypes.xml') addCatalog(doc,'spawnables');
+        const content = await file.text();
+        if(name==='cfggameplay.json'){
+          window.BUILD_IT_LOOT.gameplay(content);
+          files[name]=content;
+        } else {
+          const doc = parseXML(content,type);
+          files[name]=content;
+          if(name==='types.xml')addCatalog(doc,'types');
+          if(name==='events.xml')addCatalog(doc,'events');
+          if(name==='cfgspawnabletypes.xml')addCatalog(doc,'spawnables');
+        }
         imported++;
       } catch (err) { message(file.name + ': ' + err.message, true); }
     }
