@@ -1300,7 +1300,7 @@ test('non-persistent JSON loot export preserves cfgGameplay references and other
   expect(result.spawned).toHaveLength(5);
   expect(result.spawned.every(o=>o.enableCEPersistency===false)).toBe(true);
   expect(new Set(result.spawned.map(o=>o.pos.join(','))).size).toBe(5);
-  expect(result.arr).toEqual(['base.json','custom/BuildIt_LootDrops.json']);
+  expect(result.arr).toEqual(['base.json','custom/builditlootdrop.json']);
   expect(result.stamina).toBe(100);
   expect(result.missingHeightRejected).toBe(true);
 });
@@ -1309,7 +1309,7 @@ test('non-persistent JSON loot export preserves cfgGameplay references and other
 test('first-time loot JSON creation uses create route without overwriting existing files',async({page})=>{
   const noftp='/games/ni5774718_3/noftp';
   const mission='/games/ni5774718_3/ftproot/dayzps_missions/dayzOffline.chernarusplus';
-  const loot=mission+'/custom/BuildIt_LootDrops.json',gameplay=mission+'/cfggameplay.json';
+  const loot=mission+'/custom/builditlootdrop.json',gameplay=mission+'/cfggameplay.json';
   const original=JSON.stringify({version:130,WorldsData:{objectSpawnersArr:['custom-base.json']},PlayerData:{StaminaData:{staminaMax:100}}});
   const calls=[];
   await page.addInitScript(()=>{
@@ -1356,6 +1356,6 @@ test('first-time loot JSON creation uses create route without overwriting existi
   expect(JSON.parse(create[0].body.content).Objects.every(o=>o.enableCEPersistency===false)).toBe(true);
   expect(write).toHaveLength(1);
   expect(write[0].body).toMatchObject({path:gameplay,expectedSha256:'a'.repeat(64),confirm:true});
-  expect(JSON.parse(write[0].body.content).WorldsData.objectSpawnersArr).toEqual(['custom-base.json','custom/BuildIt_LootDrops.json']);
+  expect(JSON.parse(write[0].body.content).WorldsData.objectSpawnersArr).toEqual(['custom-base.json','custom/builditlootdrop.json']);
   await expect(page.locator('#biDraftCount')).toHaveText('0 saved');
 });
