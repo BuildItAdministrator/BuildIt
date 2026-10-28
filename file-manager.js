@@ -4,18 +4,17 @@
 (function () {
   'use strict';
   const logPanel=document.getElementById('logPanel');
-  const testBlock=logPanel?.querySelector('.log-file-test');
-  if(!testBlock || document.getElementById('fileManager')) return;
+  const fileSection=logPanel?.querySelector('#logServerFiles');
+  if(!fileSection || document.getElementById('fileManager')) return;
   const panel=document.createElement('section');
   panel.id='fileManager';
   panel.innerHTML=[
-    '<div class="log-divider"></div>',
     '<div class="log-auto-title">Nitrado File Manager</div>',
     '<p class="fm-note">DayZ PS5 mission files are usually in dayzps_missions/dayzOffline.chernarusplus, not dayzps/config. Search both Nitrado file roots below. Opening folders never changes your server.</p>',
     '<p class="fm-note">Download or edit XML, JSON and TXT files up to 512 KB. Uploads require a verified backup.</p>',
     '<label class="fm-label" for="nitradoWriteKey">Separate file-write key (MAP_WRITE_KEY)</label>',
     '<input id="nitradoWriteKey" type="password" autocomplete="off" placeholder="Enter Cloudflare file-write key">',
-    '<p class="fm-note">This key stays in this tab only. It is not saved in browser storage.</p>',
+    '<p class="fm-note">Required for Backup &amp; upload. This key stays in this tab only; it is not saved in browser storage.</p>',
     '<div class="fm-row"><button id="fmFindMission" type="button" class="log-btn">Find Chernarus mission</button></div>',
     '<div class="fm-row"><button id="fmBrowse" type="button" class="log-btn">NoFTP root</button><button id="fmFtpRoot" type="button" class="log-btn">FTP root</button><button id="fmBack" type="button" class="log-btn" disabled>Parent</button></div>',
     '<div id="fmCurrentDir" class="fm-path" aria-label="Current directory"></div>',
@@ -29,27 +28,21 @@
       '<div class="fm-row"><button type="button" id="fmRepairXml" class="log-btn" hidden>Fix duplicate XML header</button></div>',
       '<label class="fm-label" for="fmLocalFile">Load a local replacement into the editor</label>',
       '<input id="fmLocalFile" type="file" accept=".xml,.json,.txt">',
-      '<div class="fm-row"><button type="button" id="fmDownload" class="log-btn">Download copy</button><button type="button" id="fmSave" class="log-btn">Backup &amp; upload</button></div>',
+      '<div class="fm-row"><button type="button" id="fmDownload" class="log-btn">Download copy</button><button type="button" id="fmSave" class="log-btn" disabled>Backup &amp; upload</button></div>',
     '</div>',
     '<div id="fmStatus" class="log-auto-status" role="status" aria-live="polite">Browse your server files after the Cloudflare Worker upgrade is deployed.</div>'
   ].join('');
-  testBlock.insertAdjacentElement('afterend',panel);
-  // Put the actual write-key input NEXT TO the write-test button rather than
-  // below it in File Manager. It remains the same input used by file uploads.
-  const keySlot=document.createElement('div');
-  keySlot.id='fileWriteKeySlot';
-  const keyLabel=panel.querySelector('label[for="nitradoWriteKey"]');
+  fileSection.appendChild(panel);
+  // Keep MAP_WRITE_KEY inside File Manager. It authorizes real backup/upload
+  // actions, and does not depend on any temporary file-write test.
   const keyInput=panel.querySelector('#nitradoWriteKey');
-  const keyHelp=keyInput?.nextElementSibling;
   const keyCount=document.createElement('div');
   keyCount.id='nitradoWriteKeyLength';
   keyCount.setAttribute('role','status');
   keyCount.setAttribute('aria-live','polite');
-  if(keyLabel&&keyInput){
-    keySlot.append(keyLabel,keyInput);
-    if(keyHelp)keySlot.appendChild(keyHelp);
-    keySlot.appendChild(keyCount);
-    testBlock.querySelector('#nitradoFileWriteTest')?.before(keySlot);
+  const keyHelp=keyInput?.nextElementSibling;
+  if(keyInput){
+    keyHelp?.insertAdjacentElement('afterend',keyCount);
     keyInput.setAttribute('minlength','8');
     keyInput.setAttribute('spellcheck','false');
     keyInput.setAttribute('autocapitalize','off');
@@ -67,14 +60,8 @@
   }
   const style=document.createElement('style');
   style.textContent=[
-    '#fileWriteKeySlot{margin:10px 0 2px;display:block}',
-    '#fileWriteKeySlot .fm-label{display:block;font-weight:700;margin:0 0 5px}',
-    '#fileWriteKeySlot .fm-note{font-size:11px;line-height:1.45;color:#b9c7cc;margin:5px 0}',
-    '#fileWriteKeySlot #nitradoWriteKey{box-sizing:border-box;width:100%;border:1px solid #50616a;background:#101a20;color:#fff;border-radius:6px;padding:9px;font:inherit}',
-    '#nitradoWriteKeyLength{font-size:11px;line-height:1.4;padding:5px 0;color:#dda1a1}',
+    '#nitradoWriteKeyLength{font-size:11px;line-height:1.4;padding:4px 0;color:#dda1a1}',
     '#nitradoWriteKeyLength[data-valid="true"]{color:#9ddcad}',
-    'html[data-buildit-theme="light"] #fileWriteKeySlot #nitradoWriteKey{background:#fff;color:#1b3345;border-color:#aebfce}',
-    'html[data-buildit-theme="light"] #fileWriteKeySlot .fm-note{color:#526778}',
     'html[data-buildit-theme="light"] #nitradoWriteKeyLength{color:#a22c32}',
     'html[data-buildit-theme="light"] #nitradoWriteKeyLength[data-valid="true"]{color:#176636}',
         '#fileManager{padding:12px;border:1px solid rgba(255,255,255,.14);border-radius:8px;margin:12px 0;background:rgba(16,30,35,.65);color:#eee;font-size:12px}',

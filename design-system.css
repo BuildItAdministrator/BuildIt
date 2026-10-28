@@ -15,7 +15,7 @@ html[data-buildit-theme="light"]{
   color-scheme:light;
   --bi-bg:#f3f7fa;--bi-panel:#fbfdff;--bi-panel-raised:#eff5f8;
   --bi-panel-muted:#f1f6fa;--bi-line:#bed0db;--bi-line-soft:#dce7ec;
-  #bi-text:#1b3345;--bi-muted:#547084;--bi-subtle:#67899a;
+  --bi-text:#1b3345;--bi-muted:#425c6e;--bi-subtle:#526d7c;
   --bi-accent:#137c87;--bi-accent-deep:#137c87;--bi-accent-ink:#fff;
   --bi-green:#20784e;--bi-red:#b63a46;--bi-warning:#9b6d22;
   --bi-shadow:0 14px 42px rgba(35,65,81,.17),0 2px 8px rgba(35,65,81,.1);
@@ -208,8 +208,8 @@ body #filterPanel input::placeholder,body #logPanel input::placeholder,body #biP
   background:var(--bi-panel-muted)!important;color:var(--bi-muted)!important;
   border-color:var(--bi-line-soft)!important;line-height:1.55!important
 }
-#logPanel .log-auto-status.ok,#logPanel .log-file-test-status.ok{color:var(--bi-green)!important;border-color:rgba(105,206,160,.4)!important}
-#logPanel .log-auto-status.err,#logPanel .log-file-test-status.err{color:var(--bi-red)!important;border-color:rgba(218,93,112,.42)!important}
+#logPanel .log-auto-status.ok{color:var(--bi-green)!important;border-color:rgba(105,206,160,.4)!important}
+#logPanel .log-auto-status.err{color:var(--bi-red)!important;border-color:rgba(218,93,112,.42)!important}
 #logPanel .log-overview #nitradoSyncStatus{
   background:transparent!important;border:0!important;padding:5px 0 0!important;margin-top:5px!important;
   overflow-wrap:anywhere;color:var(--bi-muted)!important
@@ -230,10 +230,10 @@ body #filterPanel input::placeholder,body #logPanel input::placeholder,body #biP
 #logPanel .log-advanced{background:transparent!important;border-radius:10px!important}
 #logPanel .log-advanced summary{color:var(--bi-text)!important;font-weight:750!important}
 #logPanel .log-advanced summary:hover{background:rgba(79,171,174,.06)!important}
-#logPanel .log-compact-label,#logPanel .log-file-test-title{color:var(--bi-muted)!important}
+#logPanel .log-compact-label{color:var(--bi-muted)!important}
 #logPanel .log-upload{background:var(--bi-panel-raised)!important;color:var(--bi-text)!important;border:1px dashed var(--bi-line)!important}
 #logPanel #logDrop{background:var(--bi-panel-muted)!important;color:var(--bi-muted)!important;border-color:var(--bi-line)!important}
-#logPanel .log-file-test,#logPanel #fileManager{
+#logPanel #fileManager{
   background:var(--bi-panel-muted)!important;border:1px solid var(--bi-line-soft)!important;border-radius:10px!important
 }
 #logPanel #fileManager .fm-note,#logPanel #fileManager .fm-path{color:var(--bi-muted)!important}
@@ -299,6 +299,59 @@ body #biPanel #biPick .bi-icon{margin-right:0}
 }
 #coords{padding:9px 13px!important}
 #status{max-width:calc(100vw - 310px);text-align:center}
+/* Accessible light theme: never reuse the near-white dark-mode text.
+ * This palette is applied through shared semantic tokens and targeted
+ * overrides for legacy log/file controls which still declare dark colors.
+ */
+html[data-buildit-theme="light"] #filterPanel,
+html[data-buildit-theme="light"] #logPanel,
+html[data-buildit-theme="light"] #biPanel{
+  color:var(--bi-text)!important;
+}
+html[data-buildit-theme="light"] #filterPanel .filter-row,
+html[data-buildit-theme="light"] #filterPanel .log-check,
+html[data-buildit-theme="light"] #filterPanel .log-position-mode label,
+html[data-buildit-theme="light"] #filterPanel .log-player-row,
+html[data-buildit-theme="light"] #filterPanel .filter-players-header label,
+html[data-buildit-theme="light"] #logPanel .log-auto-check,
+html[data-buildit-theme="light"] #logPanel .log-event,
+html[data-buildit-theme="light"] #logPanel .log-event-player,
+html[data-buildit-theme="light"] #logPanel .log-advanced,
+html[data-buildit-theme="light"] #logPanel .log-auto-title,
+html[data-buildit-theme="light"] #logPanel #fileManager,
+html[data-buildit-theme="light"] #logPanel #fileManager .fm-label,
+html[data-buildit-theme="light"] #biPanel label,
+html[data-buildit-theme="light"] #biPanel .biAdvanced summary{
+  color:var(--bi-text)!important;
+}
+html[data-buildit-theme="light"] #logPanel .log-event-text,
+html[data-buildit-theme="light"] #logPanel .log-event-time,
+html[data-buildit-theme="light"] #logPanel .log-head-note,
+html[data-buildit-theme="light"] #logPanel .log-filter-hint,
+html[data-buildit-theme="light"] #logPanel .log-compact-help,
+html[data-buildit-theme="light"] #logPanel #fileManager .fm-note,
+html[data-buildit-theme="light"] #logPanel #fileManager .fm-path,
+html[data-buildit-theme="light"] #biPanel .biSmall,
+html[data-buildit-theme="light"] #biPanel .biDraftDetails,
+html[data-buildit-theme="light"] #filterPanel .filter-note,
+html[data-buildit-theme="light"] #filterPanel .filter-count,
+html[data-buildit-theme="light"] #filterPanel .filter-menu-label{
+  color:var(--bi-muted)!important;
+}
+html[data-buildit-theme="light"] #logPanel #fileManager input,
+html[data-buildit-theme="light"] #logPanel #fileManager textarea,
+html[data-buildit-theme="light"] #logPanel #fileManager select{
+  background:var(--bi-panel-muted)!important;
+  color:var(--bi-text)!important;
+  border-color:var(--bi-line)!important;
+}
+html[data-buildit-theme="light"] #logPanel #fileManager #fmValidationStatus[data-validation="valid"]{
+  color:var(--bi-green)!important;
+}
+html[data-buildit-theme="light"] #logPanel #fileManager #fmValidationStatus[data-validation="invalid"]{
+  color:var(--bi-red)!important;
+}
+
 html[data-buildit-theme="light"] #coords,
 html[data-buildit-theme="light"] #status{
   background:rgba(253,255,255,.92)!important;color:#294557!important;border-color:#c4d7e2!important
@@ -351,3 +404,6 @@ html[data-buildit-theme="light"] #status{
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{transition-duration:.001ms!important;animation-duration:.001ms!important}
 }
+
+#logPanel .log-compact-help{font-size:11px;line-height:1.5;color:var(--bi-muted);margin:11px 12px 0}
+#logPanel #fileManager{margin:12px!important}

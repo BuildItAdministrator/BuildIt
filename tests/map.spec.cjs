@@ -525,38 +525,27 @@ test('Custom Bases streams JSON bigger than 512KB without changing file editor o
 });
 
 
-test('file-write test shows exact missing/short-key reason and puts key next to test', async ({page})=>{
+test('file-write test is removed while file manager and upload key remain usable',async({page})=>{
   await page.locator('#logToggle').click();
-  await page.locator('#logConnectionDetails').evaluate(el=>el.open=true);
   await page.locator('#logServerFiles').evaluate(el=>el.open=true);
+  await expect(page.locator('#nitradoFileWriteTest')).toHaveCount(0);
+  await expect(page.locator('#nitradoFileWriteStatus')).toHaveCount(0);
+  await expect(page.locator('#fileManager')).toBeVisible();
+  await expect(page.locator('#fmBrowse')).toBeVisible();
+  await expect(page.locator('#fmSave')).toBeDisabled();
   const key=page.locator('#nitradoWriteKey');
   const count=page.locator('#nitradoWriteKeyLength');
-  const test=page.locator('#nitradoFileWriteTest');
   await expect(key).toBeVisible();
   await expect(count).toContainText('Minimum 8 characters');
-  const keyBox=await key.boundingBox();
-  const buttonBox=await test.boundingBox();
-  expect(keyBox.y+keyBox.height).toBeLessThan(buttonBox.y);
-  const noKey=await page.evaluate(async()=>{
-    try{await nitradoRequest('/api/file-write-test',{method:'POST',writeKey:true});return 'unexpected success'}
-    catch(error){return error.message}
-  });
-  expect(noKey).toContain('MAP_WRITE_KEY is empty');
   await key.fill('short');
   await expect(count).toContainText('5/8 characters');
-  const shortKey=await page.evaluate(async()=>{
-    try{await nitradoRequest('/api/file-write-test',{method:'POST',writeKey:true});return 'unexpected success'}
-    catch(error){return error.message}
-  });
-  expect(shortKey).toContain('MAP_WRITE_KEY is too short (5/8 characters)');
-  const good='abc12345';
-  await key.fill(good);
+  await key.fill('abcdefgh');
   await expect(count).toContainText('Length OK');
-  await expect(count).toContainText('Cloudflare match not yet tested');
   expect(await key.getAttribute('type')).toBe('password');
   expect(await page.evaluate(()=>localStorage.getItem('nitradoWriteKey'))).toBeNull();
-  const before=await page.evaluate(()=>sessionStorage.getItem('nitradoWriteKey'));
-  expect(before).toBeNull();
+  expect(await page.evaluate(()=>sessionStorage.getItem('nitradoWriteKey'))).toBeNull();
+  await expect(page.locator('#logServerFiles summary')).toContainText('Server files & uploads');
+  await expect(page.locator('#fmValidate')).toHaveCount(1);
 });
 
 
@@ -1123,7 +1112,7 @@ test('Professional UI uses consistent line icons without changing controls or la
   await expect(page.locator('#placeSearchBox .bi-search-icon svg.bi-icon')).toHaveCount(1);
   for(const [id,icon] of [
     ['filterToggle','sliders'],['logToggle','logs'],['biToggle','wrench'],
-    ['nitradoSyncNow','refresh'],['nitradoFileWriteTest','shield'],
+    ['nitradoSyncNow','refresh'],
     ['biSave','save'],['biPreviewServer','checkfile'],
     ['biUploadServer','cloud'],['builditThemeToggle','sun']
   ]){
@@ -1226,4 +1215,61 @@ test('New design stays inside viewport on desktop and mobile',async({page})=>{
     expect(b.x+b.width,option).toBeLessThanOrEqual(vp.width+1);
     expect(await page.locator('#filterPanel').evaluate(el=>el.scrollWidth-el.clientWidth),option).toBeLessThanOrEqual(2);
   }
+});
+
+
+test('Light mode has high-contrast readable text throughout filters, logs, events and file manager',async({page})=>{
+  await page.locator('#builditThemeToggle').click();
+  await expect(page.locator('html')).toHaveAttribute('data-buildit-theme','light');
+  const cssTokens=await page.evaluate(()=>{
+    const style=getComputedStyle(document.documentElement);
+    return {
+      foreground:style.getPropertyValue('--bi-text').trim(),
+      muted:style.getPropertyValue('--bi-muted').trim(),
+      subtle:style.getPropertyValue('--bi-subtle').trim(),
+      panel:style.getPropertyValue('--bi-panel').trim()
+    };
+  });
+  expect(cssTokens.foreground).toBe('#1b3345');
+  expect(cssTokens.muted).toBe('#425c6e');
+  expect(cssTokens.subtle).toBe('#526d7c');
+  const inspect=async(items,backgroundSelector)=>{
+    const result=await page.evaluate(({items,backgroundSelector})=>{
+      const parse=str=>{
+        const numbers=String(str).match(/[\d.]+/g);
+        return numbers?numbers.slice(0,3).map(Number):[];
+      };
+      const luminance=rgb=>{
+        const out=rgb.map(x=>{
+          x=x/255;
+          return x<=0.04045?x/12.92:Math.pow((x+0.055)/1.055,2.4);
+        });
+        return 0.2126*out[0]+0.7152*out[1]+0.0722*out[2];
+      };
+      const background=parse(getComputedStyle(document.querySelector(backgroundSelector)).backgroundColor);
+      return items.map(selector=>{
+        const element=document.querySelector(selector);
+        const color=parse(getComputedStyle(element).color);
+        const high=Math.max(luminance(background),luminance(color));
+        const low=Math.min(luminance(background),luminance(color));
+        return {selector,contrast:(high+0.05)/(low+0.05),color:getComputedStyle(element).color};
+      });
+    },{items,backgroundSelector});
+    for(const entry of result){
+      expect(entry.contrast,'Poor contrast for '+entry.selector+' ('+entry.color+')').toBeGreaterThanOrEqual(4.5);
+    }
+  };
+  await page.locator('#filterToggle').click();
+  await inspect(['#filterPanel','.filter-title','#filterPanel .filter-row','#filterPanel .filter-menu-label','#filterPanel .filter-note'],'#filterPanel');
+  await page.locator('#filterToggle').click();
+  await page.locator('#logToggle').click();
+  await inspect(['#logPanel','#logPanel .log-title','#logPanel .log-head-note','#logPanel .log-filter-hint','#logPanel .log-compact-help'],'#logPanel');
+  await page.locator('#logServerFiles summary').click();
+  await inspect(['#logPanel #fileManager','#logPanel #fileManager .fm-label','#logPanel #fileManager .fm-note','#logPanel #fileManager .fm-path'],'#logPanel');
+  await page.locator('#logToggle').click();
+  await page.locator('#biToggle').click();
+  await inspect(['#biPanel','#biPanel .biHeader .biSmall','#biPanel label[for="biName"]','#biPanel .biDraftCount'],'#biPanel');
+  await page.locator('#biToggle').click();
+  await page.locator('#builditThemeToggle').click();
+  await expect(page.locator('html')).toHaveAttribute('data-buildit-theme','dark');
 });
