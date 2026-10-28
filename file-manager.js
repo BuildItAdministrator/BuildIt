@@ -332,4 +332,10 @@
     editor.value=refresh.content;
     refreshValidation();
   }));
+  // Keep file actions disabled until a real, validated server file is open.
+  // This initialization is independent of the removed temporary write test.
+  $('fmDownload').disabled=true;
+  $('fmValidate').disabled=true;
+  $('fmRepairXml').disabled=true;
+  refreshValidation();
 })();
