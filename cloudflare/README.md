@@ -1,7 +1,7 @@
 # New JSON loot file creation: Cloudflare Worker integration
 
 Build It!++ now prepares both **existing-file updates** and **first-time creation** of
-`BuildIt_LootDrops.json` in the active Chernarus mission directory.
+`builditlootdrop.json` in the Chernarus mission `custom` directory.
 
 ## What is deployed / not deployed
 
