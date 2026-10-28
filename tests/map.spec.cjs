@@ -525,38 +525,27 @@ test('Custom Bases streams JSON bigger than 512KB without changing file editor o
 });
 
 
-test('file-write test shows exact missing/short-key reason and puts key next to test', async ({page})=>{
+test('file-write test is removed while file manager and upload key remain usable',async({page})=>{
   await page.locator('#logToggle').click();
-  await page.locator('#logConnectionDetails').evaluate(el=>el.open=true);
   await page.locator('#logServerFiles').evaluate(el=>el.open=true);
+  await expect(page.locator('#nitradoFileWriteTest')).toHaveCount(0);
+  await expect(page.locator('#nitradoFileWriteStatus')).toHaveCount(0);
+  await expect(page.locator('#fileManager')).toBeVisible();
+  await expect(page.locator('#fmBrowse')).toBeVisible();
+  await expect(page.locator('#fmSave')).toBeDisabled();
   const key=page.locator('#nitradoWriteKey');
   const count=page.locator('#nitradoWriteKeyLength');
-  const test=page.locator('#nitradoFileWriteTest');
   await expect(key).toBeVisible();
   await expect(count).toContainText('Minimum 8 characters');
-  const keyBox=await key.boundingBox();
-  const buttonBox=await test.boundingBox();
-  expect(keyBox.y+keyBox.height).toBeLessThan(buttonBox.y);
-  const noKey=await page.evaluate(async()=>{
-    try{await nitradoRequest('/api/file-write-test',{method:'POST',writeKey:true});return 'unexpected success'}
-    catch(error){return error.message}
-  });
-  expect(noKey).toContain('MAP_WRITE_KEY is empty');
   await key.fill('short');
   await expect(count).toContainText('5/8 characters');
-  const shortKey=await page.evaluate(async()=>{
-    try{await nitradoRequest('/api/file-write-test',{method:'POST',writeKey:true});return 'unexpected success'}
-    catch(error){return error.message}
-  });
-  expect(shortKey).toContain('MAP_WRITE_KEY is too short (5/8 characters)');
-  const good='abc12345';
-  await key.fill(good);
+  await key.fill('abcdefgh');
   await expect(count).toContainText('Length OK');
-  await expect(count).toContainText('Cloudflare match not yet tested');
   expect(await key.getAttribute('type')).toBe('password');
   expect(await page.evaluate(()=>localStorage.getItem('nitradoWriteKey'))).toBeNull();
-  const before=await page.evaluate(()=>sessionStorage.getItem('nitradoWriteKey'));
-  expect(before).toBeNull();
+  expect(await page.evaluate(()=>sessionStorage.getItem('nitradoWriteKey'))).toBeNull();
+  await expect(page.locator('#logServerFiles summary')).toContainText('Server files & uploads');
+  await expect(page.locator('#fmValidate')).toHaveCount(1);
 });
 
 
@@ -1123,7 +1112,7 @@ test('Professional UI uses consistent line icons without changing controls or la
   await expect(page.locator('#placeSearchBox .bi-search-icon svg.bi-icon')).toHaveCount(1);
   for(const [id,icon] of [
     ['filterToggle','sliders'],['logToggle','logs'],['biToggle','wrench'],
-    ['nitradoSyncNow','refresh'],['nitradoFileWriteTest','shield'],
+    ['nitradoSyncNow','refresh'],
     ['biSave','save'],['biPreviewServer','checkfile'],
     ['biUploadServer','cloud'],['builditThemeToggle','sun']
   ]){
