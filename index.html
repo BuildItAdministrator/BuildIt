@@ -1160,6 +1160,8 @@ async function testNitradoConnection(){
   try{
     await loadNitradoServers({quiet:true});
     const data=await nitradoRequest('/api/status',{withServer:true});
+    window.BUILD_IT_NITRADO_WORKER_MODE=nitradoWorkerMode;
+    window.BUILD_IT_NITRADO_EXPECTED_USERNAME=String(data.username||'');
     const server=data?.serverName||data?.configuredName||data?.game||`service ${data?.serviceId||''}`;
     const count=Number(data?.admLogCount)||0;
     setNitradoStatus(`Connected to ${server}. ${count} ADM log file${count===1?'':'s'} detected.`,'ok');
@@ -1224,6 +1226,8 @@ nitradoAccessKey.addEventListener('change',()=>{
 });
 nitradoServer.addEventListener('change',()=>{
   nitradoServer.dataset.savedId=nitradoServer.value;
+  window.BUILD_IT_NITRADO_EXPECTED_USERNAME='';
+  window.BUILD_IT_SERVER_FILES?.resetForServer?.();
   saveNitradoConfig();
   if(nitradoServer.value){
     const label=nitradoServer.options[nitradoServer.selectedIndex]?.text||nitradoServer.value;
@@ -1245,6 +1249,8 @@ window.BUILD_IT_NITRADO_ADMIN=Object.freeze({
     // Clear the previous server's status and cached log activity before
     // discovery. The profile manager prevents switching while active writes run.
     nitradoWorkerMode='unknown';
+    window.BUILD_IT_NITRADO_WORKER_MODE='unknown';
+    window.BUILD_IT_NITRADO_EXPECTED_USERNAME='';
     nitradoServerList=[];
     nitradoWorkerUrl.value=profile.workerUrl;
     nitradoAccessKey.value=profile.accessKey;
@@ -1260,6 +1266,10 @@ window.BUILD_IT_NITRADO_ADMIN=Object.freeze({
     const discovered=await loadNitradoServers({quiet:true});
     const selected=nitradoServer.value;
     const status=await nitradoRequest('/api/status',{withServer:true});
+    window.BUILD_IT_NITRADO_WORKER_MODE=nitradoWorkerMode;
+    window.BUILD_IT_NITRADO_EXPECTED_USERNAME=String(status.username||'');
+    if(nitradoWorkerMode==='multi'&&(!status.username||!status.serviceId))
+      throw new Error('Multi-server Worker must confirm service ID and username before file access.');
     if(profile.serverId && profile.serverId!=='default' && selected!==profile.serverId)
       throw new Error('The configured server is no longer available. Check server access.');
     if(profile.serviceId && status.serviceId && String(profile.serviceId)!==String(status.serviceId))
