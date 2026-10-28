@@ -88,6 +88,20 @@
   const entries=$('fmEntries'), editor=$('fmEditor'), box=$('fmFileBox');
   let root='',dir='',currentRoot='',storageRoots=[],selected='',sourceDigest='',running=false;
   let validationOk=false,validationResult=null,validationTimer=null;
+  window.BUILD_IT_FILE_MANAGER=Object.freeze({isBusy:()=>running});
+  window.addEventListener('buildit:nitrado-profile-changing',()=>{
+    root='';dir='';currentRoot='';storageRoots=[];selected='';sourceDigest='';
+    validationOk=false;validationResult=null;clearTimeout(validationTimer);
+    editor.value='';entries.replaceChildren();
+    box.hidden=true;
+    $('fmCurrentDir').textContent='';
+    $('fmSelected').textContent='';
+    $('fmValidationStatus').textContent='Select a file from the new server.';
+    $('fmValidationStatus').dataset.validation='';
+    $('fmSave').disabled=true;
+    $('fmDownload').disabled=true;
+    state('Server changed. Browse the new Nitrado server to continue.');
+  });
   const state=(message,error=false)=>{
     $('fmStatus').textContent=message;
     $('fmStatus').style.color=error?'#ffadad':'#a8d6e4';
