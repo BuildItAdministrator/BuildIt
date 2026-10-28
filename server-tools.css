@@ -1,7 +1,7 @@
 /* Build It!++ tools hub — follows existing light/dark system. */
 #serverToolsRoot{font-family:inherit}
 #toolHubToggle{
- position:absolute;z-index:1152;top:201px;right:var(--bi-dock-right,12px);
+ position:absolute;z-index:1152;top:247px;right:var(--bi-dock-right,12px);
  width:min(var(--bi-dock-width,264px),calc(100vw - 24px));height:40px;
  box-sizing:border-box;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;
  border:1px solid var(--bi-line);border-radius:9px;
@@ -11,8 +11,8 @@
 #toolHubToggle:hover,#toolHubToggle[aria-expanded=true]{border-color:var(--bi-accent);background:var(--bi-panel-raised)}
 #toolHubToggle .st-count{font-size:10px;color:var(--bi-muted);font-weight:600;white-space:nowrap}
 #toolHubPanel{
- position:absolute;z-index:1175;top:253px;right:var(--bi-dock-right,12px);
- width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 266px);
+ position:absolute;z-index:1175;top:305px;right:var(--bi-dock-right,12px);
+ width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 318px);
  overflow:auto;box-sizing:border-box;padding:16px;border:1px solid var(--bi-line);
  border-radius:var(--bi-radius);color:var(--bi-text);background:var(--bi-panel);
  box-shadow:var(--bi-shadow);
@@ -63,7 +63,7 @@
 body.buildit-searching #toolHubToggle{visibility:hidden!important}
 @media(max-width:600px){
  #toolHubToggle{right:10px;width:min(230px,calc(100vw - 20px))}
- #toolHubPanel{top:253px;right:10px;width:calc(100vw - 20px);max-height:calc(100dvh - 266px)}
+ #toolHubPanel{top:305px;right:10px;width:calc(100vw - 20px);max-height:calc(100dvh - 318px)}
  .st-cards{grid-template-columns:1fr}
  .st-toolbar,.st-params{grid-template-columns:1fr}
 }
