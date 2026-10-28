@@ -67,3 +67,13 @@ gameplay file and creates a verified backup before replacing it.
 
 Do not paste Nitrado access tokens or MAP_WRITE_KEY into GitHub source files.
 Store secrets only in Cloudflare Worker secrets/environment variables.
+
+## Large existing mission files (types.xml)
+
+Vanilla `db/types.xml` can exceed the older 512 KB Worker editing limit. For the full existing-file Server Tools workflow, edit your *deployed* Cloudflare Worker source:
+
+```js
+const MAX_FILE_BYTES = 4 * 1024 * 1024;
+```
+
+Change the corresponding error text from `512 KB` to `4 MB` if present. The website `server-tools-bridge.js` and `format-validator.js` already support up to 4 MB. The separate File Manager may still retain its smaller editor limit; that is intentional. Preserve `MAP_SYNC_KEY` / `MAP_WRITE_KEY`, path validation, checksum verification, Nitrado backup and read-after-write checks. A GitHub commit alone DOES NOT deploy Cloudflare Worker code. Verify with a non-destructive read before allowing writes.
