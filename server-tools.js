@@ -183,6 +183,7 @@ async function loadLive(){
 async function choose(name){
  if(busy)return;
  selected=name;snapshot=null;invalidate();
+ $('stRemoteFile').replaceChildren();
  cards.hidden=true;workspace.hidden=false;
  $('stWorkTitle').textContent=name;
  const types=['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer'].includes(name);
@@ -203,10 +204,11 @@ async function choose(name){
    'This tool checks the existing server file directly. No manual upload or file import.';
  setStatus('Connecting to Nitrado…');$('stFileState').textContent='Finding active mission…';
  setBusy(true);
- try{await refreshCatalog();}
+ let catalogReady=false;
+ try{await refreshCatalog();catalogReady=true;}
  catch(error){setStatus(error.message,true);$('stFileState').textContent='Unavailable';}
  finally{setBusy(false);}
- if($('stRemoteFile').options.length)await loadLive();
+ if(catalogReady&&$('stRemoteFile').options.length)await loadLive();
 }
 $('stBack').addEventListener('click',()=>{
  if(busy)return;
