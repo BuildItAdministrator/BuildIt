@@ -171,6 +171,9 @@ async function changeTo(id,{force=false}={}){
   const verified=await admin.switchTo(profile);
   if(profile.serviceId&&verified.status?.serviceId&&String(verified.status.serviceId)!==profile.serviceId)
    throw Error('Different Nitrado service detected. Profile is locked.');
+  if(!profile.serviceId&&verified.status?.serviceId)
+   profile.serviceId=String(verified.status.serviceId);
+  if(verified.status?.serverName)profile.serverName=String(verified.status.serverName);
   storage();
   window.dispatchEvent(new CustomEvent('buildit:nitrado-profile-changed',{
    detail:{profileId:id,name:profile.name}
