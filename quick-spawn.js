@@ -84,11 +84,24 @@ $('qsFind').addEventListener('input',()=>{
 });
 $('qsFind').addEventListener('focus',renderMatches);
 for(const id of ['qsQuantity','qsHeight'])$(id).addEventListener('input',refreshButton);
+function cancelMapPicking(){
+  picking=false;
+  $('qsPick').textContent=coordinates?'Change map position':'Click to pick a position on the map';
+  setStatus('Map selection cancelled.');
+}
 $('qsPick').addEventListener('click',()=>{
   if(busy)return;
-  picking=!picking;
-  $('qsPick').textContent=picking?'Click the map to set the spawn position':'Click to pick a position on the map';
-  setStatus(picking?'Click anywhere on the Chernarus map.':'');
+  if(picking){
+    window.BUILD_IT_UI_VISIBILITY?.cancelPick('quick-spawn');
+    cancelMapPicking();return;
+  }
+  picking=true;
+  $('qsPick').textContent='Click the map to set the spawn position';
+  setStatus('Click anywhere on the Chernarus map.');
+  window.BUILD_IT_UI_VISIBILITY?.beginPick('quick-spawn',{
+    hintText:'Choose a vehicle or loot spawn location on the map',
+    onCancel:cancelMapPicking
+  });
 });
 map.on('click',e=>{
   if(!picking||busy)return;
@@ -97,7 +110,8 @@ map.on('click',e=>{
     setStatus('Choose a position inside Chernarus.',true);return;
   }
   coordinates={x:Number(p.x.toFixed(2)),z:Number(p.z.toFixed(2))};
-  picking=false;$('qsPick').textContent='Change map position';
+  picking=false;window.BUILD_IT_UI_VISIBILITY?.finishPick('quick-spawn');
+  $('qsPick').textContent='Change map position';
   $('qsCoordinates').textContent='X '+coordinates.x+' · Z '+coordinates.z;
   if(pin)map.removeLayer(pin);
   pin=L.circleMarker(e.latlng,{radius:8,color:'#2ab6c1',weight:3,fillColor:'#2ab6c1',fillOpacity:.3}).addTo(map);
@@ -111,7 +125,7 @@ function open(){
   if(toolHub){toolHub.hidden=true;document.getElementById('toolHubToggle')?.setAttribute('aria-expanded','false');}
   root.hidden=false;$('qsFind').focus({preventScroll:true});
 }
-function close(){root.hidden=true;picking=false;$('qsPick').textContent='Click to pick a position on the map';$('qsMatches').hidden=true;}
+function close(){window.BUILD_IT_UI_VISIBILITY?.cancelPick('quick-spawn');root.hidden=true;picking=false;$('qsPick').textContent='Click to pick a position on the map';$('qsMatches').hidden=true;}
 function toggle(){root.hidden?open():close();}
 $('qsClose').addEventListener('click',close);
 $('qsAdvanced').addEventListener('click',()=>{close();api.advanced();});
