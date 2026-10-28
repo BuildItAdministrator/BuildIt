@@ -104,7 +104,8 @@
     '<div id="biItems"></div>',
     '<div class="biWarn">Loot cargo applies to every container of the same classname, not just this map location. Manual XML review is required.</div>',
     '<label style="font-weight:400"><input type="checkbox" id="biAcknowledge"> I understand the global cargo change.</label></div>',
-    '<div class="biRow biActions"><button type="button" id="biSave" class="biPrimary">Save spawn</button><button type="button" id="biNew" class="biQuiet">Clear</button></div></section>',
+    '<div class="biRow biActions"><button type="button" id="biSave" class="biPrimary">Save spawn</button><button type="button" id="biNew" class="biQuiet">Clear</button></div>',
+    '<div id="biStatus" role="status" aria-live="polite"></div></section>',
     '<section class="biSection"><div class="biSectionTitle"><span class="biStep">02</span><h4>Queued events</h4><span id="biDraftCount" class="biSmall biDraftCount">0 saved</span></div>',
     '<div id="biDrafts"></div></section>',
     '<section class="biSection biPublish"><div class="biSectionTitle"><span class="biStep">03</span><h4>Publish to Nitrado</h4></div>',
@@ -122,8 +123,7 @@
     '<div class="biRow"><button type="button" id="biExportEvents">events.xml</button><button type="button" id="biExportPositions">cfgeventspawns.xml</button></div>',
     '<button type="button" id="biExportCargo" class="biFull">cfgspawnabletypes.xml (loot)</button>',
     '<div class="biWarn">Offline exports without original XML contain additions only. Never upload them as full replacements.</div>',
-    '</details>',
-    '<div id="biStatus" role="status" aria-live="polite"></div>'
+    '</details>'
   ].join('');
   document.body.appendChild(panel);
   const message = (s, error) => { $('biStatus').textContent = s; $('biStatus').style.color = error ? '#ffb2a2' : '#a8d6e4'; };
@@ -180,9 +180,13 @@
     const input = $(kind === 'vehicle' ? 'biVehicleSearch' : 'biItemSearch');
     const target = $(kind === 'vehicle' ? 'biVehicleMatches' : 'biItemMatches');
     const term = input.value.toLowerCase().trim();
-    const set = kind === 'vehicle' ? vehicleNames : itemNames;
-    const matches = [...set].filter(n => !term || n.toLowerCase().includes(term)).sort((a,b) => a.localeCompare(b)).slice(0,25);
     target.replaceChildren();
+    // Empty suggestion lists used to occupy a large part of the phone panel.
+    // Keep searches compact until someone actually starts typing.
+    if(term.length<2){target.hidden=true;return;}
+    target.hidden=false;
+    const set = kind === 'vehicle' ? vehicleNames : itemNames;
+    const matches = [...set].filter(n => n.toLowerCase().includes(term)).sort((a,b) => a.localeCompare(b)).slice(0,25);
     if (!matches.length) { target.textContent = 'No matching classnames found.'; return; }
     matches.forEach(name => {
       const btn = document.createElement('button');
@@ -196,7 +200,7 @@
           else itemList.push({name,qty:1});
           input.value = ''; renderItems(); message(name + ' added.');
         }
-        target.replaceChildren();
+        target.replaceChildren();target.hidden=true;
       });
       target.appendChild(btn);
     });
