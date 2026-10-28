@@ -404,7 +404,7 @@
       eventIndent.includes('\t')?'\t':eventIndent.length>=2?' '.repeat(Math.min(4,eventIndent.length)):'    ';
     const insertionAt=closeStart-closeIndent.length;
     const prefix=original.slice(0,insertionAt);
-    const blocks=newNodes.map(el=>formatNewXmlNode(el,eventIndent,unit,newline)).join(newline);
+    const blocks=newNodes.map(el=>formatNewXmlNode(el,eventIndent,unit,newline)).join(newline+newline);
     const insertion=(/[\r\n]$/.test(prefix)?'':newline)+blocks+newline;
     const merged=prefix+insertion+original.slice(insertionAt);
     const resultDoc=parseXML(merged,root);
@@ -448,7 +448,18 @@
         doc.documentElement.appendChild(kind==='events'?createEvent(doc,d):createPos(doc,d));
       });
     }
-    const xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + new XMLSerializer().serializeToString(doc);
+    // For offline add-only exports, indent every new element instead of
+    // serializing the entire document onto a single unreadable line.
+    // Existing cargo imports retain the legacy manual-only exporter.
+    const xml = !original
+      ? '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
+        formatNewXmlNode(doc.documentElement,'','    ','\n')+'\n'
+      : (()=>{
+          const encoded=new XMLSerializer().serializeToString(doc);
+          const declaration=original.match(/^\uFEFF?\s*<\?xml\b[\s\S]*?\?>/i);
+          const withoutLeading=encoded.replace(/^\uFEFF?\s*<\?xml\b[\s\S]*?\?>\s*/i,'');
+          return (declaration?.[0]||'<?xml version="1.0" encoding="UTF-8"?>')+'\n'+withoutLeading;
+        })();
     return {filename: original ? filename : 'BuildIt_ADD_ONLY_' + filename,xml,complete:!!original};
   }
   // Nitrado deployment: vehicle events only. Client previews are never treated as
