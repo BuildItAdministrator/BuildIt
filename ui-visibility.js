@@ -62,7 +62,7 @@ function setManuallyHidden(value,{persist=true}={}){
  }
 }
 toggle.addEventListener('click',()=>{
- if(active)cancelPick();
+ if(active){cancelPick();setManuallyHidden(false);return;}
  setManuallyHidden(!manuallyHidden);
 });
 cancel.querySelector('#builditMapPickCancel').addEventListener('click',()=>cancelPick());
