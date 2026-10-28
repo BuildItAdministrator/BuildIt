@@ -1304,3 +1304,58 @@ test('non-persistent JSON loot export preserves cfgGameplay references and other
   expect(result.stamina).toBe(100);
   expect(result.missingHeightRejected).toBe(true);
 });
+
+
+test('first-time loot JSON creation uses create route without overwriting existing files',async({page})=>{
+  const noftp='/games/ni5774718_3/noftp';
+  const mission='/games/ni5774718_3/ftproot/dayzps_missions/dayzOffline.chernarusplus';
+  const loot=mission+'/BuildIt_LootDrops.json',gameplay=mission+'/cfggameplay.json';
+  const original=JSON.stringify({version:130,WorldsData:{objectSpawnersArr:['custom-base.json']},PlayerData:{StaminaData:{staminaMax:100}}});
+  const calls=[];
+  await page.addInitScript(()=>{
+    localStorage.setItem('buildit_events_drafts_v1',JSON.stringify([{
+      name:'CreateTestDrop',kind:'loot',x:4465.78,z:10227.54,y:269,a:0,spacing:1.5,items:[{name:'Apple',qty:2}]
+    }]));
+  });
+  await page.route('https://buildit-nitrado-logs.davaydresnikov.workers.dev/**',async route=>{
+    const url=new URL(route.request().url()),method=route.request().method();
+    calls.push({path:url.pathname,method,body:method==='POST'?route.request().postDataJSON():null});
+    let status=200,data={};
+    if(url.pathname==='/api/files/list'){
+      const dir=url.searchParams.get('dir');
+      if(!dir)data={root:noftp,dir:noftp,entries:[]};
+      else if(dir===mission)data={root:noftp,dir,entries:[{name:'db',type:'directory',path:mission+'/db'},{name:'cfggameplay.json',type:'file',path:gameplay}]};
+      else{status=404;data={error:'Unknown directory'};}
+    }else if(url.pathname==='/api/files/read'){
+      const file=url.searchParams.get('file');
+      if(file===gameplay)data={path:file,content:original,sha256:'a'.repeat(64)};
+      else{status=404;data={error:'Missing file'};}
+    }else if(url.pathname==='/api/files/create'){
+      data={created:true,verified:true,sha256:'b'.repeat(64)};
+    }else if(url.pathname==='/api/files/write'){
+      data={verified:true,backupPath:gameplay+'.backup'};
+    }else{status=404;data={error:'Unrecognized route'};}
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
+  });
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.locator('#nitradoWorkerUrl').evaluate(el=>el.value='https://buildit-nitrado-logs.davaydresnikov.workers.dev');
+  await page.locator('#nitradoAccessKey').evaluate(el=>el.value='test-read-access');
+  await page.locator('#nitradoWriteKey').evaluate(el=>el.value='test-write-access');
+  await page.locator('#biToggle').click();
+  await page.locator('#biPrepareLoot').click();
+  await expect(page.locator('#biLootReview')).toContainText('READY');
+  await expect(page.locator('#biLootReview')).toContainText('New loot JSON');
+  await page.locator('#biLootServerStopped').check();
+  page.on('dialog',d=>d.accept());
+  await page.locator('#biDeployLoot').click();
+  await expect(page.locator('#biLootReview')).toContainText('UPLOAD VERIFIED');
+  const create=calls.filter(c=>c.path==='/api/files/create');
+  const write=calls.filter(c=>c.path==='/api/files/write');
+  expect(create).toHaveLength(1);
+  expect(create[0].body).toMatchObject({path:loot,confirm:true,expectedAbsent:true});
+  expect(JSON.parse(create[0].body.content).Objects.every(o=>o.enableCEPersistency===false)).toBe(true);
+  expect(write).toHaveLength(1);
+  expect(write[0].body).toMatchObject({path:gameplay,expectedSha256:'a'.repeat(64),confirm:true});
+  expect(JSON.parse(write[0].body.content).WorldsData.objectSpawnersArr).toEqual(['custom-base.json','BuildIt_LootDrops.json']);
+  await expect(page.locator('#biDraftCount')).toHaveText('0 saved');
+});
