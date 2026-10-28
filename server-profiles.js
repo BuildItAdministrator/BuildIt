@@ -154,6 +154,12 @@ async function candidate(){
 }
 async function changeTo(id,{force=false}={}){
  if(locked())throw Error('Wisselen is geblokkeerd zolang een Nitrado-verzoek of upload loopt.');
+ if(window.BUILD_IT_FILE_MANAGER?.hasUnsaved?.()||
+    window.BUILD_IT_TOOLS?.hasPreview?.()||
+    window.BUILD_IT_QUICK_SPAWN?.hasDraft?.()){
+   if(!confirm('Je hebt nog niet-gepubliceerde wijzigingen op de huidige server. Deze selectie of preview wordt gewist bij serverwissel. Toch wisselen?'))
+     throw Error('Serverwissel geannuleerd; niet-opgeslagen wijzigingen zijn behouden.');
+ }
  const profile=profiles.find(p=>p.id===id);
  if(!profile)throw Error('Server profile not found.');
  if(!force&&activeId===id)return;
