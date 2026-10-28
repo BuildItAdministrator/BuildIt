@@ -1391,21 +1391,21 @@ test('JSON loot migration replaces old Build It references with custom/builditlo
 });
 
 
-test('server tools catalog shows 53 items, with no local-file import workflow',async({page})=>{
+test('Server Tools shows only implemented Nitrado-connected tools and no local file uploads',async({page})=>{
   const stats=await page.evaluate(()=>window.BUILD_IT_TOOLS);
-  expect(stats).toEqual({count:53,ready:21,mode:'nitrado'});
+  expect(stats).toEqual({count:32,ready:32,mode:'nitrado'});
   await page.locator('#toolHubToggle').click();
   await expect(page.locator('#toolHubPanel')).toBeVisible();
-  await expect(page.locator('#stCards .st-card')).toHaveCount(53);
+  await expect(page.locator('#stCards .st-card')).toHaveCount(32);
   await expect(page.locator('#stFile')).toHaveCount(0);
   await expect(page.locator('#stDownload')).toHaveCount(0);
   await page.locator('#stSearch').fill('NPC Generator');
-  await expect(page.locator('#stCards .st-card')).toHaveCount(1);
-  await expect(page.locator('#stCards .st-card')).toContainText('Planned');
-  await expect(page.locator('#stCards .st-card button')).toHaveCount(0);
+  await expect(page.locator('#stCards .st-card')).toHaveCount(0);
   await page.locator('#stSearch').fill('JSON Splitter');
-  await expect(page.locator('#stCards .st-card')).toContainText('Planned');
-  await expect(page.locator('#stCards .st-card button')).toHaveCount(0);
+  await expect(page.locator('#stCards .st-card')).toHaveCount(0);
+  await page.locator('#stSearch').fill('Horde Generator');
+  await expect(page.locator('#stCards .st-card')).toHaveCount(1);
+  await expect(page.locator('#stCards .st-card button')).toHaveCount(1);
 });
 
 test('live Nitrado Types Booster previews then publishes with current SHA and backup',async({page})=>{
@@ -1692,10 +1692,12 @@ test('Event Group Calculator counts live event positions and identifies duplicat
   expect(result.warnings.some(w=>w.includes('Duplicate position'))).toBe(true);
 });
 
-test('Server Tools foregrounds live Nitrado actions and labels unsupported tools without false launch buttons',async({page})=>{
+test('Server Tools excludes unsupported server mods',async({page})=>{
   await page.locator('#toolHubToggle').click();
-  await expect(page.locator('#stCards .st-card').first()).toContainText('Connected to Nitrado');
+  await expect(page.locator('#stCards .st-card').first()).toContainText('Server-connected');
   await page.locator('#stSearch').fill('Airstrike Generator');
-  await expect(page.locator('#stCards .st-card')).toContainText('Nog in ontwikkeling');
-  await expect(page.locator('#stCards .st-card button')).toHaveCount(0);
+  await expect(page.locator('#stCards .st-card')).toHaveCount(0);
+  await page.locator('#stSearch').fill('Types Organizer');
+  await expect(page.locator('#stCards .st-card')).toHaveCount(1);
+  await expect(page.locator('#stCards .st-card button')).toHaveCount(1);
 });
