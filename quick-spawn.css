@@ -3,8 +3,8 @@
  */
 #quickSpawnPanel{
  position:absolute;z-index:1170;
- top:var(--bi-panel-top,259px);right:var(--bi-dock-right,12px);
- width:min(385px,calc(100vw - 24px));max-height:calc(100dvh - 280px);
+ top:var(--bi-panel-top,305px);right:var(--bi-dock-right,12px);
+ width:min(385px,calc(100vw - 24px));max-height:calc(100dvh - 322px);
  overflow-y:auto;box-sizing:border-box;padding:16px;border:1px solid var(--bi-line);
  border-radius:14px;box-shadow:var(--bi-shadow);background:var(--bi-panel);
  color:var(--bi-text);font:12px/1.5 Inter,Arial,sans-serif;
@@ -54,5 +54,5 @@
 #quickSpawnPanel .qs-settings summary{cursor:pointer;color:var(--bi-muted);font-size:11px}
 #quickSpawnPanel #qsAdvanced{width:100%;font-size:11px;border-color:transparent;background:transparent;color:var(--bi-muted)}
 @media(max-width:600px){
- #quickSpawnPanel{right:10px;width:calc(100vw - 20px);max-height:calc(100dvh - 270px)}
+ #quickSpawnPanel{right:10px;width:calc(100vw - 20px);max-height:calc(100dvh - 318px)}
 }
