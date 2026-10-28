@@ -1701,3 +1701,122 @@ test('Server Tools excludes unsupported server mods',async({page})=>{
   await expect(page.locator('#stCards .st-card')).toHaveCount(1);
   await expect(page.locator('#stCards .st-card button')).toHaveCount(1);
 });
+
+
+test('server-native gas zone cloning preserves working static schema and refuses duplicates',async({page})=>{
+  const got=await page.evaluate(()=>{
+    const addon=window.BUILD_IT_SERVER_ADDONS;
+    const source=JSON.stringify({Areas:[{AreaName:'Existing',Type:'ContaminatedArea_Static',
+      TriggerType:'ContaminatedTrigger',Data:{Pos:[100,0,200],Radius:50,
+      PosHeight:20,NegHeight:10,ParticleName:'graphics/particles/contaminated_area_gas_bigass_debug'},
+      PlayerData:{PPERequesterType:'PPERequester_ContaminatedAreaTint'}}]});
+    const result=addon.addGasZone(source,'BuildItGas',4500,250,10100,60);
+    const out=JSON.parse(result.content);
+    let duplicateBlocked=false;
+    try{addon.addGasZone(result.content,'BuildItGas',4800,250,10200,60);}catch{duplicateBlocked=true;}
+    return {count:out.Areas.length,oldArea:out.Areas[0].AreaName,
+      radius:out.Areas[1].Data.Radius,pos:out.Areas[1].Data.Pos,
+      particle:out.Areas[1].Data.ParticleName,duplicateBlocked};
+  });
+  expect(got).toEqual({count:2,oldArea:'Existing',radius:60,pos:[4500,250,10100],
+    particle:'graphics/particles/contaminated_area_gas_bigass_debug',duplicateBlocked:true});
+});
+
+test('Horde Generator adds a zone of an existing type without inventing infected events',async({page})=>{
+  const got=await page.evaluate(()=>{
+    const addon=window.BUILD_IT_SERVER_ADDONS;
+    const src='<territory-type><territory color="123"><zone name="InfectedArmy" smin="0" smax="0" dmin="3" dmax="5" x="100" z="200" r="50" /></territory><territory color="456"><zone name="InfectedCity" smin="0" smax="0" dmin="8" dmax="12" x="400" z="500" r="70"/></territory></territory-type>';
+    const out=addon.addHorde(src,'InfectedArmy',4500,10100,80,20,50);
+    const doc=new DOMParser().parseFromString(out.content,'application/xml');
+    let unknownBlocked=false;
+    try{addon.addHorde(src,'MadeUpZombie',4500,10100,80,20,50);}catch{unknownBlocked=true;}
+    const army=[...doc.querySelectorAll('territory[color="123"] > zone')];
+    return {army:army.length,city:doc.querySelectorAll('territory[color="456"] > zone').length,
+      newX:army[1]?.getAttribute('x'),newMax:army[1]?.getAttribute('dmax'),unknownBlocked};
+  });
+  expect(got).toEqual({army:2,city:1,newX:'4500',newMax:'50',unknownBlocked:true});
+});
+
+test('Build Relocator preserves original elevations while offsetting an entire object group',async({page})=>{
+  const got=await page.evaluate(()=>{
+    const data={Objects:[{name:'Wall',pos:[100,30,200],ypr:[0,0,0]},
+      {name:'Gate',pos:[110,32,210],ypr:[5,0,0]}]};
+    const out=window.BUILD_IT_SERVER_ADDONS.moveBuild(JSON.stringify(data),1010,2010);
+    const list=JSON.parse(out.content).Objects;
+    return {count:out.count,center:out.target,first:list[0].pos,second:list[1].pos,ypr:list[1].ypr};
+  });
+  expect(got).toEqual({count:2,center:[1010,2010],first:[1005,30,2005],
+    second:[1015,32,2015],ypr:[5,0,0]});
+});
+
+test('Weapon Blueprint Generator and Bag Fill add only to an existing classname',async({page})=>{
+  const result=await page.evaluate(()=>{
+    const src='<spawnabletypes><!-- <type name="M4A1"><attachments chance="0.1"/></type> --><type name="M4A1"><damage min="0" max="0.2"/></type><type name="Other"><cargo preset="food"/></type></spawnabletypes>';
+    const one=window.BUILD_IT_SERVER_ADDONS.appendEquipment(src,'M4A1','ACOGOptic','attachments',1,0.8);
+    const two=window.BUILD_IT_SERVER_ADDONS.appendEquipment(one.content,'M4A1','Apple','cargo',0.9,0.7);
+    const doc=new DOMParser().parseFromString(two.content,'application/xml');
+    return {hasComment:two.content.includes('<!-- <type name="M4A1">'),
+      attachments:doc.querySelectorAll('type[name="M4A1"] > attachments > item[name="ACOGOptic"]').length,
+      cargo:doc.querySelectorAll('type[name="M4A1"] > cargo > item[name="Apple"]').length,
+      other:doc.querySelector('type[name="Other"] > cargo')?.getAttribute('preset'),
+      invalid:!!doc.querySelector('parsererror')};
+  });
+  expect(result).toEqual({hasComment:true,attachments:1,cargo:1,other:'food',invalid:false});
+});
+
+test('Types Organizer and Events Organizer preserve unrelated configuration',async({page})=>{
+  const result=await page.evaluate(()=>{
+    const core=window.BUILD_IT_SERVER_FINAL;
+    const types='<types><type name="Zebra"><nominal>10</nominal></type>\n<type name="Apple"><nominal>20</nominal></type></types>';
+    const sorted=core.organizeTypes(types);
+    const events='<events><event name="HeliCrash"><nominal>4</nominal><min>1</min><max>10</max></event><event name="Police"><nominal>1</nominal><min>0</min><max>3</max></event></events>';
+    const changed=core.editEvent(events,'HeliCrash','nominal',6);
+    return {sorted:sorted.content.indexOf('name="Apple"')<sorted.content.indexOf('name="Zebra"'),
+      changedNominal:changed.content.includes('<nominal>6</nominal>'),
+      policeUnchanged:changed.content.includes('name="Police"><nominal>1</nominal>')};
+  });
+  expect(result).toEqual({sorted:true,changedNominal:true,policeUnchanged:true});
+});
+
+test('Ignore List and registered Loadout Generator preserve non-target entries',async({page})=>{
+  const got=await page.evaluate(()=>{
+    const api=window.BUILD_IT_SERVER_FINAL;
+    const ignore=api.addIgnore('<ignore><type name="Zombie"/></ignore>','Apple');
+    const source=JSON.stringify({name:'Test',spawnWeight:1,characterTypes:[],
+      attachmentSlotItemSets:[],discreteUnsortedItemSets:[{name:'Food',spawnWeight:1,simpleChildrenTypes:['Pear']}]});
+    const next=api.addLoadoutCargo(source,'Apple');
+    const data=JSON.parse(next.content);
+    return {ignore:ignore.content.includes('<type name="Apple"/>'),
+      existingIgnore:ignore.content.includes('<type name="Zombie"/>'),
+      items:data.discreteUnsortedItemSets[0].simpleChildrenTypes,
+      registered:api.presetFiles(JSON.stringify({PlayerData:{spawnGearPresetFiles:['custom/test.json','../../evil.json']}}))};
+  });
+  expect(got).toEqual({ignore:true,existingIgnore:true,items:['Pear','Apple'],registered:['custom/test.json']});
+});
+
+test('Underground Areas only edits the selected existing trigger',async({page})=>{
+  const got=await page.evaluate(()=>{
+    const api=window.BUILD_IT_SERVER_FINAL;
+    const source=JSON.stringify({Triggers:[{Position:[1,2,3],EyeAccommodation:0.8,Size:[10,10,10]},
+      {Position:[4,5,6],EyeAccommodation:0.4,Size:[20,20,20]}]});
+    const result=api.editTrigger(source,1,0.1),out=JSON.parse(result.content);
+    return {changed:result.changed,one:out.Triggers[0].EyeAccommodation,
+      two:out.Triggers[1].EyeAccommodation,size:out.Triggers[1].Size};
+  });
+  expect(got).toEqual({changed:1,one:0.8,two:0.1,size:[20,20,20]});
+});
+
+test('Chernarus fresh-spawn generator places coordinates inside a named official spawn group',async({page})=>{
+  const got=await page.evaluate(()=>{
+    const ext=window.BUILD_IT_SERVER_EXTENSIONS;
+    const xml='<playerspawnpoints><fresh><generator_posbubbles><group name="WestCherno"><pos x="100" z="200"/></group>'+
+      '<group name="EastCherno"><pos x="400" z="500"/></group></generator_posbubbles></fresh></playerspawnpoints>';
+    const groups=ext.spawnGroups(xml);
+    const changed=ext.addSpawnPoint(xml,600,700,'EastCherno');
+    const doc=new DOMParser().parseFromString(changed.content,'application/xml');
+    let missingBlocked=false;try{ext.addSpawnPoint(xml,600,700,'MadeUp');}catch{missingBlocked=true;}
+    return{groups,west:doc.querySelectorAll('group[name="WestCherno"] > pos').length,
+      east:doc.querySelectorAll('group[name="EastCherno"] > pos').length,missingBlocked};
+  });
+  expect(got).toEqual({groups:['WestCherno','EastCherno'],west:1,east:2,missingBlocked:true});
+});
