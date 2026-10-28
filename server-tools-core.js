@@ -124,5 +124,73 @@
     }
     return {total:groups.size,findings};
   }
-  root.BUILD_IT_SERVER_CORE=Object.freeze({validate,splitJSON,editTypes,eventConflicts,xmlDoc});
+
+  // CE globals editor — only changes an existing numeric "value" attribute.
+  // All unrelated XML nodes, comments and formatting remain exactly intact.
+  function globalsList(source){
+    const doc=xmlDoc(source,'variables'),vars=[];
+    for(const element of doc.documentElement.children){
+      if(element.nodeName!=='var')continue;
+      const name=element.getAttribute('name'),type=element.getAttribute('type'),value=element.getAttribute('value');
+      if(name&&['0','1'].includes(type)&&value!==null)
+        vars.push({name,type,value});
+    }
+    return vars;
+  }
+  function editGlobal(source,name,newValue){
+    const vars=globalsList(source);
+    const target=vars.find(v=>v.name===name);
+    if(!target)throw new Error('Select an existing numeric global from globals.xml.');
+    if(vars.filter(v=>v.name===name).length!==1)throw new Error('Duplicate global '+name+'; manual repair required.');
+    const number=Number(newValue);
+    if(newValue===''||!Number.isFinite(number)||Math.abs(number)>100000000)
+      throw new Error('A finite numeric value is required (maximum 100,000,000).');
+    if(target.type==='0'&&!Number.isSafeInteger(number))
+      throw new Error(name+' requires an integer.');
+    const attr=/(^|[\s])name\s*=\s*(["'])(.*?)\2/i;
+    const valueAttr=/(\bvalue\s*=\s*)(["'])([^"']*)\2/i;
+    let matched=0;
+    const content=source.replace(/<var\b[^>]*\/\s*>/gi,tag=>{
+      const label=tag.match(attr);
+      if(!label||label[3]!==name)return tag;
+      matched++;
+      if(!valueAttr.test(tag))throw new Error(name+' has no value attribute.');
+      return tag.replace(valueAttr,(_,prefix,quote)=>prefix+quote+String(number)+quote);
+    });
+    if(matched!==1)throw new Error('Could not safely find one '+name+' entry in the source XML.');
+    xmlDoc(content,'variables');
+    return {content,changed:target.value!==String(number)?1:0,previous:target.value,current:String(number),name};
+  }
+  function spawnableDuplicates(source){
+    const doc=xmlDoc(source,'spawnabletypes'),seen=new Map(),findings=[];
+    let total=0;
+    for(const item of doc.documentElement.children){
+      if(item.nodeName!=='type')continue;
+      total++;
+      const name=item.getAttribute('name')||'';
+      if(!name){findings.push('Unnamed spawnable type at entry '+total);continue;}
+      const key=name.toLowerCase();
+      if(seen.has(key))findings.push('Duplicate spawnable type '+name+' at entries '+seen.get(key)+' and '+total);
+      else seen.set(key,total);
+    }
+    return {total,findings};
+  }
+  function objectDuplicates(source){
+    const data=JSON.parse(source);
+    if(!data||Array.isArray(data)||!Array.isArray(data.Objects))
+      throw new Error('Expected DayZ JSON Object Spawner with Objects[].');
+    const positions=new Map(),findings=[];
+    for(let i=0;i<data.Objects.length;i++){
+      const object=data.Objects[i];
+      if(!object||typeof object.name!=='string'||!Array.isArray(object.pos)||
+         object.pos.length!==3||object.pos.some(n=>typeof n!=='number'||!Number.isFinite(n)))
+        throw new Error('Invalid object at entry '+(i+1));
+      const key=object.name.toLowerCase()+'|'+object.pos.map(n=>n.toFixed(3)).join('|');
+      if(positions.has(key))findings.push('Duplicate '+object.name+' at entries '+positions.get(key)+' and '+(i+1));
+      else positions.set(key,i+1);
+    }
+    return {total:data.Objects.length,findings};
+  }
+
+  root.BUILD_IT_SERVER_CORE=Object.freeze({validate,splitJSON,editTypes,eventConflicts,globalsList,editGlobal,spawnableDuplicates,objectDuplicates,xmlDoc});
 })(window);
