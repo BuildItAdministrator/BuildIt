@@ -703,6 +703,8 @@ test('Event Manager uploads preserve exact original XML declaration, comments, i
   page.on('dialog',d=>d.accept());
   await page.locator('#biUploadServer').click();
   await expect(page.locator('#biServerPreview')).toContainText('UPLOAD VERIFIED');
+  await expect(page.locator('#biDraftCount')).toHaveText('0 saved');
+  await expect(page.locator('#biUploadServer')).toBeDisabled();
   expect(Object.keys(uploaded).sort()).toEqual(Object.keys(originals).sort());
   for(const [path,source] of Object.entries(originals)){
     const result=uploaded[path];
