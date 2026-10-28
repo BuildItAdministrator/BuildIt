@@ -241,7 +241,7 @@
     $('biName').value = 'BuildIt_Event' + (drafts.length + 1);
     $('biKind').value = 'vehicle'; $('biKind').dispatchEvent(new Event('change'));
     $('biAngle').value = '0'; $('biVehicleSearch').value = '';
-    $('biSave').textContent = 'Save draft';
+    $('biSave').textContent = 'Save spawn';
   }
   $('biNew').addEventListener('click', () => { resetForm(); message('New event. Pick a location on the map.'); });
   $('biSave').addEventListener('click', () => {
@@ -622,7 +622,12 @@
         if(!result?.verified||!result?.backupPath)throw new Error(name+' was not verified by the Worker.');
         results.push({name,backup:result.backupPath});
       }
-      setDeploy('UPLOAD VERIFIED — '+drafts.length+' vehicle event(s), both files updated.\n'+
+      const deployed=drafts.length;
+      // These were queued changes, not permanent user records. Only clear them
+      // after both files have been verified on the server. This avoids trying
+      // to publish identical event names on the next upload.
+      drafts=[];persist();resetForm();
+      setDeploy('UPLOAD VERIFIED — '+deployed+' vehicle event(s) published. Queue cleared.\n'+
         results.map(r=>r.name+' backup: '+r.backup).join('\n')+
         '\nStart the DayZ server to load the new economy event configuration.');
       clearStaged();
