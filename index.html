@@ -784,10 +784,10 @@ function setupSpawnFilters(){
   }
 }
 
+let activeSpawnGroups=SPAWN_GROUPS;
 function addAllSpawns(){
   let number=0;
-
-  for(const group of SPAWN_GROUPS){
+  for(const group of activeSpawnGroups){
     const category=spawnCategory(group.name);
     const cat=SPAWN_CATEGORIES[category] || SPAWN_CATEGORIES.generic;
     const targetLayer=spawnLayers[category];
@@ -829,6 +829,13 @@ function addAllSpawns(){
 
 setupSpawnFilters();
 addAllSpawns();
+window.BUILD_IT_replaceSpawnGroups=groups=>{
+  if(!Array.isArray(groups))throw new Error('Spawn group list must be an array.');
+  for(const layer of Object.values(spawnLayers))layer.clearLayers();
+  activeSpawnGroups=groups;
+  addAllSpawns();
+  return groups.reduce((sum,group)=>sum+(Array.isArray(group.positions)?group.positions.length:0),0);
+};
 
 map.on('mousemove',e=>{
  if(e.latlng.lng<0||e.latlng.lng>256||e.latlng.lat<-256||e.latlng.lat>0){
@@ -1780,6 +1787,7 @@ try {
 <script src="./theme.js"></script>
 <script src="./map-style.js"></script>
 <script src="./custom-bases-sync.js"></script>
+<script src="./server-spawns-sync.js"></script>
 <script src="./ui-icons.js"></script>
 <script src="./server-profiles.js"></script>
 <script>
