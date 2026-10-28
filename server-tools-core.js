@@ -74,6 +74,11 @@
       count:Math.min(chunkSize,list.length-i*chunkSize)
     }));
   }
+  function ignoredXmlRanges(source){
+    return [...source.matchAll(/<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>/g)]
+      .map(m=>[m.index,m.index+m[0].length]);
+  }
+  function inXmlComment(ranges,position){return ranges.some(([a,b])=>position>=a&&position<b);}
   function editTypes(source,options){
     xmlDoc(source,'types');
     const mode=options?.mode;
@@ -89,8 +94,10 @@
     if(tier&&!/^Tier[1-4]$/.test(tier))throw new Error('Select a valid DayZ loot tier.');
     if(only&&!/^[A-Za-z0-9_]+$/.test(only))throw new Error('Invalid classname filter.');
     let changed=0,skipped=0,matched=0;
+    const ignored=ignoredXmlRanges(source);
     const fieldRe=new RegExp('(<'+field+'\\s*>)(\\s*)(\\d+)(\\s*)(<\\/'+field+'\\s*>)','i');
-    const result=source.replace(/<type\b[^>]*\bname\s*=\s*(["'])([^"']+)\1[^>]*>[\s\S]*?<\/type\s*>/gi,(block,quote,name)=>{
+    const result=source.replace(/<type\b[^>]*\bname\s*=\s*(["'])([^"']+)\1[^>]*>[\s\S]*?<\/type\s*>/gi,(block,quote,name,offset)=>{
+      if(inXmlComment(ignored,offset))return block;
       if(only&&name.toLowerCase()!==only.toLowerCase())return block;
       // Only target entries with an explicit <value name="TierN"/>.
       // Custom user aliases are deliberately not guessed.
@@ -155,7 +162,9 @@
     const attr=/(^|[\s])name\s*=\s*(["'])(.*?)\2/i;
     const valueAttr=/(\bvalue\s*=\s*)(["'])([^"']*)\2/i;
     let matched=0;
-    const content=source.replace(/<var\b[^>]*\/\s*>/gi,tag=>{
+    const ignored=ignoredXmlRanges(source);
+    const content=source.replace(/<var\b[^>]*\/\s*>/gi,(tag,offset)=>{
+      if(inXmlComment(ignored,offset))return tag;
       const label=tag.match(attr);
       if(!label||label[3]!==name)return tag;
       matched++;
