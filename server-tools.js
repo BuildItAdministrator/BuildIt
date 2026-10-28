@@ -13,7 +13,7 @@ const C=[
  ['Equipment & effects',['Loadout Generator','Weapon Blueprint Generator','Bag Fill Generator','CfgEffect Converter']]
 ];
 const TOOLS=C.flatMap(([group,names])=>names.map(name=>({name,group})));
-const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','SpawnObject Heatmap','Event Group Calculator']);
+const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','SpawnObject Heatmap','Event Group Calculator','Gas Zone Generator','Build Relocator','Weapon Blueprint Generator','Bag Fill Generator','Loot & Proxy Calculator']);
 const RELATED={'Events Organizer':'biToggle','Build A Vehicle':'biToggle'};
 const ROOT=document.createElement('div');ROOT.id='serverToolsRoot';
 ROOT.innerHTML=`
@@ -50,6 +50,10 @@ ROOT.innerHTML=`
    <div id="stPlayerSpawnControls" class="st-params" hidden><label class="st-field"><span>Spawn X</span><input id="stPlayerX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Spawn Z</span><input id="stPlayerZ" type="number" min="0" max="15360" step="0.01"></label></div>
    <div id="stMapControls" class="st-actions" hidden><button id="stPickMap" type="button">Pick on map</button><span class="st-help">Optional map selection for X/Z.</span></div>
    <div id="stHeatmapControls" class="st-actions" hidden><button id="stShowHeatmap" type="button">Show density on map</button><button id="stClearHeatmap" type="button">Clear heatmap</button></div>
+   <div id="stGasControls" class="st-params" hidden><label class="st-field st-wide"><span>New zone name</span><input id="stGasName" type="text" placeholder="BuildIt_GasZone_1"></label><label class="st-field"><span>X</span><input id="stGasX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Z</span><input id="stGasZ" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Ground height Y</span><input id="stGasY" type="number" min="-100" max="1200" step="0.01" placeholder="Real terrain elevation"></label><label class="st-field"><span>Radius (m)</span><input id="stGasRadius" type="number" min="10" max="300" step="1" value="50"></label></div>
+   <div id="stRelocatorControls" class="st-params" hidden><label class="st-field"><span>New center X</span><input id="stRelocX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>New center Z</span><input id="stRelocZ" type="number" min="0" max="15360" step="0.01"></label><p class="st-help st-wide">Moves every object by the same offset. Terrain Y heights are unchanged; use flat ground to avoid floating or buried objects.</p></div>
+   <div id="stEquipmentControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing parent classname (weapon or container)</span><input id="stEquipParent" type="text" placeholder="e.g. M4A1 or TaloonBag_Green"></label><label class="st-field st-wide"><span>Existing attachment or cargo classname</span><input id="stEquipItem" type="text" placeholder="e.g. ACOGOptic, Apple"></label><label class="st-field"><span>Group chance (0–1)</span><input id="stEquipGroup" type="number" min="0" max="1" step="0.05" value="1"></label><label class="st-field"><span>Item chance (0–1)</span><input id="stEquipChance" type="number" min="0" max="1" step="0.05" value="1"></label></div>
+
    <div class="st-actions"><button id="stRun" type="button" disabled>Check / Preview</button><button id="stPublish" type="button" hidden disabled>Apply to Nitrado</button></div>
    <pre id="stResult" class="st-result" role="status" aria-live="polite"></pre>
    <details class="st-settings"><summary>Connection · MAP_WRITE_KEY</summary><p class="st-help">Use the same write key as the File Manager. This key is never saved.</p><label class="st-field"><span>Write key</span><input id="stWriteKey" type="password" autocomplete="off" placeholder="MAP_WRITE_KEY"></label></details>
@@ -59,8 +63,8 @@ document.body.appendChild(ROOT);
 const $=id=>ROOT.querySelector('#'+id);
 const panel=$('toolHubPanel'),cards=$('stCards'),workspace=$('stWorkspace');
 let selected=null,snapshot=null,preview=null,busy=false,remoteList=[],heatLayer=null;
-const bridge=window.BUILD_IT_SERVER_FILES,core=window.BUILD_IT_SERVER_CORE,ext=window.BUILD_IT_SERVER_EXTENSIONS;
-if(!bridge||!core||!ext)throw new Error('Server Tools dependencies not ready.');
+const bridge=window.BUILD_IT_SERVER_FILES,core=window.BUILD_IT_SERVER_CORE,ext=window.BUILD_IT_SERVER_EXTENSIONS,addons=window.BUILD_IT_SERVER_ADDONS;
+if(!bridge||!core||!ext||!addons)throw new Error('Server Tools dependencies not ready.');
 const DEFAULTS={
  'XML Validator':'db/types.xml',
  'JSON Validator':'cfggameplay.json',
@@ -82,9 +86,14 @@ const DEFAULTS={
  'SpawnObject Mover':'custom/builditlootdrop.json',
  'SpawnObject Organizer':'custom/builditlootdrop.json',
  'SpawnObject Heatmap':'custom/builditlootdrop.json',
- 'Event Group Calculator':'cfgeventspawns.xml'
+ 'Event Group Calculator':'cfgeventspawns.xml',
+ 'Gas Zone Generator':'cfgEffectArea.json',
+ 'Build Relocator':'custom/builditlootdrop.json',
+ 'Weapon Blueprint Generator':'cfgspawnabletypes.xml',
+ 'Bag Fill Generator':'cfgspawnabletypes.xml',
+ 'Loot & Proxy Calculator':'db/types.xml'
 };
-const EDITORS=new Set(['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Globals Configurator','Messages Generator','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer']);
+const EDITORS=new Set(['Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Globals Configurator','Messages Generator','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','Gas Zone Generator','Build Relocator','Weapon Blueprint Generator','Bag Fill Generator']);
 function setStatus(text,error=false){
  $('stResult').textContent=text;$('stResult').dataset.error=String(error);
 }
@@ -93,7 +102,7 @@ function invalidate(){
 }
 function setBusy(value){
  busy=value;
- for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPickMap']){
+ for(const id of ['stRemoteFile','stReload','stField','stValue','stClassname','stGlobalName','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPickMap','stGasName','stGasX','stGasZ','stGasY','stGasRadius','stRelocX','stRelocZ','stEquipParent','stEquipItem','stEquipGroup','stEquipChance']){
    $(id).disabled=value;
  }
  $('stRun').disabled=value||!snapshot;
@@ -148,7 +157,7 @@ function toolFiles(){
  return remoteList.filter(file=>{
    if(selected==='JSON Validator')return file.relative.endsWith('.json');
    if(selected==='XML Validator')return file.relative.endsWith('.xml');
-   if(['SpawnObject Duplicate Checker','SpawnObject Mover','SpawnObject Organizer','SpawnObject Heatmap'].includes(selected))return file.relative.startsWith('custom/')&&file.relative.endsWith('.json');
+   if(['SpawnObject Duplicate Checker','SpawnObject Mover','SpawnObject Organizer','SpawnObject Heatmap','Build Relocator'].includes(selected))return file.relative.startsWith('custom/')&&file.relative.endsWith('.json');
    if(selected==='Weather Manager')return file.relative==='cfgweather.xml';
    if(selected==='Messages Generator')return ['db/messages.xml','messages.xml'].includes(file.relative);
    return file.relative===DEFAULTS[selected];
@@ -251,6 +260,10 @@ async function choose(name){
  $('stPlayerSpawnControls').hidden=name!=='Spawn Point Generator';
  $('stMapControls').hidden=!['SpawnObject Mover','Spawn Point Generator'].includes(name);
  $('stHeatmapControls').hidden=name!=='SpawnObject Heatmap';
+ $('stGasControls').hidden=name!=='Gas Zone Generator';
+ $('stRelocatorControls').hidden=name!=='Build Relocator';
+ $('stEquipmentControls').hidden=!['Weapon Blueprint Generator','Bag Fill Generator'].includes(name);
+ $('stMapControls').hidden=!['SpawnObject Mover','Spawn Point Generator','Gas Zone Generator','Build Relocator'].includes(name);
  $('stValueLabel').textContent=name==='Advanced Types Editor'?'Set value':'Multiplier';
  $('stValue').value=name==='Types Reducer'||name==='Lifetime Reducer'?'0.5':
    name==='Advanced Types Editor'?'100':'2';
@@ -275,7 +288,7 @@ $('stBack').addEventListener('click',()=>{
 });
 $('stRemoteFile').addEventListener('change',()=>void loadLive());
 $('stReload').addEventListener('click',()=>void loadLive());
-for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPickMap']){
+for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPickMap','stGasName','stGasX','stGasZ','stGasY','stGasRadius','stRelocX','stRelocZ','stEquipParent','stEquipItem','stEquipGroup','stEquipChance']){
  $(id).addEventListener('input',invalidate);$(id).addEventListener('change',invalidate);
 }
 $('stGlobalName').addEventListener('change',()=>{invalidate();refreshGlobal();});
