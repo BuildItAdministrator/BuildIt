@@ -43,7 +43,19 @@ ROOT.innerHTML=`
    <div id="stMessageControls" class="st-params" hidden><label class="st-field st-wide"><span>Server message (max 160 characters)</span><textarea id="stMessageText" maxlength="160" rows="3" placeholder="Welcome to our DayZ server!"></textarea></label><label class="st-field"><span>Repeat (minutes)</span><input id="stMessageInterval" type="number" min="1" max="1440" step="1" value="30"></label></div>
    <div id="stTierControls" class="st-params" hidden><label class="st-field"><span>Explicit loot tier</span><select id="stTier"><option>Tier1</option><option>Tier2</option><option>Tier3</option><option>Tier4</option></select></label><label class="st-field"><span>Nominal multiplier</span><input id="stTierFactor" type="number" min="1" max="1000" step="0.1" value="2"></label></div>
    <div id="stClassSearchControls" class="st-params" hidden><label class="st-field st-wide"><span>Search actual server classnames</span><input id="stClassSearch" type="search" autocomplete="off" placeholder="e.g. M4A1, Apple, Offroad"></label></div>
-   <div id="stSpawnableControls" class="st-params" hidden><label class="st-field st-wide"><span>Exact existing classname</span><input id="stSpawnableName" type="text" placeholder="e.g. Offroad_02_Beige"></label><label class="st-field"><span>Existing section</span><select id="stSpawnableSection"><option value="attachments">Attachments</option><option value="cargo">Cargo</option></select></label><label class="st-field"><span>Chance (0–1)</span><input id="stSpawnableChance" type="number" min="0" max="1" step="0.05" value="1"></label></div>
+   <div id="stSpawnableControls" class="st-params" hidden>
+   <label class="st-field st-wide"><span>What would you like to change?</span><select id="stSpawnableMode">
+    <option value="all">All vehicles — attachments at 100%</option>
+    <option value="one">One vehicle — attachments at 100%</option>
+    <option value="advanced">Advanced — edit one classname manually</option>
+   </select></label>
+   <p id="stSpawnableSummary" class="st-help st-wide">Loading vehicle list from Nitrado…</p>
+   <label class="st-field st-wide st-spawn-single" hidden><span>Vehicle</span><select id="stSpawnableVehicle"></select></label>
+   <label class="st-field st-wide st-spawn-advanced" hidden><span>Exact existing classname</span><input id="stSpawnableName" type="text" placeholder="e.g. Offroad_02_Beige"></label>
+   <label class="st-field st-spawn-advanced" hidden><span>Existing section</span><select id="stSpawnableSection"><option value="attachments">Attachments</option><option value="cargo">Cargo</option></select></label>
+   <label class="st-field st-spawn-advanced" hidden><span>Chance (0–1)</span><input id="stSpawnableChance" type="number" min="0" max="1" step="0.05" value="1"></label>
+   <p class="st-help st-wide">Only existing parts are adjusted. Cargo and damage stay unchanged. Parts in the same slot can be alternatives.</p>
+  </div>
    <div id="stGameplayControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing gameplay setting</span><select id="stGameplayPath"></select></label><label class="st-field st-wide"><span>New value</span><input id="stGameplayValue" type="text" placeholder="true, false or a number"></label></div>
    <div id="stWeatherControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing weather parameter</span><select id="stWeatherPath"></select></label><label class="st-field st-wide"><span>Value (0–1)</span><input id="stWeatherValue" type="number" min="0" max="1" step="0.05"></label></div>
    <div id="stObjectMoveControls" class="st-params" hidden><label class="st-field st-wide"><span>Object from server file</span><select id="stObjectIndex"></select></label><label class="st-field"><span>X</span><input id="stObjectX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Z</span><input id="stObjectZ" type="number" min="0" max="15360" step="0.01"></label></div>
@@ -67,7 +79,7 @@ ROOT.innerHTML=`
 document.body.appendChild(ROOT);
 const $=id=>ROOT.querySelector('#'+id);
 const panel=$('toolHubPanel'),cards=$('stCards'),workspace=$('stWorkspace');
-let selected=null,snapshot=null,preview=null,busy=false,remoteList=[],heatLayer=null,gearPresets=[];
+let selected=null,snapshot=null,preview=null,busy=false,remoteList=[],heatLayer=null,gearPresets=[],spawnableInfo=null;
 const bridge=window.BUILD_IT_SERVER_FILES,core=window.BUILD_IT_SERVER_CORE,ext=window.BUILD_IT_SERVER_EXTENSIONS,addons=window.BUILD_IT_SERVER_ADDONS,extra=window.BUILD_IT_SERVER_FINAL;
 if(!bridge||!core||!ext||!addons||!extra)throw new Error('Server Tools dependencies not ready.');
 const DEFAULTS={
@@ -240,8 +252,31 @@ async function loadLive(){
    if(!relative)throw new Error('Choose a Nitrado file.');
    $('stFileState').textContent='Reading current server file…';
    snapshot=await bridge.read(relative);
+   if(selected==='Spawnable Types Adjuster'){
+
+    let eventsSource='';
+
+    try{eventsSource=(await bridge.read('db/events.xml')).content;}catch(_){}
+
+    spawnableInfo=core.vehicleSpawnableCandidates(snapshot.content,eventsSource);
+
+    const select=$('stSpawnableVehicle');select.replaceChildren();
+
+    for(const vehicle of spawnableInfo.vehicles){
+
+     const option=document.createElement('option');option.value=vehicle.name;
+
+     option.textContent=vehicle.name+' · '+vehicle.parts+' parts';select.appendChild(option);
+
+    }
+
+    updateSpawnableMode();
+
+   }
+
    if(selected==='Spawn Point Generator'){
-     const groups=ext.spawnGroups(snapshot.content),select=$('stPlayerGroup');
+
+    const groups=ext.spawnGroups(snapshot.content),select=$('stPlayerGroup');
      select.replaceChildren();
      for(const name of groups){const o=document.createElement('option');o.value=name;o.textContent=name;select.appendChild(o);}
      if(!groups.length)throw new Error('No valid fresh-spawn groups found.');
@@ -310,7 +345,7 @@ async function loadLive(){
 async function choose(name){
  if(busy)return;
  cancelToolMapPick();
- selected=name;snapshot=null;invalidate();
+ selected=name;snapshot=null;spawnableInfo=null;invalidate();
  $('stRemoteFile').replaceChildren();
  cards.hidden=true;workspace.hidden=false;
  $('stWorkTitle').textContent=name;
@@ -321,6 +356,7 @@ async function choose(name){
  $('stTierControls').hidden=name!=='Tier Booster';
  $('stClassSearchControls').hidden=name!=='Classname Finder';
  $('stSpawnableControls').hidden=name!=='Spawnable Types Adjuster';
+  if(name==='Spawnable Types Adjuster'){$('stSpawnableMode').value='all';updateSpawnableMode();}
  $('stGameplayControls').hidden=name!=='Gameplay Generator';
  $('stWeatherControls').hidden=name!=='Weather Manager';
  $('stObjectMoveControls').hidden=name!=='SpawnObject Mover';
@@ -341,12 +377,16 @@ async function choose(name){
  $('stValue').max=name==='Advanced Types Editor'?'100000000':'1000';
  $('stClassname').value='';
  $('stField').value=name==='Lifetime Reducer'?'lifetime':'nominal';
- $('stRun').textContent=name==='Spawn Point Generator'?'Preview replacement':EDITORS.has(name)?'Preview server changes':'Check server file';
+ $('stRun').textContent=name==='Spawn Point Generator'?'Preview replacement':
+    name==='Spawnable Types Adjuster'?'Preview attachment changes':
+    EDITORS.has(name)?'Preview server changes':'Check server file';
  $('stPublish').textContent=name==='Spawn Point Generator'?'Replace spawn file on Nitrado':'Apply to Nitrado';
  $('stHelp').textContent=name==='Spawn Point Generator'?
    'REPLACE MODE: Generates a new cfgplayerspawnpoints.xml with ONLY your selected fresh spawn. Every older fresh-spawn position and unused fresh-spawn group is removed. Fresh spawn parameters and separate hop/travel sections are preserved. Review first; a verified backup is required before the complete server file is overwritten.':
+   name==='Spawnable Types Adjuster'?
+      'Quick action: set existing vehicle attachments and listed parts to 100%, or choose one vehicle. Review the detected list first. Existing vehicles on the map are not changed.':
    EDITORS.has(name)?
-     'The current file is loaded from Nitrado. Preview the changes, then publish with a verified backup. No import or download required.':
+      'The current file is loaded from Nitrado. Preview the changes, then publish with a verified backup. No import or download required.':
      'This tool checks the existing server file directly. No manual upload or file import.';
  setStatus('Connecting to Nitrado…');$('stFileState').textContent='Finding active mission…';
  setBusy(true);
@@ -362,10 +402,23 @@ $('stBack').addEventListener('click',()=>{
 });
 $('stRemoteFile').addEventListener('change',()=>void loadLive());
 $('stReload').addEventListener('click',()=>void loadLive());
-for(const id of ['stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPlayerGroup','stPickMap','stGasName','stGasX','stGasZ','stGasY','stGasRadius','stRelocX','stRelocZ','stEquipParent','stEquipItem','stEquipGroup','stEquipChance','stHordeType','stHordeX','stHordeZ','stHordeRadius','stHordeMin','stHordeMax','stIgnoreItem','stEventName','stEventField','stEventValue','stLoadoutItem','stUndergroundIndex','stUndergroundValue']){
+for(const id of ['stSpawnableMode','stSpawnableVehicle','stField','stValue','stClassname','stGlobalValue','stMessageText','stMessageInterval','stTier','stTierFactor','stClassSearch','stSpawnableName','stSpawnableSection','stSpawnableChance','stGameplayPath','stGameplayValue','stWeatherPath','stWeatherValue','stObjectIndex','stObjectX','stObjectZ','stPlayerX','stPlayerZ','stPlayerGroup','stPickMap','stGasName','stGasX','stGasZ','stGasY','stGasRadius','stRelocX','stRelocZ','stEquipParent','stEquipItem','stEquipGroup','stEquipChance','stHordeType','stHordeX','stHordeZ','stHordeRadius','stHordeMin','stHordeMax','stIgnoreItem','stEventName','stEventField','stEventValue','stLoadoutItem','stUndergroundIndex','stUndergroundValue']){
  $(id).addEventListener('input',invalidate);$(id).addEventListener('change',invalidate);
 }
-$('stGlobalName').addEventListener('change',()=>{invalidate();refreshGlobal();});
+function updateSpawnableMode(){
+ const mode=$('stSpawnableMode').value;
+ for(const field of ROOT.querySelectorAll('.st-spawn-single'))field.hidden=mode!=='one';
+ for(const field of ROOT.querySelectorAll('.st-spawn-advanced'))field.hidden=mode!=='advanced';
+ const info=spawnableInfo,count=info?.vehicles.length||0;
+ $('stSpawnableSummary').textContent=mode==='advanced'?
+   'Advanced: edit an existing classname and existing section.':
+   mode==='one'?
+     (count?count+' recognized vehicles. Choose one to set its listed attachments to 100%.':'No vehicle recognized. Choose Advanced for manual editing.'):
+     (count?count+' recognized vehicles in your live server file. Their listed attachments will be set to 100%.':'No recognized vehicles. No bulk changes available.')+
+     (count?'\nVehicle classnames: '+info.vehicles.map(v=>v.name).join(', '):'');
+}
+$('stSpawnableMode').addEventListener('change',updateSpawnableMode);
+ $('stGlobalName').addEventListener('change',()=>{invalidate();refreshGlobal();});
 $('stGameplayPath').addEventListener('change',()=>{invalidate();fillGameplay();});
 $('stWeatherPath').addEventListener('change',()=>{invalidate();fillWeather();});
 $('stObjectIndex').addEventListener('change',()=>{invalidate();fillObject();});
@@ -560,8 +613,22 @@ function analyze(){
      '\nNote: nominal values are targets, not real-time physical loot counts.'};
  }
  if(selected==='Spawnable Types Adjuster'){
-   const result=core.editSpawnableChance(source,$('stSpawnableName').value,$('stSpawnableSection').value,$('stSpawnableChance').value);
-   return {content:result.content,changed:result.changed,message:'PREVIEW — '+result.classname+' · '+result.section+'\n'+result.changed+' existing chance attributes will be set to '+result.chance+'.\nOther classnames and settings remain unchanged.'};
+   const mode=$('stSpawnableMode').value;
+   if(mode==='advanced'){
+     const result=core.editSpawnableChance(source,$('stSpawnableName').value,$('stSpawnableSection').value,$('stSpawnableChance').value);
+     return {content:result.content,changed:result.changed,message:'PREVIEW — '+result.classname+' · '+result.section+'\n'+result.changed+' existing chance attributes changed to '+result.chance+'.\nOther entries are unchanged.'};
+   }
+   const names=mode==='all'?spawnableInfo?.vehicles.map(v=>v.name):
+     [$('stSpawnableVehicle').value].filter(Boolean);
+   if(!names?.length)throw new Error('No recognized vehicles found. Use Advanced for a specific classname.');
+   const result=core.makeVehicleAttachmentsCertain(source,names);
+   return {content:result.content,changed:result.changed,
+     message:'PREVIEW — '+(mode==='all'?'ALL RECOGNIZED VEHICLES':'ONE VEHICLE')+' TO 100%'+
+       '\nVehicles: '+result.vehicles+' | Attachment groups: '+result.groups+' | Listed parts: '+result.parts+
+       '\nChance attributes changed: '+result.changed+
+       '\nClassnames: '+result.names.join(', ')+
+       '\nUnrelated loot, cargo and damage stay unchanged.'+
+       '\nAlternatives for the same attachment slot may remain mutually exclusive.'};
  }
  if(selected==='Classname Finder'){
    const matches=core.findClassnames(source,$('stClassSearch').value);
