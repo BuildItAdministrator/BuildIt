@@ -141,11 +141,16 @@
         path:snapshot.path,content,expectedSha256:snapshot.sha256,confirm:true
       }
     });
-    if(!result?.verified||!result?.backupPath)
-      throw new Error('Upload could not be verified by Nitrado. Inspect the file before retrying.');
+    if(!result?.verified||(!result?.backupPath&&result?.backupSkipped!==true))
+      throw new Error('Nitrado did not verify the upload or acknowledge its backup policy. Inspect the file before retrying.');
     if(snapshot.serverGeneration!==generation)
       throw new Error('Server changed during the upload, verify Nitrado before retrying.');
-    return Object.freeze({path:snapshot.path,backupPath:result.backupPath,verified:true});
+    return Object.freeze({
+      path:snapshot.path,
+      backupPath:result.backupPath||null,
+      backupSkipped:result.backupSkipped===true,
+      verified:true
+    });
     }finally{activeWrites--;}
   }
   window.BUILD_IT_SERVER_FILES=Object.freeze({
