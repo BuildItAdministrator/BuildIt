@@ -2,6 +2,9 @@
 (function () {
   'use strict';
   if (typeof map === 'undefined' || typeof L === 'undefined' || typeof gameToLeaflet !== 'function' || typeof leafletToGame !== 'function') return;
+  // The Worker may explicitly verify uploads without creating another file on Nitrado.
+  const verifiedFileWrite = result => !!result?.verified && (!!result.backupPath || result.backupSkipped === true);
+  const backupNote = backup => backup ? ' (server backup: '+backup+')' : ' (no Nitrado backup; use your own copy)';
   const BASE = 'https://raw.githubusercontent.com/BohemiaInteractive/DayZ-Central-Economy/master/dayzOffline.chernarusplus/';
   const STORE = 'buildit_events_drafts_v1';
   let activeDraftStore=STORE;
@@ -673,7 +676,7 @@
         'db/events.xml — '+eventFormat.detail+'\n'+
         'cfgeventspawns.xml — '+positionFormat.detail+
         '\nOriginal event entries, indentation and comments will be retained.'+
-        '\nBoth files receive verified backups before replacement. If the second upload fails, restore the first from its backup.');
+        '\nNo extra Nitrado server backup is created when the updated Worker is deployed. Keep your own copies of BOTH files; if the second upload fails, restore the first yourself.');
       deployUpload.disabled=false;
     }catch(e){
       eventDeploy.mission='';
@@ -694,7 +697,7 @@
       setDeploy('Stop your DayZ server and check the confirmation box before uploading.',true);return;
     }
     if(!window.confirm('Upload '+vehicleDrafts().length+' vehicle event(s) to your LIVE server?\n'+
-      'This will back up and overwrite events.xml and cfgeventspawns.xml.\n'+
+      'This will overwrite events.xml and cfgeventspawns.xml. Have external backups ready.\n'+
       'Nitrado must grant file-write permission. Continue?'))return;
     eventDeploy.sending=true;deployUpload.disabled=true;deployLoad.disabled=true;deployPreview.disabled=true;
     const results=[],changes=['events.xml','cfgeventspawns.xml'];
@@ -713,7 +716,7 @@
         window.BUILD_IT_FORMAT.validate(eventDeploy.paths[name],staged.xml[name],{expectedRoot});
       }
       for(const name of changes){
-        setDeploy('Creating verified backup and uploading '+name+' ('+(results.length+1)+'/2)…');
+        setDeploy('Validating current file and uploading '+name+' ('+(results.length+1)+'/2)…');
         const result=await nitradoRequest('/api/files/write',{
           method:'POST',writeKey:true,
           body:{
@@ -721,7 +724,7 @@
             expectedSha256:eventDeploy.signatures[name],confirm:true
           }
         });
-        if(!result?.verified||!result?.backupPath)throw new Error(name+' was not verified by the Worker.');
+        if(!verifiedFileWrite(result))throw new Error(name+' was not verified by the Worker.');
         results.push({name,backup:result.backupPath});
       }
       const deployed=vehicleDrafts().length;
@@ -730,7 +733,7 @@
       // to publish identical event names on the next upload.
       drafts=drafts.filter(d=>d.kind!=='vehicle');persist();resetForm();
       setDeploy('UPLOAD VERIFIED — '+deployed+' vehicle event(s) published. Queue cleared.\n'+
-        results.map(r=>r.name+' backup: '+r.backup).join('\n')+
+        results.map(r=>r.name+backupNote(r.backup)).join('\n')+
         '\nStart the DayZ server to load the new economy event configuration.');
       clearStaged();
       // A new deployment can only be prepared after fetching the new server originals.
@@ -738,8 +741,8 @@
       deployPreview.disabled=true;
     }catch(e){
       setDeploy('UPLOAD FAILED: '+e.message+'\n'+
-        (results.length?'ALREADY UPLOADED: '+results.map(r=>r.name+' (backup '+r.backup+')').join(', ')+
-          '. Restore these files from their backups before retrying.':
+        (results.length?'ALREADY UPLOADED: '+results.map(r=>r.name+backupNote(r.backup)).join(', ')+
+          '. Restore affected files from your own backups before retrying.':
           'No file upload was verified. Check write permissions or directory settings.')+
         '\nNo automatic rollback was attempted.',true);
       clearStaged();
@@ -880,7 +883,7 @@
         window.BUILD_IT_FORMAT.validate(staged.paths[name],staged.output[name]);
       for(const name of names){
         const creating=name==='loot'&&staged.needsCreate;
-        lootMessage((creating?'Creating and verifying ':'Backing up and uploading ')+staged.paths[name].split('/').pop()+'…');
+        lootMessage((creating?'Creating and verifying ':'Validating and uploading ')+staged.paths[name].split('/').pop()+'…');
         let result;
         try{
           result=await nitradoRequest(creating?'/api/files/create':'/api/files/write',{
@@ -893,7 +896,7 @@
           if(creating)throw new Error('The Cloudflare Worker could not create the loot file. Deploy its secure /api/files/create handler first. '+error.message);
           throw error;
         }
-        if(!result?.verified||(creating?!result.created:!result.backupPath))
+        if(!result?.verified||(creating?!result.created:!verifiedFileWrite(result)))
           throw new Error('Server verification failed for '+name+'.');
         uploaded.push({name,backup:result.backupPath||null,created:creating});
       }
@@ -901,14 +904,14 @@
       drafts=drafts.filter(d=>d.kind!=='loot');persist();resetForm();
       lootMessage('UPLOAD VERIFIED — '+count+' JSON loot items saved.\n'+
         uploaded.map(r=>staged.paths[r.name].split('/').pop()+
-          (r.created?' created':(' backup: '+r.backup))).join('\n')+
+          (r.created?' created':backupNote(r.backup))).join('\n')+
         '\nStart the server to spawn these items.');
       lootStaged=null;
       $('biLootServerStopped').checked=false;
     }catch(error){
       lootMessage('UPLOAD FAILED: '+error.message+'\n'+
-        (uploaded.length?'Uploaded before failure: '+uploaded.map(r=>r.name+(r.created?' (new file)':' (backup '+r.backup+')')).join(', ')+
-          '. Restore updated files from their backups; review newly created files before retrying.':
+        (uploaded.length?'Uploaded before failure: '+uploaded.map(r=>r.name+(r.created?' (new file)':backupNote(r.backup))).join(', ')+
+          '. Restore updated files from your own backups; review newly created files before retrying.':
           'No upload was verified. Confirm the MAP_WRITE_KEY and server file permissions.')+
         '\nNo automatic rollback was attempted.',true);
       lootStaged=null;
@@ -917,7 +920,7 @@
 
   // Quick Spawn: one confirmed publish, no manual XML/JSON files or draft queue.
   // Reuses the audited reader, append-only event formatter, checksum writes,
-  // Nitrado backups and dedicated JSON creator. No server restart is triggered.
+  // optional Nitrado backups and dedicated JSON creator. No server restart is triggered.
   let quickBusy=false;
   function quickSelection(kind,value){
     const set=kind==='vehicle'?vehicleNames:itemNames;
@@ -972,14 +975,14 @@
         // Write positions first: if the second write fails, an unreferenced
         // position is less dangerous than an active event without its position.
         for(const file of [changes[1],changes[0]]){
-          update('Backing up and publishing '+file.path.split('/').pop()+'…');
+          update('Validating and publishing '+file.path.split('/').pop()+'…');
           const saved=await nitradoRequest('/api/files/write',{
             method:'POST',writeKey:true,
             body:{path:file.path,content:file.content,expectedSha256:file.previous,confirm:true}
           });
-          if(!saved?.verified||!saved?.backupPath)
+          if(!verifiedFileWrite(saved))
             throw new Error('Upload verification failed for '+file.path.split('/').pop());
-          completed.push({path:file.path,backup:saved.backupPath});
+          completed.push({path:file.path,backup:saved.backupPath||null,created:false});
         }
         return {kind,classname,name,files:completed.map(x=>x.path),pendingRestart:true};
       }
@@ -1032,24 +1035,24 @@
           {path:lootPath,content:merged,expectedSha256:current.sha256,confirm:true}:
           {path:lootPath,content:merged,expectedAbsent:true,confirm:true}
       });
-      if(!saved?.verified||(exists?!saved.backupPath:!saved.created))
+      if(!saved?.verified||(exists?!verifiedFileWrite(saved):!saved.created))
         throw new Error('Loot file creation/upload could not be verified.');
       completed.push({path:lootPath,backup:saved.backupPath||null,created:!exists});
       if(updateGameplay){
-        update('Backing up and updating cfgGameplay reference…');
+        update('Updating cfgGameplay reference…');
         const changed=await nitradoRequest('/api/files/write',{
           method:'POST',writeKey:true,
           body:{path:gameplayPath,content:gameplay,expectedSha256:gameplayLive.sha256,confirm:true}
         });
-        if(!changed?.verified||!changed?.backupPath)
+        if(!verifiedFileWrite(changed))
           throw new Error('cfgGameplay upload could not be verified.');
-        completed.push({path:gameplayPath,backup:changed.backupPath});
+        completed.push({path:gameplayPath,backup:changed.backupPath||null,created:false});
       }
       return {kind,classname,quantity:qty,files:completed.map(x=>x.path),pendingRestart:true};
     }catch(error){
       const detail=completed.length?
         ' Partial upload: '+completed.map(f=>f.path.split('/').pop()+
-          (f.backup?' (backup: '+f.backup+')':' (new file)')).join(', ')+
+          (f.created?' (new file)':backupNote(f.backup))).join(', ')+
           '. Inspect and restore incomplete changes in Nitrado before retrying.':'';
       throw new Error(error.message+detail);
     }finally{quickBusy=false;}
