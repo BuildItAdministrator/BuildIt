@@ -246,8 +246,80 @@ function addSpawnPoint(src,x,z,groupName=''){
    throw Error('Player spawn count verification failed.');
  return{content,changed:1,x:X,z:Z,group:groupName||'Direct positions'};
 }
+/**
+ * Create a replacement fresh-spawn table from the current Nitrado XML.
+ * The complete resulting cfgplayerspawnpoints.xml is uploaded by the verified
+ * existing-file bridge, not appended to the live file.
+ * Keep fresh spawn parameters and independent hop/travel sections unchanged.
+ */
+function replaceSpawnPoints(src,x,z,groupName=''){
+  const doc=xml(src,'playerspawnpoints');
+  const fresh=doc.documentElement.querySelector(':scope > fresh');
+  const container=fresh?.querySelector(':scope > generator_posbubbles');
+  if(!container)throw Error('Fresh generator_posbubbles was not found.');
+  const xx=Number(x),zz=Number(z);
+  if(x===''||z===''||!Number.isFinite(xx)||!Number.isFinite(zz)||
+     xx<0||xx>15360||zz<0||zz>15360)
+    throw Error('X/Z must be inside Chernarus (0–15360).');
+  const X=Number(xx.toFixed(2)),Z=Number(zz.toFixed(2));
+  const groups=[...container.children].filter(el=>el.nodeName==='group');
+  const oldPoints=container.querySelectorAll('pos').length;
+  let group='Direct positions',groupOpen='';
+  if(groups.length){
+    const matching=groups.filter(g=>g.getAttribute('name')===String(groupName||''));
+    if(matching.length!==1)
+      throw Error('Select exactly one existing fresh-spawn group for the replacement.');
+    group=matching[0].getAttribute('name');
+    // Retain attributes such as group name/counter/lifetime, but no old positions.
+    const empty=new XMLSerializer().serializeToString(matching[0].cloneNode(false));
+    const tag=empty.match(/^<group\b[^>]*>/)?.[0];
+    if(!tag)throw Error('Could not serialize the selected spawn group.');
+    groupOpen=tag.endsWith('/>')?tag.slice(0,-2)+'>':tag;
+  }else if(groupName&&groupName!=='Direct positions'){
+    throw Error('This spawn file contains direct positions, not named groups.');
+  }
+  const ranges=commentRanges(src),matches=[];
+  for(const m of src.matchAll(/<generator_posbubbles\b[^>]*>[\s\S]*?<\/generator_posbubbles\s*>/gi)){
+    if(!outside(ranges,m.index,m.index+m[0].indexOf('>')+1))continue;
+    const earlier=src.slice(0,m.index);
+    if(earlier.lastIndexOf('<fresh')<=earlier.lastIndexOf('</fresh'))continue;
+    matches.push(m);
+  }
+  if(matches.length!==1)
+    throw Error('Fresh spawn section could not be identified uniquely. No file generated.');
+  const match=matches[0],openEnd=match[0].indexOf('>');
+  const openTag=match[0].slice(0,openEnd+1);
+  const lineStart=Math.max(src.lastIndexOf('\n',match.index),src.lastIndexOf('\r',match.index))+1;
+  const leading=src.slice(lineStart,match.index);
+  const indent=/^[ \t]*$/.test(leading)?leading:'        ';
+  const level=match[0].match(/(?:\r\n|\n|\r)([ \t]+)<(?:group|pos)\b/)?.[1];
+  const inside=level&&level.length>indent.length?level:indent+'    ';
+  const childIndent=inside+(inside.includes('\t')?'\t':'    ');
+  const point='<pos x="'+X+'" z="'+Z+'" />';
+  const nl=u(src).nl;
+  const body=groupOpen
+    ?inside+groupOpen+nl+childIndent+point+nl+inside+'</group>'
+    :inside+point;
+  const replacement=openTag+nl+body+nl+indent+'</generator_posbubbles>';
+  const content=src.slice(0,match.index)+replacement+
+    src.slice(match.index+match[0].length);
+  const verified=xml(content,'playerspawnpoints');
+  const freshAfter=verified.documentElement.querySelector(':scope > fresh > generator_posbubbles');
+  const positions=freshAfter?.querySelectorAll('pos')||[];
+  const groupsAfter=[...(freshAfter?.children||[])].filter(el=>el.nodeName==='group');
+  if(positions.length!==1||
+     Number(positions[0].getAttribute('x'))!==X||
+     Number(positions[0].getAttribute('z'))!==Z||
+     groupsAfter.length!==(groups.length?1:0)||
+     (groupsAfter.length&&groupsAfter[0].getAttribute('name')!==group))
+    throw Error('Replacement spawn XML failed verification. No file generated.');
+  return{
+    content,changed:Number(content!==src),x:X,z:Z,group,
+    oldPoints,removedGroups:Math.max(0,groups.length-groupsAfter.length)
+  };
+}
 root.BUILD_IT_SERVER_EXTENSIONS=Object.freeze({
  GAMEPLAY_SETTINGS,gameplayEntries,changeGameplay,weatherEntries,changeWeather,
- objectList,changeObjectPosition,organizeObjects,spawnGroups,addSpawnPoint
+ objectList,changeObjectPosition,organizeObjects,spawnGroups,addSpawnPoint,replaceSpawnPoints
 });
 })(window);
