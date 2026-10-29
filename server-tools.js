@@ -692,7 +692,7 @@ $('stRun').addEventListener('click',async()=>{
        $('stPublish').hidden=false;$('stPublish').disabled=false;
      }
    }
-   setStatus(result.message+(preview?'\nReady to publish to Nitrado with a verified backup.':''));
+   setStatus(result.message+(preview?'\nReady to publish to Nitrado after review. The Worker controls the server-backup policy.':''));
  }catch(error){setStatus('Preview blocked: '+error.message,true);}
  finally{setBusy(false);}
 });
@@ -707,12 +707,12 @@ $('stPublish').addEventListener('click',async()=>{
    'Publish '+selected+' to LIVE Nitrado?\n\n'+pending.source.relative+
      '\n\nConfirm your DayZ server is STOPPED. A verified backup is required before this file is replaced.';
  if(!window.confirm(confirmation))return;
- setBusy(true);setStatus('Validating current Nitrado file, creating backup and publishing…');
+ setBusy(true);setStatus('Checking current server file and publishing safely…');
  try{
    const result=await bridge.publish(pending.source,pending.content);
    invalidate();
    setStatus('UPLOAD VERIFIED — '+pending.source.relative+
-     '\nBackup: '+result.backupPath+'\nStart your server to activate the new settings.');
+     '\n'+(result.backupSkipped?'No extra backup created on Nitrado. Keep your own backups.':'Server backup: '+result.backupPath)+'\nStart your server to activate the new settings.');
    $('stFileState').textContent='Refreshing Nitrado…';
    snapshot=await bridge.read(pending.source.relative);
    $('stFileState').textContent='Live: '+snapshot.relative;
