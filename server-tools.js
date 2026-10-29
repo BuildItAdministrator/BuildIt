@@ -382,11 +382,11 @@ async function choose(name){
     EDITORS.has(name)?'Preview server changes':'Check server file';
  $('stPublish').textContent=name==='Spawn Point Generator'?'Replace spawn file on Nitrado':'Apply to Nitrado';
  $('stHelp').textContent=name==='Spawn Point Generator'?
-   'REPLACE MODE: Generates a new cfgplayerspawnpoints.xml with ONLY your selected fresh spawn. Every older fresh-spawn position and unused fresh-spawn group is removed. Fresh spawn parameters and separate hop/travel sections are preserved. Review first; a verified backup is required before the complete server file is overwritten.':
+   'REPLACE MODE: Generates a new cfgplayerspawnpoints.xml with ONLY your selected fresh spawn. Every older fresh-spawn position and unused fresh-spawn group is removed. Fresh spawn parameters and separate hop/travel sections are preserved. Review first; keep your own backup before the complete server file is overwritten.':
    name==='Spawnable Types Adjuster'?
       'Quick action: set existing vehicle attachments and listed parts to 100%, or choose one vehicle. Review the detected list first. Existing vehicles on the map are not changed.':
    EDITORS.has(name)?
-      'The current file is loaded from Nitrado. Preview the changes, then publish with a verified backup. No import or download required.':
+      'The current file is loaded from Nitrado. Preview the changes, then confirm and publish. No import or download required.':
      'This tool checks the existing server file directly. No manual upload or file import.';
  setStatus('Connecting to Nitrado…');$('stFileState').textContent='Finding active mission…';
  setBusy(true);
@@ -530,7 +530,7 @@ function analyze(){
      '\nOld fresh groups removed: '+change.removedGroups+
      '\nResult: exactly ONE fresh spawn; old fresh locations are gone.'+
      '\nDayZ configuration and separate hop/travel positions stay intact.'+
-     '\nThe entire XML file will be overwritten after confirmation and a verified backup.'};
+     '\nThe entire XML file will be overwritten after confirmation and a fresh file-integrity check.'};
  }
  if(selected==='SpawnObject Mover'){
    const change=ext.changeObjectPosition(source,$('stObjectIndex').value,$('stObjectX').value,$('stObjectZ').value);
@@ -702,10 +702,10 @@ $('stPublish').addEventListener('click',async()=>{
  const confirmation=selected==='Spawn Point Generator'?
    'REPLACE ALL EXISTING FRESH SPAWNS?\n\n'+pending.source.relative+
      '\n\nEvery old fresh-spawn location and unused fresh-spawn group will be removed. Only your chosen point remains.'+
-     '\nThe entire Nitrado XML file will be overwritten. The Worker creates and verifies a backup first.'+
+     '\nThe entire Nitrado XML file will be overwritten. No extra Nitrado backup is created when the updated Worker is deployed. Keep your own backup.'+
      '\n\nConfirm your DayZ server is STOPPED.':
    'Publish '+selected+' to LIVE Nitrado?\n\n'+pending.source.relative+
-     '\n\nConfirm your DayZ server is STOPPED. A verified backup is required before this file is replaced.';
+     '\n\nConfirm your DayZ server is STOPPED. Check your own backup before replacing this file.';
  if(!window.confirm(confirmation))return;
  setBusy(true);setStatus('Checking current server file and publishing safely…');
  try{
@@ -719,7 +719,7 @@ $('stPublish').addEventListener('click',async()=>{
  }catch(error){
    invalidate();snapshot=null;
    setStatus('UPLOAD NOT VERIFIED: '+error.message+
-     '\nInspect server file and backups before retrying.',true);
+     '\nInspect your server file and your own backups before retrying.',true);
    $('stFileState').textContent='Reload required';
  }finally{setBusy(false);}
 });
