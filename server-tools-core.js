@@ -300,6 +300,90 @@
   }
 
 
+
+  // Source-driven bulk vehicle adjustment: preserve all unrelated XML bytes.
+  const VEHICLE_PARENT=/^(?:CivilianSedan|Hatchback_02|HatchbackSedan|OffroadHatchback|Offroad_02|Sedan_02|Truck_01|Truck_02|Truck_03|Van_01|M1025|Humvee|Boat_01|Boat_02|InflatableBoat|DirtBike|Dirt_Bike|Motorbike|Motorcycle|Scooter|Moped|ATV|UAZ|S1203|Bus|Vehicle[A-Z0-9_])(?:_[A-Za-z0-9]+)*$/i;
+  const VEHICLE_PART=/(?:^|_)(?:carbattery|truckbattery|carradiator|sparkplug|glowplug|headlight|wheel|tyre|tire|door|hood|bonnet|trunk|bikebattery|motorcyclebattery|engine|fueltank)(?:_|$)/i;
+  function vehicleSpawnableCandidates(source,eventsSource=''){
+    const doc=xmlDoc(source,'spawnabletypes'),fromEvents=new Set();
+    if(eventsSource){
+      const events=xmlDoc(eventsSource,'events');
+      for(const event of events.documentElement.children){
+        if(event.nodeName!=='event'||!/^(?:Vehicle|StaticVehicle)/i.test(event.getAttribute('name')||''))continue;
+        for(const child of event.getElementsByTagName('child')){
+          const name=child.getAttribute('type');
+          if(name)fromEvents.add(name.toLowerCase());
+        }
+      }
+    }
+    const vehicles=[],all=[];
+    for(const type of doc.documentElement.children){
+      if(type.nodeName!=='type')continue;
+      const name=type.getAttribute('name')||'';
+      if(!name)continue;
+      const groups=[...type.children].filter(el=>el.nodeName==='attachments');
+      if(!groups.length)continue;
+      const parts=groups.flatMap(group=>[...group.getElementsByTagName('item')])
+        .map(item=>item.getAttribute('name')||'').filter(Boolean);
+      const eventMatch=fromEvents.has(name.toLowerCase());
+      const knownName=VEHICLE_PARENT.test(name);
+      const clues=parts.filter(part=>VEHICLE_PART.test(part)).length;
+      const item={name,groups:groups.length,parts:parts.length,detected:eventMatch||knownName||clues>=2,
+        reason:eventMatch?'events.xml':knownName?'known vehicle':'vehicle parts'};
+      all.push(item);
+      if(item.detected)vehicles.push(item);
+    }
+    return{vehicles,all,eventsDetected:fromEvents.size};
+  }
+  function makeVehicleAttachmentsCertain(source,names){
+    xmlDoc(source,'spawnabletypes');
+    if(!Array.isArray(names)||!names.length)throw new Error('No vehicles selected. Review the live vehicle list.');
+    const selected=new Set(names.map(name=>String(name).toLowerCase()));
+    if(selected.size!==names.length)throw new Error('Duplicate selected vehicle classnames.');
+    const ignored=ignoredXmlRanges(source);
+    let changed=0,groupCount=0,itemCount=0,matched=0;
+    const touched=[];
+    function setChance(tag){
+      const attr=/\bchance\s*=\s*(["'])([0-9]*\.?[0-9]+)\1/i;
+      const found=tag.match(attr);
+      if(found){
+        if(Number(found[2])===1)return tag;
+        changed++;
+        return tag.replace(attr,(whole,quote)=>whole.replace(quote+found[2]+quote,quote+'1.0'+quote));
+      }
+      changed++;
+      return tag.replace(/(\s*\/?>)$/,part=>' chance="1.0"'+part);
+    }
+    const content=source.replace(/<type\b[^>]*\bname\s*=\s*(["'])([^"']+)\1[^>]*>[\s\S]*?<\/type\s*>/gi,
+      (block,quote,current,offset)=>{
+        if(inXmlComment(ignored,offset)||!selected.has(current.toLowerCase()))return block;
+        matched++;touched.push(current);
+        return block.replace(/<attachments\b[^>]*>[\s\S]*?<\/attachments\s*>/gi,
+          (group,groupOffset)=>{
+            if(inXmlComment(ignored,offset+groupOffset))return group;
+            groupCount++;
+            return group.replace(/<attachments\b[^>]*>|<item\b[^>]*\/?>/gi,
+              (tag,tagOffset)=>{
+                if(inXmlComment(ignored,offset+groupOffset+tagOffset))return tag;
+                if(/^<item\b/i.test(tag))itemCount++;
+                return setChance(tag);
+              });
+          });
+      });
+    if(matched!==selected.size)throw new Error('Some selected vehicle entries are absent or duplicated. Reload cfgspawnabletypes.xml.');
+    if(groupCount===0)throw new Error('No attachment groups found in the selected vehicle entries.');
+    const verified=xmlDoc(content,'spawnabletypes');
+    for(const type of verified.documentElement.children){
+      if(type.nodeName!=='type'||!selected.has((type.getAttribute('name')||'').toLowerCase()))continue;
+      for(const group of [...type.children].filter(el=>el.nodeName==='attachments')){
+        if(Number(group.getAttribute('chance'))!==1)throw new Error('Vehicle attachment group verification failed.');
+        for(const item of group.getElementsByTagName('item'))
+          if(Number(item.getAttribute('chance'))!==1)throw new Error('Vehicle part verification failed.');
+      }
+    }
+    return{content,changed,groups:groupCount,parts:itemCount,vehicles:matched,names:touched};
+  }
+
   function eventGroupStats(source){
     const doc=xmlDoc(source,'eventposdef'),events=[],warnings=[];
     const duplicates=new Set();
@@ -322,5 +406,5 @@
     return{events:events.sort((a,b)=>b.positions-a.positions),total,warnings};
   }
 
-  root.BUILD_IT_SERVER_CORE=Object.freeze({validate,splitJSON,editTypes,eventConflicts,eventGroupStats,globalsList,editGlobal,spawnableDuplicates,objectDuplicates,addMessage,findClassnames,editSpawnableChance,xmlDoc});
+  root.BUILD_IT_SERVER_CORE=Object.freeze({validate,splitJSON,editTypes,eventConflicts,eventGroupStats,globalsList,editGlobal,spawnableDuplicates,objectDuplicates,addMessage,findClassnames,editSpawnableChance,vehicleSpawnableCandidates,makeVehicleAttachmentsCertain,xmlDoc});
 })(window);
