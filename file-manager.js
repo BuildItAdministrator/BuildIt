@@ -340,9 +340,9 @@
     const result=await nitradoRequest('/api/files/write',{
       method:'POST',body:{path:selected,content:preparedContent,expectedSha256:sourceDigest,confirm:true},writeKey:true
     });
-    state('Upload verified. '+(result.backupSkipped?'No additional backup was created on Nitrado. Keep your own backups.':'Server backup: '+result.backupPath)+'\nRestart the DayZ server when appropriate.');
     if(!result?.verified||(!result.backupPath&&result.backupSkipped!==true))
       throw new Error('Nitrado did not verify the upload or confirm its backup policy.');
+    state('Upload verified. '+(result.backupSkipped?'No additional backup was created on Nitrado. Keep your own backups.':'Server backup: '+result.backupPath)+'\nRestart the DayZ server when appropriate.');
     const refresh=await nitradoRequest('/api/files/read?file='+encodeURIComponent(selected));
     sourceDigest=refresh.sha256;
     editor.value=refresh.content;loadedContent=refresh.content;
