@@ -946,7 +946,7 @@
       update('Finding the active Chernarus mission…');
       const mission=await discoverServerMission();
       if(kind==='vehicle'){
-        const name='BuildItQuick_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);
+        const name='Vehicle_BuildItQuick_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);
         const angle=Number(input.angle??0);
         if(!numbers(angle,0,359.99))throw new Error('Rotation must be 0–359.99 degrees.');
         const draft={name,kind:'vehicle',vehicle:classname,...coords,a:angle};
