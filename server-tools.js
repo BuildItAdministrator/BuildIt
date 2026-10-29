@@ -47,7 +47,7 @@ ROOT.innerHTML=`
    <div id="stGameplayControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing gameplay setting</span><select id="stGameplayPath"></select></label><label class="st-field st-wide"><span>New value</span><input id="stGameplayValue" type="text" placeholder="true, false or a number"></label></div>
    <div id="stWeatherControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing weather parameter</span><select id="stWeatherPath"></select></label><label class="st-field st-wide"><span>Value (0–1)</span><input id="stWeatherValue" type="number" min="0" max="1" step="0.05"></label></div>
    <div id="stObjectMoveControls" class="st-params" hidden><label class="st-field st-wide"><span>Object from server file</span><select id="stObjectIndex"></select></label><label class="st-field"><span>X</span><input id="stObjectX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Z</span><input id="stObjectZ" type="number" min="0" max="15360" step="0.01"></label></div>
-   <div id="stPlayerSpawnControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing fresh-spawn group</span><select id="stPlayerGroup"></select></label><label class="st-field"><span>Spawn X</span><input id="stPlayerX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Spawn Z</span><input id="stPlayerZ" type="number" min="0" max="15360" step="0.01"></label></div>
+   <div id="stPlayerSpawnControls" class="st-params" hidden><label class="st-field st-wide"><span>Fresh-spawn group to keep</span><select id="stPlayerGroup"></select></label><label class="st-field"><span>Spawn X</span><input id="stPlayerX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Spawn Z</span><input id="stPlayerZ" type="number" min="0" max="15360" step="0.01"></label></div>
    <div id="stMapControls" class="st-actions" hidden><button id="stPickMap" type="button">Pick on map</button><span class="st-help">Optional map selection for X/Z.</span></div>
    <div id="stHeatmapControls" class="st-actions" hidden><button id="stShowHeatmap" type="button">Show density on map</button><button id="stClearHeatmap" type="button">Clear heatmap</button></div>
    <div id="stHordeControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing infected event type</span><select id="stHordeType"></select></label><label class="st-field"><span>X</span><input id="stHordeX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Z</span><input id="stHordeZ" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Radius (m)</span><input id="stHordeRadius" type="number" min="10" max="300" value="80"></label><label class="st-field"><span>Minimum infected</span><input id="stHordeMin" type="number" min="1" max="75" step="1" value="10"></label><label class="st-field"><span>Maximum infected</span><input id="stHordeMax" type="number" min="1" max="75" step="1" value="20"></label></div>
@@ -341,10 +341,13 @@ async function choose(name){
  $('stValue').max=name==='Advanced Types Editor'?'100000000':'1000';
  $('stClassname').value='';
  $('stField').value=name==='Lifetime Reducer'?'lifetime':'nominal';
- $('stRun').textContent=EDITORS.has(name)?'Preview server changes':'Check server file';
- $('stHelp').textContent=EDITORS.has(name)?
-   'The current file is loaded from Nitrado. Preview the changes, then publish with a verified backup. No import or download required.':
-   'This tool checks the existing server file directly. No manual upload or file import.';
+ $('stRun').textContent=name==='Spawn Point Generator'?'Preview replacement':EDITORS.has(name)?'Preview server changes':'Check server file';
+ $('stPublish').textContent=name==='Spawn Point Generator'?'Replace spawn file on Nitrado':'Apply to Nitrado';
+ $('stHelp').textContent=name==='Spawn Point Generator'?
+   'REPLACE MODE: Generates a new cfgplayerspawnpoints.xml with ONLY your selected fresh spawn. Every older fresh-spawn position and unused fresh-spawn group is removed. Fresh spawn parameters and separate hop/travel sections are preserved. Review first; a verified backup is required before the complete server file is overwritten.':
+   EDITORS.has(name)?
+     'The current file is loaded from Nitrado. Preview the changes, then publish with a verified backup. No import or download required.':
+     'This tool checks the existing server file directly. No manual upload or file import.';
  setStatus('Connecting to Nitrado…');$('stFileState').textContent='Finding active mission…';
  setBusy(true);
  let catalogReady=false;
@@ -467,9 +470,14 @@ function analyze(){
      change.previous+' → '+change.value+'\nOther weather settings are preserved.'};
  }
  if(selected==='Spawn Point Generator'){
-   const change=ext.addSpawnPoint(source,$('stPlayerX').value,$('stPlayerZ').value,$('stPlayerGroup').value);
-   return {content:change.content,changed:1,message:'PREVIEW — Add fresh spawn in '+change.group+' at X '+change.x+' / Z '+change.z+
-     '\nOriginal spawn points and all other groups are preserved.'};
+   const change=ext.replaceSpawnPoints(source,$('stPlayerX').value,$('stPlayerZ').value,$('stPlayerGroup').value);
+   return {content:change.content,changed:change.changed,message:'PREVIEW — REPLACE ENTIRE '+snapshot.relative+
+     '\nNew fresh spawn: '+change.group+' at X '+change.x+' / Z '+change.z+
+     '\nOld fresh spawns removed: '+change.oldPoints+
+     '\nOld fresh groups removed: '+change.removedGroups+
+     '\nResult: exactly ONE fresh spawn; old fresh locations are gone.'+
+     '\nDayZ configuration and separate hop/travel positions stay intact.'+
+     '\nThe entire XML file will be overwritten after confirmation and a verified backup.'};
  }
  if(selected==='SpawnObject Mover'){
    const change=ext.changeObjectPosition(source,$('stObjectIndex').value,$('stObjectX').value,$('stObjectZ').value);
@@ -624,8 +632,14 @@ $('stRun').addEventListener('click',async()=>{
 $('stPublish').addEventListener('click',async()=>{
  if(busy||!preview)return;
  const pending=preview;
- if(!window.confirm('Publish '+selected+' to LIVE Nitrado?\n\n'+pending.source.relative+
-   '\n\nConfirm your DayZ server is STOPPED. A verified backup is required before this file is replaced.'))return;
+ const confirmation=selected==='Spawn Point Generator'?
+   'REPLACE ALL EXISTING FRESH SPAWNS?\n\n'+pending.source.relative+
+     '\n\nEvery old fresh-spawn location and unused fresh-spawn group will be removed. Only your chosen point remains.'+
+     '\nThe entire Nitrado XML file will be overwritten. The Worker creates and verifies a backup first.'+
+     '\n\nConfirm your DayZ server is STOPPED.':
+   'Publish '+selected+' to LIVE Nitrado?\n\n'+pending.source.relative+
+     '\n\nConfirm your DayZ server is STOPPED. A verified backup is required before this file is replaced.';
+ if(!window.confirm(confirmation))return;
  setBusy(true);setStatus('Validating current Nitrado file, creating backup and publishing…');
  try{
    const result=await bridge.publish(pending.source,pending.content);
