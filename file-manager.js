@@ -11,10 +11,10 @@
   panel.innerHTML=[
     '<div class="log-auto-title">Nitrado File Manager</div>',
     '<p class="fm-note">DayZ PS5 mission files are usually in dayzps_missions/dayzOffline.chernarusplus, not dayzps/config. Search both Nitrado file roots below. Opening folders never changes your server.</p>',
-    '<p class="fm-note">Download or edit XML, JSON and TXT files up to 512 KB. Uploads require a verified backup.</p>',
+    '<p class="fm-note">Download or edit XML, JSON and TXT files up to 512 KB. Uploads use SHA checks and read-back verification. With the updated Worker, no additional Nitrado backup is created.</p>',
     '<label class="fm-label" for="nitradoWriteKey">Separate file-write key (MAP_WRITE_KEY)</label>',
     '<input id="nitradoWriteKey" type="password" autocomplete="off" placeholder="Enter Cloudflare file-write key">',
-    '<p class="fm-note">Required for Backup &amp; upload. This key stays in this tab only; it is not saved in browser storage.</p>',
+    '<p class="fm-note">Required for verified upload. This key stays in this tab only; it is not saved in browser storage.</p>',
     '<div class="fm-row"><button id="fmFindMission" type="button" class="log-btn">Find Chernarus mission</button></div>',
     '<div class="fm-row"><button id="fmBrowse" type="button" class="log-btn">NoFTP root</button><button id="fmFtpRoot" type="button" class="log-btn">FTP root</button><button id="fmBack" type="button" class="log-btn" disabled>Parent</button></div>',
     '<div id="fmCurrentDir" class="fm-path" aria-label="Current directory"></div>',
@@ -28,7 +28,7 @@
       '<div class="fm-row"><button type="button" id="fmRepairXml" class="log-btn" hidden>Fix duplicate XML header</button></div>',
       '<label class="fm-label" for="fmLocalFile">Load a local replacement into the editor</label>',
       '<input id="fmLocalFile" type="file" accept=".xml,.json,.txt">',
-      '<div class="fm-row"><button type="button" id="fmDownload" class="log-btn">Download copy</button><button type="button" id="fmSave" class="log-btn" disabled>Backup &amp; upload</button></div>',
+      '<div class="fm-row"><button type="button" id="fmDownload" class="log-btn">Download copy</button><button type="button" id="fmSave" class="log-btn" disabled>Upload changes</button></div>',
     '</div>',
     '<div id="fmStatus" class="log-auto-status" role="status" aria-live="polite">Browse your server files after the Cloudflare Worker upgrade is deployed.</div>'
   ].join('');
@@ -223,7 +223,7 @@
     refreshRepairButton();
     refreshValidation();
     if($('fmRepairXml').hidden)
-      state('File opened. A backup will be verified before any upload.');
+      state('File opened. Changes will be validated and verified before upload. Keep your own backup.');
     else
       state('Duplicate XML declaration detected. Click Fix duplicate XML header to repair the editor copy. No server file has been changed.',true);
   }
@@ -333,14 +333,16 @@
     const verified=window.BUILD_IT_FORMAT.validate(selected,preparedContent);
     refreshValidation();
     if(!validationOk)throw new Error('File format validation failed. Upload blocked.');
-    if(!window.confirm('Overwrite '+selected.split('/').pop()+' on your LIVE DayZ server?\n\nA backup must be created and verified before the upload proceeds. Continue?')){
+    if(!window.confirm('Overwrite '+selected.split('/').pop()+' on your LIVE DayZ server?\n\nMake sure you have your own backup. This overwrites the live file. Continue?')){
       state('Upload cancelled.');return;
     }
-    state('Creating and verifying server backup before uploading…');
+    state('Checking current file and uploading…');
     const result=await nitradoRequest('/api/files/write',{
       method:'POST',body:{path:selected,content:preparedContent,expectedSha256:sourceDigest,confirm:true},writeKey:true
     });
-    state('Upload verified. Original backup: '+result.backupPath+'\nRestart the DayZ server when appropriate.');
+    state('Upload verified. '+(result.backupSkipped?'No additional backup was created on Nitrado. Keep your own backups.':'Server backup: '+result.backupPath)+'\nRestart the DayZ server when appropriate.');
+    if(!result?.verified||(!result.backupPath&&result.backupSkipped!==true))
+      throw new Error('Nitrado did not verify the upload or confirm its backup policy.');
     const refresh=await nitradoRequest('/api/files/read?file='+encodeURIComponent(selected));
     sourceDigest=refresh.sha256;
     editor.value=refresh.content;loadedContent=refresh.content;
