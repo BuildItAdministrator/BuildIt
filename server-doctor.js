@@ -40,6 +40,18 @@ function parseXml(text){
  if(doc.querySelector('parsererror'))throw Error('Invalid XML');
  return doc;
 }
+function duplicateTopLevelNames(text,tagName){
+ const doc=parseXml(text),seen=new Set(),duplicates=new Set();
+ for(const entry of doc.documentElement.children){
+  if(entry.localName?.toLowerCase()!==tagName)continue;
+  const name=entry.getAttribute('name')?.trim();
+  if(!name)continue;
+  const key=name.toLowerCase();
+  if(seen.has(key))duplicates.add(name);
+  else seen.add(key);
+ }
+ return [...duplicates];
+}
 function refs(gameplay){
  const refs=[];
  for(const value of [gameplay?.objectSpawnersArr,gameplay?.PlayerData?.spawnGearPresetFiles]){
@@ -74,6 +86,24 @@ async function scan(){
    }catch(e){
     row('error',actual,e.message||'Could not read or validate this file.');
     fail++;
+   }
+  }
+  for(const [name,tag] of [
+    ['db/types.xml','type'],['db/events.xml','event'],['cfgspawnabletypes.xml','type']
+   ]){
+   if(!info[name])continue;
+   try{
+    const duplicates=duplicateTopLevelNames(info[name].content,tag);
+    if(duplicates.length){
+     warning++;
+     row('warn','Duplicate entries · '+name,
+      duplicates.slice(0,12).join(', ')+(duplicates.length>12?' …':'')+
+      ' appear more than once at the top level. Review before publishing.');
+    }else{
+     pass++;row('ok','Duplicate entries · '+name,'No duplicate top-level names found.');
+    }
+   }catch(error){
+    warning++;row('warn','Duplicate entries · '+name,'Could not check for duplicates: '+error.message);
    }
   }
   if(!byLower.has('db/events.xml')){warning++;row('warn','events.xml','Not found in the current mission listing.');}
