@@ -369,7 +369,7 @@ async function gumroadRedeem(req,env){
     await env.DB.prepare(
       'INSERT INTO gumroad_memberships(sale_id,user_id,product_id,subscription_id,key_hash,encrypted_license,active,ends_at,checked_at,status,created_at) '+
       'VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(sale_id) DO UPDATE SET '+
-      'active=excluded.active,ends_at=excluded.ends_at,checked_at=excluded.checked_at,status=excluded.status, '+
+      'active=excluded.active,ends_at=excluded.ends_at,checked_at=excluded.checked_at,status=excluded.status, key_hash=excluded.key_hash, '+
       'encrypted_license=excluded.encrypted_license WHERE user_id=excluded.user_id')
       .bind(verified.saleId,r.user.id,verified.productId,verified.subscriptionId,hash,encrypted,
         1,verified.endsAt,stamp,verified.status,stamp).run();
