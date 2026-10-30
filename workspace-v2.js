@@ -69,7 +69,7 @@ timePanel.innerHTML='<div class="bw-time-head"><div><strong>Day / night planner<
  '<p class="bw-time-note">Uses 12 in-game hours of daylight and 12 of darkness as an estimate. Seasonal daylight lengths vary. No server settings are changed.</p>';
 document.body.appendChild(timePanel);
 const validRate=n=>Number.isFinite(n)&&n>=0.1&&n<=64;
-const duration=mins=>{const h=Math.floor(mins/60),m=Math.round(mins%60);return (h?String(h)+'h ':'')+String(m)+'m';};
+const duration=mins=>{const total=Math.round(mins),h=Math.floor(total/60),m=total%60;return (h?String(h)+'h ':'')+String(m)+'m';};
 function updateTime(){
  const a=Number($('bwTimeRate').value),n=Number($('bwNightRate').value);
  const valid=validRate(a)&&validRate(n);
@@ -91,6 +91,7 @@ const search=$('placeSearchBox'),profiles=$('biServerProfileDock'),actions=$('bw
 if(profiles)header.insertBefore(profiles,actions);
 if(search)header.insertBefore(search,actions);
 let preferred='map',paletteOpen=false,results=[],selectedIndex=0,previousFocus=null;
+const gated=()=>!!$('accessGate')&&!$('accessGate').classList.contains('hidden');
 const openPanel=id=>{const p=$(id);return !!p&&!p.hidden&&!p.classList.contains('hidden');};
 const click=id=>{const e=$(id);if(e&&typeof e.click==='function'){e.click();return true;}return false;};
 function hidePanels(){
@@ -104,7 +105,7 @@ function hidePanels(){
  timePanel.hidden=true;
 }
 function navigate(target){
- if(!items.some(item=>item.id===target))return;
+ if(!items.some(item=>item.id===target)||gated())return;
  if(window.BUILD_IT_UI_VISIBILITY?.isPicking?.())return;
  hidePanels();
  preferred=target;
@@ -189,7 +190,7 @@ function selectIndex(){
  [...$('bwCommandList').querySelectorAll('.bw-palette-item')].forEach((b,i)=>b.setAttribute('aria-selected',String(i===selectedIndex)));
 }
 function openPalette(){
- if(paletteOpen||window.BUILD_IT_UI_VISIBILITY?.isPicking?.())return;
+ if(paletteOpen||gated()||window.BUILD_IT_UI_VISIBILITY?.isPicking?.())return;
  previousFocus=document.activeElement;paletteOpen=true;dialog.hidden=false;
  $('bwCommandInput').value='';selectedIndex=0;renderPalette();$('bwCommandInput').focus();
 }
@@ -218,7 +219,7 @@ document.addEventListener('keydown',e=>{
  else if(e.key==='Escape'&&paletteOpen){e.preventDefault();closePalette();}
 },true);
 $('bwFocusMap').addEventListener('click',()=>{
- if(window.BUILD_IT_UI_VISIBILITY?.isPicking?.())return;
+ if(gated()||window.BUILD_IT_UI_VISIBILITY?.isPicking?.())return;
  hidePanels();
  window.BUILD_IT_UI_VISIBILITY?.toggleMenus?.();
  syncActive();
