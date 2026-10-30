@@ -11,5 +11,11 @@
       "database_name": "buildit-auth-test",
       "database_id": "b379e7a1-288d-454a-af9c-a3ec2bfa4941"
     }
-  ]
+  ],
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none"
+  }
 }
