@@ -6,10 +6,16 @@ on:
       - 'index.html'
       - 'workspace-v2.*'
       - 'server-doctor.js'
+      - 'server-tools.js'
+      - 'service-worker.js'
       - 'tests/**'
       - 'playwright.config.js'
       - '.github/workflows/ui-smoke.yml'
   workflow_dispatch:
+
+concurrency:
+  group: ui-smoke-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
