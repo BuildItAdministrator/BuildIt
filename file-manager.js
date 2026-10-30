@@ -33,11 +33,21 @@
     '<div id="fmStatus" class="log-auto-status" role="status" aria-live="polite">Browse your server files after the Cloudflare Worker upgrade is deployed.</div>'
   ].join('');
   fileSection.appendChild(panel);
+  // The OAuth application uses its authenticated session for writes.
+  // Preserve the hidden compatibility field for older editor helpers.
+  if(window.BUILD_IT_STAGE4_BOOT){
+    const legacyKey=panel.querySelector('#nitradoWriteKey');
+    const legacyHelp=legacyKey?.nextElementSibling;
+    if(legacyHelp?.classList.contains('fm-note'))legacyHelp.remove();
+    panel.querySelector('label[for="nitradoWriteKey"]')?.remove();
+    if(legacyKey)legacyKey.type='hidden';
+  }
   // Keep MAP_WRITE_KEY inside File Manager. It authorizes real backup/upload
   // actions, and does not depend on any temporary file-write test.
   const keyInput=panel.querySelector('#nitradoWriteKey');
   const keyCount=document.createElement('div');
   keyCount.id='nitradoWriteKeyLength';
+  if(window.BUILD_IT_STAGE4_BOOT)keyCount.hidden=true;
   keyCount.setAttribute('role','status');
   keyCount.setAttribute('aria-live','polite');
   const keyHelp=keyInput?.nextElementSibling;
@@ -328,7 +338,7 @@
   $('fmSave').addEventListener('click',()=>perform(async()=>{
     if(!selected||!sourceDigest)throw new Error('Open a server file first.');
     const key=$('nitradoWriteKey').value.trim();
-    if(key.length<8)throw new Error('Enter the separate MAP_WRITE_KEY (at least 8 characters).');
+    if(key.length<8)throw new Error(window.BUILD_IT_STAGE4_BOOT?'De Nitrado-verbinding is nog niet gereed. Vernieuw de pagina.':'Enter the separate MAP_WRITE_KEY (at least 8 characters).');
     const preparedContent=editor.value;
     const verified=window.BUILD_IT_FORMAT.validate(selected,preparedContent);
     refreshValidation();
