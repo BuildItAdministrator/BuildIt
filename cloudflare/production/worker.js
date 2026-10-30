@@ -249,10 +249,141 @@ async function linkedServices(env,user){
     return nitradoServicesByToken(await connectionToken(env,user));
   }
 }
+
+// Gumroad Membership Premium: a verified recurring sale is bound to one Discord user.
+// Production only. Never accept a browser-declared paid status or a receipt screenshot.
+const GUMROAD_VERIFY='https://api.gumroad.com/v2/licenses/verify';
+const GUMROAD_TTL=300;
+const GUMROAD_MAX_ATTEMPTS=8;
+function gumroadProduct(env){
+  const id=String(env.GUMROAD_PRODUCT_ID||'').trim();
+  if(!/^[A-Za-z0-9_=-]{8,160}$/.test(id))throw Error('GUMROAD_PRODUCT_ID is not configured');
+  return id;
+}
+function gumroadPurchaseState(p,at=now()){
+  if(!p||typeof p!=='object'||p.refunded===true||p.disputed===true||p.chargebacked===true)
+    return {active:false,status:'revoked',endsAt:null};
+  if(typeof p.subscription_id!=='string'||!p.subscription_id.trim()||
+     typeof p.recurrence!=='string'||!p.recurrence.trim()||
+     p.is_multiseat_license===true||Number(p.quantity||1)!==1||
+     !Number.isFinite(Number(p.price))||Number(p.price)<=0)
+    return {active:false,status:'not_paid_membership',endsAt:null};
+  const ends=[];
+  for(const field of ['subscription_ended_at','subscription_cancelled_at','subscription_failed_at']){
+    if(p[field]===null||p[field]===undefined||p[field]==='')continue;
+    if(typeof p[field]!=='string')return {active:false,status:'invalid_end_date',endsAt:null};
+    const seconds=Math.floor(Date.parse(p[field])/1000);
+    if(!Number.isFinite(seconds)||seconds<=0)return {active:false,status:'invalid_end_date',endsAt:null};
+    ends.push(seconds);
+  }
+  const endsAt=ends.length?Math.min(...ends):null;
+  return {active:endsAt===null||endsAt>at,
+    status:endsAt===null?'active':(endsAt>at?'ending':'ended'),endsAt};
+}
+async function gumroadVerify(env,key){
+  const productId=gumroadProduct(env);
+  const form=new URLSearchParams({product_id:productId,license_key:key,increment_uses_count:'false'});
+  let response;
+  try{
+    response=await fetch(GUMROAD_VERIFY,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',Accept:'application/json'},
+      body:form.toString(),redirect:'error',signal:AbortSignal.timeout(10000)});
+  }catch(e){throw Object.assign(Error('Gumroad verification temporarily unavailable'),{httpStatus:503});}
+  if(response.status===404)return {active:false,status:'invalid_license'};
+  if(!response.ok)throw Object.assign(Error('Gumroad verification unavailable (HTTP '+response.status+')'),{httpStatus:503});
+  const json=await response.json().catch(()=>null);
+  const p=json?.purchase;
+  if(json?.success!==true||!p||p.product_id!==productId)
+    return {active:false,status:'invalid_license'};
+  const saleId=String(p.sale_id||p.id||''),subscriptionId=String(p.subscription_id||'');
+  if(!saleId||saleId.length>160||!subscriptionId||subscriptionId.length>160)
+    return {active:false,status:'invalid_license'};
+  return {...gumroadPurchaseState(p),saleId,subscriptionId,productId};
+}
+async function gumroadEncrypt(env,userId,keyText){
+  const iv=new Uint8Array(12);crypto.getRandomValues(iv);
+  const cryptoSecret=await cryptoKey(env);
+  const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:enc.encode('gumroad:'+userId)},
+    cryptoSecret,enc.encode(keyText));
+  return 'g1.'+b64(iv)+'.'+b64(new Uint8Array(cipher));
+}
+async function gumroadDecrypt(env,userId,ciphertext){
+  const parts=String(ciphertext||'').split('.');
+  if(parts.length!==3||parts[0]!=='g1')throw Error('Gumroad license format invalid');
+  const cryptoSecret=await cryptoKey(env);
+  const data=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(parts[1]),
+      additionalData:enc.encode('gumroad:'+userId)},cryptoSecret,unb64(parts[2]));
+  return dec.decode(data);
+}
+function gumroadInactive(status='not_active',admin=false){
+  return {status,active:false,periodEnd:null,cancelAtPeriodEnd:false,admin};
+}
+async function gumroadMembership(env,user){
+  if(!user)return gumroadInactive();
+  if(user.role==='admin')return {status:'admin',active:true,periodEnd:null,cancelAtPeriodEnd:false,admin:true};
+  const productId=gumroadProduct(env);
+  const rows=await env.DB.prepare('SELECT * FROM gumroad_memberships WHERE user_id=? AND product_id=? ORDER BY checked_at DESC LIMIT 5')
+    .bind(user.id,productId).all();
+  let fallback=gumroadInactive();
+  for(const row of (rows.results||[])){
+    if(row.checked_at>now()-GUMROAD_TTL){
+      if(row.active===1&&(!row.ends_at||Number(row.ends_at)>now()))
+        return {status:row.status,active:true,periodEnd:row.ends_at||null,cancelAtPeriodEnd:row.status==='ending',admin:false};
+      fallback=gumroadInactive(row.status);
+      continue;
+    }
+    let checked;
+    try{checked=await gumroadVerify(env,await gumroadDecrypt(env,user.id,row.encrypted_license));}
+    catch(error){console.error('Gumroad entitlement check failed',error.message);return gumroadInactive('verification_unavailable');}
+    const matches=checked.saleId===row.sale_id&&checked.productId===row.product_id&&checked.subscriptionId===row.subscription_id;
+    const valid=matches&&checked.active===true,stamp=now();
+    const status=matches?checked.status:'license_changed',endsAt=matches?checked.endsAt:null;
+    await env.DB.prepare('UPDATE gumroad_memberships SET active=?,ends_at=?,status=?,checked_at=? WHERE sale_id=? AND user_id=?')
+      .bind(valid?1:0,endsAt,status,stamp,row.sale_id,user.id).run();
+    if(valid)return {status,active:true,periodEnd:endsAt||null,cancelAtPeriodEnd:status==='ending',admin:false};
+    fallback=gumroadInactive(status);
+  }
+  return fallback;
+}
+async function gumroadRedeem(req,env){
+  const r=await requireForm(req,env);if(r.error)return r.error;
+  if(r.user.role==='admin')return redirect('/account');
+  const key=String(r.form.get('license_key')||'').trim();
+  if(key.length<12||key.length>180||!/^[A-Za-z0-9_-]+$/.test(key))
+    return redirect('/account?license=invalid');
+  const stamp=now(),cutoff=stamp-1800;
+  const attempt=await env.DB.prepare(
+    'INSERT INTO gumroad_redeem_attempts(user_id,window_start,attempts) VALUES(?,?,1) '+
+    'ON CONFLICT(user_id) DO UPDATE SET attempts=CASE WHEN window_start<=? THEN 1 ELSE attempts+1 END, '+
+    'window_start=CASE WHEN window_start<=? THEN ? ELSE window_start END RETURNING attempts')
+    .bind(r.user.id,stamp,cutoff,cutoff,stamp).first();
+  if(Number(attempt?.attempts||0)>GUMROAD_MAX_ATTEMPTS)
+    return reply({error:'Too many activation attempts. Try again in 30 minutes.'},429);
+  const verified=await gumroadVerify(env,key);
+  if(!verified.active)return redirect('/account?license=invalid');
+  const hash=await sha('buildit-gumroad-license:'+key);
+  const existing=await env.DB.prepare('SELECT user_id FROM gumroad_memberships WHERE sale_id=? OR key_hash=? LIMIT 1')
+    .bind(verified.saleId,hash).first();
+  if(existing&&existing.user_id!==r.user.id)return redirect('/account?license=already_used');
+  const encrypted=await gumroadEncrypt(env,r.user.id,key);
+  try{
+    await env.DB.prepare(
+      'INSERT INTO gumroad_memberships(sale_id,user_id,product_id,subscription_id,key_hash,encrypted_license,active,ends_at,checked_at,status,created_at) '+
+      'VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(sale_id) DO UPDATE SET '+
+      'active=excluded.active,ends_at=excluded.ends_at,checked_at=excluded.checked_at,status=excluded.status, '+
+      'encrypted_license=excluded.encrypted_license WHERE user_id=excluded.user_id')
+      .bind(verified.saleId,r.user.id,verified.productId,verified.subscriptionId,hash,encrypted,
+        1,verified.endsAt,stamp,verified.status,stamp).run();
+  }catch(e){
+    if(/UNIQUE|constraint/i.test(String(e.message)))return redirect('/account?license=already_used');
+    throw e;
+  }
+  return redirect('/account?license=activated');
+}
+
 async function requirePremium(req,env){
   const user=await currentUser(req,env);if(!user)return {error:reply({error:'Discord login required'},401)};
-  const sub=billView(await billRow(env,user.id),user);
-  if(!sub.active)return {error:reply({error:'An active Build It!++ Premium subscription is required'},403)};
+  const sub=await gumroadMembership(env,user);
+  if(!sub.active)return {error:reply({error:'An active Gumroad Build It!++ Premium Membership is required'},403)};
   return {user,sub};
 }
 async function nitradoBegin(req,env){
@@ -295,7 +426,7 @@ async function nitradoList(req,env){
 }
 async function nitradoSelect(req,env){
   const r=await requireForm(req,env);if(r.error)return r.error;
-  if(!billView(await billRow(env,r.user.id),r.user).active)return reply({error:'Premium subscription required'},403);
+  if(!(await gumroadMembership(env,r.user)).active)return reply({error:'Active Gumroad Premium Membership required'},403);
   const id=String(r.form.get('service_id')||'');
   if(!/^\d{1,20}$/.test(id))return reply({error:'Invalid server ID'},400);
   const services=await linkedServices(env,r.user);
