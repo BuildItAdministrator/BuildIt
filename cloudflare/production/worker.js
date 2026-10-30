@@ -442,7 +442,7 @@ async function nitradoDisconnect(req,env){
 }
 async function account(req,env,url){
   const user=await currentUser(req,env),token=user?await csrf(req):'';
-  const billing=billView(user?await billRow(env,user.id):null,user),conn=user?await connectionRow(env,user):null;
+  const billing=await gumroadMembership(env,user),conn=user?await connectionRow(env,user):null;
   const form=(action,label,extra='')=>`<form method="POST" action="${action}"><input type="hidden" name="csrf" value="${esc(token)}">${extra}<button>${esc(label)}</button></form>`;
   let serverHtml='';
   if(user&&billing.active&&conn){
@@ -472,7 +472,7 @@ async function account(req,env,url){
     .notice,.server{border:1px solid #47616a;background:#213940;border-radius:10px;padding:13px;margin-top:12px}.server small{display:block;margin:6px 0}hr{border:0;border-top:1px solid #47616a;margin:23px 0}
     </style></head><body><main><h1>Build It!++</h1><p class="note">Build It!++ — Account & Billing</p>${content}</main></body></html>`;
   return new Response(html,{headers:headers({'Content-Type':'text/html; charset=utf-8',
-    'Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://checkout.stripe.com https://billing.stripe.com; base-uri 'none'; frame-ancestors 'none'"})});
+    'Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"})});
 }
 
 /**
@@ -1815,7 +1815,7 @@ async function stage4Static(req,env,url){
   if(p==='/stage4-bridge.js')return new Response(STAGE4_BRIDGE,{headers:headers({'Content-Type':'application/javascript; charset=utf-8'})});
   if(!STAGE4_STATIC.test(p)||/^\/(?:cloudflare|\.github|tests?|node_modules)\//i.test(p))return reply({error:'Not found'},404);
   const u=await currentUser(req,env);
-  if(!u||!billView(await billRow(env,u.id),u).active)return reply({error:'Subscription required'},403);
+  if(!u||!(await gumroadMembership(env,u)).active)return reply({error:'Gumroad Membership required'},403);
   // No redirects or untrusted origin can be requested. No client cookies are sent upstream.
   if(!env.ASSETS)return reply({error:'Website assets binding not configured'},502);
   const response=await env.ASSETS.fetch(new URL(p,req.url));
@@ -1826,18 +1826,13 @@ async function stage4Static(req,env,url){
 export default {
   async fetch(req,env){
     const url=new URL(req.url),p=url.pathname;
-    // Stripe webhook must be independent of the user's cookie.
-    if(p==='/api/stripe/webhook'){
-      if(req.method!=='POST')return reply({error:'Method not allowed'},405);
-      try{return await stripeWebhook(req,env);}catch(e){return stage4Error(e,req);}
-    }
+    // Payment checks and license activation are secured through Gumroad.
     try{
       config(req,env);
       if(p==='/api/auth/discord')return req.method==='GET'?await discordBegin(req,env):reply({error:'Method not allowed'},405);
       if(p==='/api/auth/callback')return req.method==='GET'?await discordCallback(req,env,url):reply({error:'Method not allowed'},405);
       if(p==='/api/auth/logout')return req.method==='POST'?await logout(req,env):reply({error:'Method not allowed'},405);
-      if(p==='/api/billing/checkout')return req.method==='POST'?await checkout(req,env):reply({error:'Method not allowed'},405);
-      if(p==='/api/billing/portal')return req.method==='POST'?await portal(req,env):reply({error:'Method not allowed'},405);
+      if(p==='/api/gumroad/redeem')return req.method==='POST'?await gumroadRedeem(req,env):reply({error:'Method not allowed'},405);
       if(p==='/api/nitrado/connect')return req.method==='GET'?await nitradoBegin(req,env):reply({error:'Method not allowed'},405);
       if(p==='/api/nitrado/callback')return req.method==='GET'?await nitradoCallback(req,env,url):reply({error:'Method not allowed'},405);
       if(p==='/api/nitrado/servers')return req.method==='GET'?await nitradoList(req,env):reply({error:'Method not allowed'},405);
@@ -1846,7 +1841,7 @@ export default {
       if(p==='/api/me'){
         if(req.method!=='GET')return reply({error:'Method not allowed'},405);
         const user=await currentUser(req,env);if(!user)return reply({authenticated:false},401);
-        const subscription=billView(await billRow(env,user.id),user),connection=await connectionRow(env,user);
+        const subscription=await gumroadMembership(env,user),connection=await connectionRow(env,user);
         return reply({authenticated:true,user:{id:user.id,username:user.username,role:user.role},subscription,
           nitrado:{connected:!!connection,selectedServiceId:subscription.active?connection?.selected_service_id:null},
           toolsEnabled:subscription.active&&!!connection?.selected_service_id});
@@ -1856,7 +1851,7 @@ export default {
         const response=await account(req,env,url);
         const user=await currentUser(req,env);
         if(!user)return response;
-        const subscription=billView(await billRow(env,user.id),user),connection=await connectionRow(env,user);
+        const subscription=await gumroadMembership(env,user),connection=await connectionRow(env,user);
         if(!subscription.active||!connection?.selected_service_id)return response;
         let html=await response.text();
         const launch='<p><a class="button" href="/app">Open Build It!++ Server Tools</a></p>';
