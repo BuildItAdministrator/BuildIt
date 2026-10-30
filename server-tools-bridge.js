@@ -126,7 +126,7 @@
       throw new Error('Server was switched since this source was loaded; reload it before uploading.');
     activeWrites++;
     try{
-    if(!writeKeyReady())throw new Error('Enter MAP_WRITE_KEY once under Server Tools → Connection.');
+    if(!writeKeyReady())throw new Error(window.BUILD_IT_STAGE4_BOOT?'Je Nitrado-verbinding is nog niet gereed. Vernieuw de pagina.':'Enter MAP_WRITE_KEY once under Server Tools → Connection.');
     if(!snapshot?.relative||!snapshot?.path||!snapshot?.sha256||!checkRelative(snapshot.relative))
       throw new Error('No verified server source is loaded.');
     if(snapshot.path!==(await mission())+'/'+snapshot.relative)
