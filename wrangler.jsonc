@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/wrangler.json",
+  "name": "buildit-auth-test",
+  "main": "./cloudflare/auth-test/worker.js",
+  "compatibility_date": "2026-10-30",
+  "workers_dev": true,
+  "keep_vars": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "buildit-auth-test",
+      "database_id": "b379e7a1-288d-454a-af9c-a3ec2bfa4941"
+    }
+  ]
+}
