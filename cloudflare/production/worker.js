@@ -451,20 +451,29 @@ async function account(req,env,url){
       serverHtml=services.length?services.map(s=>`<div class="server"><strong>${esc(s.name)}</strong><small>ID: ${esc(s.id)} · ${esc(s.game||s.type||'Nitrado')} · ${esc(s.status)}</small>${s.id===conn.selected_service_id?'<p class="green">Selected server</p>':form('/api/nitrado/select','Select server',`<input type="hidden" name="service_id" value="${esc(s.id)}">`)}</div>`).join(''):'<p>No accessible services were returned by Nitrado.</p>';
     }catch(e){serverHtml='<p class="note">Could not load Nitrado servers. Check connection or reconnect.</p>';console.error('Nitrado list:',e.message);}
   }
-  const banner=url.searchParams.get('nitrado');
-  const notice=banner==='connected'?'Nitrado account connected and permission verified.':banner==='selected'?'Server selected.':banner==='disconnected'?'Nitrado connection removed from Build It!++.':banner==='cancel'?'Nitrado authorization cancelled.':url.searchParams.get('checkout')==='success'?'Stripe checkout completed; waiting for a verified webhook.':'';
+  const gumroadUrl=String(env.GUMROAD_BUY_URL||'').trim();
+  const buyHref=/^https:\/\/(?:[A-Za-z0-9-]+\.)?gumroad\.com\/l\/[A-Za-z0-9_-]+(?:\?[^#]*)?$/.test(gumroadUrl)?gumroadUrl:'';
+  const gumroadOffer='<h2>Build It!++ Premium — €5.99/month</h2><p>Recurring Gumroad Membership for access to Build It!++ tools. Your own Nitrado server is not included.</p>'+
+    (buyHref?'<p><a class="button" href="'+esc(buyHref)+'" target="_blank" rel="noopener noreferrer">Buy membership on Gumroad</a></p>':'<p class="note">Gumroad purchase link is being configured.</p>')+
+    '<p>Already purchased? Enter the license key from your Gumroad receipt.</p>'+
+    form('/api/gumroad/redeem','Activate Gumroad Membership','<label>Gumroad license key <input name="license_key" type="text" autocomplete="off" spellcheck="false" required minlength="12" maxlength="180" placeholder="License key from receipt"></label>')+
+    '<p class="note">Cancel or change recurring payments using Subscription settings on your Gumroad receipt or in your Gumroad Library. Access continues until the membership end date.</p>';
+  const licenseStatus=url.searchParams.get('license');
+  const licenseNotice=licenseStatus==='activated'?'Gumroad Membership successfully activated.':licenseStatus==='invalid'?'License invalid, expired or revoked.':licenseStatus==='already_used'?'License is already linked to another Discord account.':'';
+  const notice=banner==='connected'?'Nitrado account connected and permission verified.':banner==='selected'?'Server selected.':banner==='disconnected'?'Nitrado connection removed from Build It!++.':banner==='cancel'?'Nitrado authorization cancelled.':'';
   const content=!user?'<p>Sign in to connect your own DayZ server.</p><a class="button" href="/api/auth/discord">Continue with Discord</a>':`
     <p>Signed in as <strong>${esc(user.username)}</strong></p>
-    <p>Subscription: <strong>${esc(billing.status)}</strong> · Premium: <strong>${billing.active?'ACTIVE':'INACTIVE'}</strong></p>
+    <p>Gumroad Membership: <strong>${esc(billing.status)}</strong> · Premium: <strong>${billing.active?'ACTIVE':'INACTIVE'}</strong></p>
     ${billing.periodEnd?`<p class="note">Paid until: ${esc(new Date(billing.periodEnd*1000).toLocaleDateString('nl-NL'))}</p>`:''}
     ${notice?`<p class="notice">${esc(notice)}</p>`:''}
-    ${!billing.active&&!billing.admin?form('/api/billing/checkout','Subscribe — €4.99/month'):''}
+    ${licenseNotice?`<p class="notice">${esc(licenseNotice)}</p>`:''}
+    ${!billing.admin?gumroadOffer:''}
     ${billing.active?`<h2>Connect your Nitrado server</h2>${conn?`<p class="green">Nitrado connected</p>${serverHtml}${form('/api/nitrado/disconnect','Disconnect Nitrado')}`:'<p>Authorize Build It!++ to see the Nitrado services available to your account.</p><a class="button" href="/api/nitrado/connect">Connect Nitrado</a>'}`:'<p class="note">Activate Premium before connecting Nitrado.</p>'}
     <hr>
     ${user&&conn?'<p class="note">Your tokens are encrypted in D1. The existing production Nitrado Worker is unaffected.</p>':''}
-    ${user?(await billRow(env,user.id))?.stripe_customer_id?form('/api/billing/portal','Manage subscription'):'' :''}
+    <p class="note">Membership payments, cancellations and payment method changes are managed in your Gumroad account.</p>
     ${form('/api/auth/logout','Sign out')}
-    <p class="note">Secure billing via Stripe. Your subscription renews monthly until you cancel. Nitrado server access is available while your subscription is active.</p>`;
+    <p class="note">Recurring billing is handled by Gumroad. Premium grants access to Build It!++ tools, not a Nitrado server.</p>`;
   const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Build It!++ — Account</title><style>
     :root{color-scheme:dark}*{box-sizing:border-box}body{font:16px system-ui,sans-serif;background:#101c23;color:#edf6fa;display:grid;place-items:center;min-height:100vh;margin:0;padding:25px}
     main{background:#19303a;border:1px solid #395663;border-radius:18px;width:min(96vw,590px);padding:32px}h1{margin:0}h2{margin-top:26px}p{line-height:1.5}.note,small{font-size:13px;color:#b0c9d4}.green{color:#8edbb3}
