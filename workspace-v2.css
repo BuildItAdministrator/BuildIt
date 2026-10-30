@@ -303,3 +303,24 @@ html[data-buildit-ui="v2"] #bwDoctorPanel[hidden]{display:none!important}
 @media(max-width:690px){
  html[data-buildit-ui="v2"] #bwDoctorPanel{top:calc(var(--bw-header) + 5px);right:5px;bottom:5px;width:calc(100vw - var(--bw-rail) - 10px);padding:14px}
 }
+
+/* Full-screen map focus is reversible and never changes Nitrado server state. */
+html[data-buildit-ui="v2"][data-buildit-focus="true"] #biWorkspaceRail,
+html[data-buildit-ui="v2"][data-buildit-focus="true"] #placeSearchBox,
+html[data-buildit-ui="v2"][data-buildit-focus="true"] #biServerProfileDock,
+html[data-buildit-ui="v2"][data-buildit-focus="true"] #bwQuickFind,
+html[data-buildit-ui="v2"][data-buildit-focus="true"] #biWorkspaceHeader .bw-brand,
+html[data-buildit-ui="v2"][data-buildit-focus="true"] #biWorkspaceHeader .bw-title{display:none!important}
+html[data-buildit-ui="v2"][data-buildit-focus="true"] #biWorkspaceHeader{
+ height:auto!important;left:auto!important;right:0!important;top:0!important;
+ width:auto!important;min-width:0!important;border:0!important;background:transparent!important;
+ box-shadow:none!important;backdrop-filter:none!important;padding:10px!important;
+ pointer-events:none!important;
+}
+html[data-buildit-ui="v2"][data-buildit-focus="true"] #bwHeaderActions{pointer-events:none!important}
+html[data-buildit-ui="v2"][data-buildit-focus="true"] #bwFocusMap{pointer-events:auto!important;box-shadow:0 8px 24px rgba(0,0,0,.3)!important}
+html[data-buildit-ui="v2"][data-buildit-focus="true"] .leaflet-top.leaflet-left{
+ top:10px!important;left:10px!important
+}
+html[data-buildit-ui="v2"][data-buildit-focus="true"] #coords{left:50%!important}
+html[data-buildit-ui="v2"][data-buildit-focus="true"] #status{top:15px!important;left:50%!important}
