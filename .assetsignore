@@ -1,0 +1,23 @@
+# Build It!++ Cloudflare test Worker: ship only public website assets.
+# All requests run through the Worker and require an active session.
+.git/
+.github/
+cloudflare/
+node_modules/
+tests/
+test/
+test-results/
+playwright-report/
+coverage/
+wrangler.jsonc
+wrangler.toml
+package.json
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+.env
+.env.*
+*.md
+*.map
+*.zip
+*.log
