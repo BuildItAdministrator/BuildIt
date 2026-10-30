@@ -7,9 +7,10 @@ This supersedes the earlier proposal for one-time 30-day license purchases.
 Customers use **their own Nitrado account/server**. Build It!++ does not sell
 or host game servers.
 
-**Pricing:** Initial offer intended EUR 4.99 / month. Seller's current screenshot
-shows a 5.99 monthly tier plus quarterly/6-month/yearly/2-yearly plans: seller
-must choose final rates/frequencies before publishing. The app must reflect
+**Pricing:** EUR 5.99/month for Build It!++ Premium (seller-confirmed on 2026-10-30),
+chosen to account for Gumroad transaction fees. Gumroad also currently displays
+quarterly, 6-month, yearly and 2-yearly membership tiers: verify whether to
+retain them and confirm their prices before publishing. The app must reflect
 the actual Gumroad price and never claim "one-time" or "no renewal" for Membership.
 
 **Seller status:** Gumroad Individual is supported without business-registration
@@ -65,7 +66,8 @@ commercial business can separately trigger Dutch KvK/tax obligations.
       its current prohibited-services policy
 - [ ] Seller's payout settings configured honestly as Individual and any
       required verification fulfilled
-- [ ] Final recurring prices/frequencies and billing language agreed
+- [x] Monthly recurring price agreed: **EUR 5.99/month**
+- [ ] Decide whether longer-term membership pricing/frequencies remain offered
 - [ ] Gumroad Membership tier enabled and license-key block saved
 - [ ] Get public Gumroad product ID and purchase link
 - [ ] Finish production D1 setup independent of sandbox
