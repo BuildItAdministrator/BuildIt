@@ -6,6 +6,7 @@ const root=document.documentElement;
 const $=id=>document.getElementById(id);
 const iconPaths={
  map:'<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/>',
+ doctor:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
  time:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
  tools:'<path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4l-3 3-3-3z"/>',
  events:'<path d="M8 3h8l5 5v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M16 3v5h5M7 13h10M7 17h7"/>',
@@ -29,6 +30,7 @@ const rail=document.createElement('nav');rail.id='biWorkspaceRail';rail.setAttri
 const items=[
  {id:'map',title:'Map',subtitle:'Explore locations and spawns'},
  {id:'tools',title:'Server tools',subtitle:'Configure and validate files'},
+ {id:'doctor',title:'Server doctor',subtitle:'Run a read-only preflight check'},
  {id:'events',title:'Event manager',subtitle:'Build and publish events'},
  {id:'time',title:'Day / night planner',subtitle:'Estimate day and night durations'},
  {id:'logs',title:'Server activity',subtitle:'Review logs and player activity'},
@@ -98,6 +100,7 @@ function hidePanels(){
  if(openPanel('filterPanel'))click('filterToggle');
  if(openPanel('logPanel'))click('logClose');
  window.BUILD_IT_QUICK_SPAWN?.close?.();
+ window.BUILD_IT_SERVER_DOCTOR?.close?.();
  timePanel.hidden=true;
 }
 function navigate(target){
@@ -107,6 +110,7 @@ function navigate(target){
  preferred=target;
  if(target==='events')click('biToggle');
  else if(target==='time')timePanel.hidden=false;
+ else if(target==='doctor')window.BUILD_IT_SERVER_DOCTOR?.open?.();
  else if(target==='tools')click('toolHubToggle');
  else if(target==='logs'||target==='files'){
   click('logToggle');
@@ -126,6 +130,7 @@ function navigate(target){
 function syncActive(){
  let active='map';
  if(!timePanel.hidden)active='time';
+ else if(window.BUILD_IT_SERVER_DOCTOR?.isOpen?.())active='doctor';
  else if(openPanel('biServerProfilePanel'))active='servers';
  else if(openPanel('toolHubPanel'))active='tools';
  else if(openPanel('biPanel'))active='events';
