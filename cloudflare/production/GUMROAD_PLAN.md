@@ -1,56 +1,91 @@
-# Build It!++ payment plan: Gumroad — 30-day software access
+# Build It!++ — Gumroad Membership launch integration
 
-Status: design proposal, not yet implemented or deployed. Existing Stripe sandbox and all Nitrado tools remain unchanged.
+**Chosen model (2026-10-30):** Gumroad **Membership** sold by an **Individual** seller.
+This supersedes the earlier proposal for one-time 30-day license purchases.
 
-## Product and customer journey
+**Product:** Paid recurring access to Build It!++ website software tools.
+Customers use **their own Nitrado account/server**. Build It!++ does not sell
+or host game servers.
 
-- **Product:** Build It!++ Premium, 30 days' access to the Build It!++ website tools, **NOT** Nitrado servers or hosting.
-- **Price:** EUR 4.99, one-time purchase, **no automatic renewal**.
-- Customer signs in to Build It!++ with Discord and buys the product via a Gumroad checkout link.
-- Gumroad issues a **license key** in the purchase receipt. The customer enters this in their Build It!++ account page.
-- Cloudflare Worker checks Gumroad's **official License Verify API** server-side with the configured `product_id`; use `increment_uses_count=false`.
-- Accept only a paid, non-refunded, non-disputed, non-chargebacked purchase of our configured product. Never grant access just because a client claims payment or has a receipt screenshot.
-- Link each Gumroad sale ID/license key to **one Discord user ID** in an isolated production D1 database. Store a keyed hash of the license key, not the raw key, except where a securely encrypted value is necessary for later Gumroad checks.
-- Set entitlement expiry from the verified original sale timestamp plus 30*24 hours. A license should not gain 30 new days each time it is redeemed.
-- On new purchase, expiry should extend according to a documented renewal policy; never re-use a previously redeemed sale to extend access.
-- A customer can read their expiry date on /account. Access to /app and write API denied automatically after expiry.
-- Consider real-time/license-status revalidation with caching and a documented revoke/refund mechanism. If Gumroad verification is unavailable, fail closed for new redemptions.
-- Verify the same sale cannot be claimed on two Discord accounts (atomic D1 uniqueness constraint).
-- The Nitrado OAuth service remains scoped to each logged-in Discord user. An expired entitlement revokes tool access, but never modifies their actual Nitrado server files.
+**Pricing:** Initial offer intended EUR 4.99 / month. Seller's current screenshot
+shows a 5.99 monthly tier plus quarterly/6-month/yearly/2-yearly plans: seller
+must choose final rates/frequencies before publishing. The app must reflect
+the actual Gumroad price and never claim "one-time" or "no renewal" for Membership.
 
-## Official references
+**Seller status:** Gumroad Individual is supported without business-registration
+documents according to Gumroad's payout guidance, but identity verification for
+bank payouts may still require personal ID and national ID details; operating a
+commercial business can separately trigger Dutch KvK/tax obligations.
 
-- License API, per-product identity, `increment_uses_count`, refunded/disputed fields:
-  https://gumroad.com/help/article/76-license-keys
-- Gumroad Individual seller / payout verification:
-  https://gumroad.com/help/article/260-your-payout-settings-page
-- Gumroad current processing/transaction fees:
-  https://gumroad.com/help/article/66-gumroads-fees
-- Gumroad prohibited external services / software guidance:
-  https://gumroad.com/help/article/155-things-you-cant-sell-on-gumroad
-- Gumroad Merchant of Record tax policy:
-  https://gumroad.com/pricing
+## Customer journey
 
-## Launch blockers (do NOT activate checkout until these are resolved)
+1. Customer signs in to Build It!++ with Discord.
+2. Customer purchases a Gumroad Membership at the declared recurring rate.
+3. Customer receives a Gumroad-generated **license key**, enters it in
+   `/account` to link the membership to their Discord identity.
+4. Cloudflare Worker calls Gumroad **license verify API** with the exact product ID
+   and the license key, with `increment_uses_count=false`.
+5. Grant Premium **while the verified membership is active**. Never assume
+   `sale_timestamp + 30 days` for subscriptions.
+6. A Gumroad cancellation leaves access until membership end. Gumroad's
+   `subscription_cancelled_at`, `subscription_ended_at` and
+   `subscription_failed_at` are **membership end dates**; terminate when
+   the applicable timestamp is reached, or if verification says otherwise.
+7. Refunds, disputes and chargebacks block new redemptions and revoke
+   access per verified provider status and refund policy.
+8. Member can manage/cancel on Gumroad. Website shows link to Gumroad
+   membership management and access status.
+9. One Gumroad subscription/license can bind to **only one** Discord user.
+   Use DB uniqueness, same-transaction writes, and per-user authorization.
+10. Verify entitlement server-side on tool access, with a bounded verification
+    cache and fail-closed policy once verification is stale; do not trust
+    browser state. Keep encrypted key for rechecks, not plaintext.
+11. Access to the user's Nitrado server follows the same selected-service,
+    OAuth and verified-owner checks already in the Stage 4 Worker.
 
-- [ ] Gumroad seller signup and payout settings completed as **Individual**, without falsely claiming a KvK registration
-- [ ] Seller understands Gumroad bank payout for Netherlands may still require **photo ID / national identity** verification via Stripe; this platform is **not** a way to avoid KYC
-- [ ] Confirm with Gumroad Support that off-platform access to our **original SaaS/software tools** via license-key activation is permitted under current products policy
-- [ ] Review fees: direct sales have 10% + USD 0.50 Gumroad fee, PLUS separate card processing (e.g. 2.9% + USD 0.30), which is material for EUR 4.99
-- [ ] Decide how Gumroad displays VAT/total and how EUR 4.99 is communicated (Merchant of Record handles applicable sales taxes, not seller income tax)
-- [ ] User creates a **one-time digital software product** (not Membership) and adds Gumroad's built-in License Key block. Product is not publicly offered until policy reviewed
-- [ ] Confirm live product **product ID** and public buy URL (neither is a credential)
-- [ ] Add production D1 schema with unique Gumroad sale / license bindings and expiry
-- [ ] Implement server-side redemption, product verification, refund/dispute checks, account UI, expiry and renewal; no reliance on webhook without a secure authenticated/verified method
-- [ ] Verify two-user isolation, replay of purchase, refunded purchase and expired license tests
-- [ ] Privacy, Terms, cancellation/withdrawal, refund, support, consumer rights and local tax / KvK obligations reviewed
-- [ ] Bind separate production Cloudflare Worker and D1; do NOT modify `buildit-auth-test` or `buildit-nitrado-logs`
-- [ ] Run a real purchase and access test before opening sales
+## Technical notes
 
-## Stripe status
+- License keys are supported on Gumroad Membership tiers, including via the
+  Content tab. Keep multi-seat option disabled for one Discord user per license.
+- Gumroad's license-verify response can include `subscription_id`,
+  `recurrence`, `subscription_cancelled_at`, `subscription_ended_at`,
+  `subscription_failed_at`, `refunded`, `disputed`, `chargebacked`.
+- Renewal **does not change** original `sale_timestamp` or `created_at`.
+- A license key may stay enabled after a subscription ended; rely on verified
+  subscription end status, not just `success:true`.
+- No Gumroad API secrets in client JavaScript. Public product ID can be
+  configured on production Worker as `GUMROAD_PRODUCT_ID`; seller account
+  access tokens are not needed for the documented license verify endpoint.
+- **Do not deploy** the current `cloudflare/production/worker.js` as a Gumroad
+  implementation: it still contains the previous Stripe Live workflow.
 
-The `cloudflare/production/worker.js` file on `launch-prep` is a **previous Stripe Live implementation**, not the chosen Gumroad integration. Do not deploy it as Gumroad checkout. Keep the existing functioning Stripe sandbox separate until Gumroad access has been fully built and tested.
+## Before publishing
 
-## Personal data
+- [ ] Gumroad approves software access delivered outside Gumroad under
+      its current prohibited-services policy
+- [ ] Seller's payout settings configured honestly as Individual and any
+      required verification fulfilled
+- [ ] Final recurring prices/frequencies and billing language agreed
+- [ ] Gumroad Membership tier enabled and license-key block saved
+- [ ] Get public Gumroad product ID and purchase link
+- [ ] Finish production D1 setup independent of sandbox
+- [ ] Implement real Gumroad membership verification and unique Discord binding
+- [ ] Implement server-side renewal/cancel/end/failed payment/refund enforcement
+- [ ] Build account UI: redeem, active status, manage/cancel membership
+- [ ] Add tests for two users, stale verification, replayed/reassigned
+      licenses, cancellations within paid period and failed renewals
+- [ ] Real purchase + cancellation flow tested; no self-purchases for testing,
+      Gumroad recommends its test purchase feature
+- [ ] Confirm privacy, consumer terms and Dutch business/tax compliance
 
-Do not request/put Gumroad seller passport/BSN, bank data, licenses, access tokens or credentials in GitHub or ChatGPT. Seller payout verification happens solely inside Gumroad's own interface.
+## Vendor documentation
+
+- Gumroad memberships: https://gumroad.com/help/article/82-membership-products
+- License-key state & subscription end timestamps: https://gumroad.com/help/article/76-license-keys
+- Individual seller / KYC: https://gumroad.com/help/article/260-your-payout-settings-page
+- Gumroad product rules: https://gumroad.com/help/article/155-things-you-cant-sell-on-gumroad
+- Gumroad fees: https://gumroad.com/pricing
+
+**Deployment discipline:** Changes are only on `launch-prep`.
+Do not modify the live `main` website, the production Nitrado logs Worker,
+or the working `auth-test-deploy` Stripe sandbox.
