@@ -6,6 +6,7 @@ const root=document.documentElement;
 const $=id=>document.getElementById(id);
 const iconPaths={
  map:'<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/>',
+ time:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
  tools:'<path d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 0 0 6.4-6.4l-3 3-3-3z"/>',
  events:'<path d="M8 3h8l5 5v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M16 3v5h5M7 13h10M7 17h7"/>',
  logs:'<path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h4"/>',
@@ -29,6 +30,7 @@ const items=[
  {id:'map',title:'Map',subtitle:'Explore locations and spawns'},
  {id:'tools',title:'Server tools',subtitle:'Configure and validate files'},
  {id:'events',title:'Event manager',subtitle:'Build and publish events'},
+ {id:'time',title:'Day / night planner',subtitle:'Estimate day and night durations'},
  {id:'logs',title:'Server activity',subtitle:'Review logs and player activity'},
  {id:'files',title:'File manager',subtitle:'Edit server files safely'},
  {id:'layers',title:'Map layers',subtitle:'Filter locations and markers'},
@@ -55,6 +57,34 @@ dialog.innerHTML='<div class="bw-palette"><div class="bw-palette-head">'+svg('se
  '<button id="bwCommandClose" type="button" aria-label="Close search">Esc</button></div>'+
  '<div id="bwCommandList" class="bw-palette-list" role="listbox" aria-label="Matching tools"></div></div>';
 document.body.append(header,rail,dialog);
+const timePanel=document.createElement('section');timePanel.id='bwTimePanel';timePanel.hidden=true;
+timePanel.setAttribute('role','region');timePanel.setAttribute('aria-label','Day and night planner');
+timePanel.innerHTML='<div class="bw-time-head"><div><strong>Day / night planner</strong><p>Calculate a server time cycle before changing Nitrado settings.</p></div><button id="bwTimeClose" type="button" aria-label="Close planner">×</button></div>'+
+ '<div class="bw-time-fields"><label>Time acceleration <small>serverTimeAcceleration</small><input id="bwTimeRate" type="number" min="0.1" max="64" step="0.1" value="12"></label>'+
+ '<label>Night acceleration <small>serverNightTimeAcceleration</small><input id="bwNightRate" type="number" min="0.1" max="64" step="0.1" value="4"></label></div>'+
+ '<div class="bw-time-results"><div><small>Daytime · approx.</small><strong id="bwDayResult">—</strong></div><div><small>Nighttime · approx.</small><strong id="bwNightResult">—</strong></div><div><small>Full cycle · approx.</small><strong id="bwCycleResult">—</strong></div></div>'+
+ '<div class="bw-time-file"><div>Suggested server settings</div><pre id="bwTimeConfig"></pre><button id="bwCopyTime" type="button">Copy settings</button></div>'+
+ '<p class="bw-time-note">Uses 12 in-game hours of daylight and 12 of darkness as an estimate. Seasonal daylight lengths vary. No server settings are changed.</p>';
+document.body.appendChild(timePanel);
+const validRate=n=>Number.isFinite(n)&&n>=0.1&&n<=64;
+const duration=mins=>{const h=Math.floor(mins/60),m=Math.round(mins%60);return (h?String(h)+'h ':'')+String(m)+'m';};
+function updateTime(){
+ const a=Number($('bwTimeRate').value),n=Number($('bwNightRate').value);
+ const valid=validRate(a)&&validRate(n);
+ $('bwDayResult').textContent=valid?duration(720/a):'—';
+ $('bwNightResult').textContent=valid?duration(720/(a*n)):'—';
+ $('bwCycleResult').textContent=valid?duration(720/a+720/(a*n)):'—';
+ $('bwTimeConfig').textContent=valid?'serverTimeAcceleration = '+a+';\nserverNightTimeAcceleration = '+n+';':'Use values between 0.1 and 64.';
+ $('bwCopyTime').disabled=!valid;
+}
+$('bwTimeRate').addEventListener('input',updateTime);
+$('bwNightRate').addEventListener('input',updateTime);
+$('bwCopyTime').addEventListener('click',async()=>{
+ try{await navigator.clipboard.writeText($('bwTimeConfig').textContent);$('bwCopyTime').textContent='Copied';}
+ catch(_){$('bwCopyTime').textContent='Select and copy the text above';}
+});
+$('bwTimeClose').addEventListener('click',()=>navigate('map'));
+updateTime();
 const search=$('placeSearchBox'),profiles=$('biServerProfileDock'),actions=$('bwHeaderActions');
 if(profiles)header.insertBefore(profiles,actions);
 if(search)header.insertBefore(search,actions);
@@ -68,6 +98,7 @@ function hidePanels(){
  if(openPanel('filterPanel'))click('filterToggle');
  if(openPanel('logPanel'))click('logClose');
  window.BUILD_IT_QUICK_SPAWN?.close?.();
+ timePanel.hidden=true;
 }
 function navigate(target){
  if(!items.some(item=>item.id===target))return;
@@ -75,6 +106,7 @@ function navigate(target){
  hidePanels();
  preferred=target;
  if(target==='events')click('biToggle');
+ else if(target==='time')timePanel.hidden=false;
  else if(target==='tools')click('toolHubToggle');
  else if(target==='logs'||target==='files'){
   click('logToggle');
@@ -93,7 +125,8 @@ function navigate(target){
 }
 function syncActive(){
  let active='map';
- if(openPanel('biServerProfilePanel'))active='servers';
+ if(!timePanel.hidden)active='time';
+ else if(openPanel('biServerProfilePanel'))active='servers';
  else if(openPanel('toolHubPanel'))active='tools';
  else if(openPanel('biPanel'))active='events';
  else if(openPanel('filterPanel'))active='layers';
