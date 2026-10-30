@@ -13,6 +13,8 @@ const C=[
  ['Equipment & effects',['Loadout Generator','Weapon Blueprint Generator','Bag Fill Generator']]
 ];
 const TOOLS=C.flatMap(([group,names])=>names.map(name=>({name,group})));
+// Read-only complete catalog for workspace search; independent of dashboard filters.
+window.BUILD_IT_TOOL_CATALOG=Object.freeze(TOOLS.map(({name,group})=>Object.freeze({name,group})));
 const ACTIVE=new Set(['XML Validator','JSON Validator','Types Booster','Types Reducer','Advanced Types Editor','Lifetime Reducer','Event Conflict Check','Globals Configurator','Spawnable Duplicate Checker','SpawnObject Duplicate Checker','Messages Generator','Tier Booster','Classname Finder','Spawnable Types Adjuster','Gameplay Generator','Weather Manager','Spawn Point Generator','SpawnObject Mover','SpawnObject Organizer','SpawnObject Heatmap','Event Group Calculator','Gas Zone Generator','Build Relocator','Weapon Blueprint Generator','Bag Fill Generator','Loot & Proxy Calculator','Horde Generator','Types Organizer','Events Organizer','Ignore List Generator','Loadout Generator','Underground Areas','Vehicle Spawn','Lootdrop Spawn']);
 
 const ROOT=document.createElement('div');ROOT.id='serverToolsRoot';
