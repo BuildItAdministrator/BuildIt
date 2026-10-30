@@ -1,19 +1,18 @@
 /**
- * Build It!++ — PRODUCTION: Discord + Stripe Live + personal Nitrado OAuth.
+ * Build It!++ — PRODUCTION: Discord + Gumroad Membership + personal Nitrado OAuth.
  * Production build: ONLY deploy to buildit-app. Never to buildit-auth-test or buildit-nitrado-logs.
  * D1 binding: DB
  * Discord: DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_REDIRECT_URI
- * Stripe: STRIPE_SECRET_KEY (sk_live_), STRIPE_PRICE_ID (live), STRIPE_WEBHOOK_SECRET (live)
+ * Gumroad: GUMROAD_PRODUCT_ID (public), GUMROAD_BUY_URL (public)
  * Nitrado: NITRADO_CLIENT_ID, NITRADO_CLIENT_SECRET,
  *          NITRADO_REDIRECT_URI, NITRADO_ENCRYPTION_KEY (32 bytes, base64)
- * D1 tables: users, sessions, oauth_states, subscriptions, stripe_events,
- *            nitrado_oauth_states, nitrado_connections.
- * Stage 3 is for connection and server selection only. File edits are NOT enabled.
+ * D1 tables: users, sessions, oauth_states, nitrado_oauth_states,
+ *            nitrado_connections, gumroad_memberships, gumroad_redeem_attempts.
+ * Production tools require active verified Gumroad Membership and Nitrado OAuth.
  */
 const SESSION='__Host-buildit_session', OAUTH='__Host-buildit_oauth';
 const SESSION_TTL=7*86400, OAUTH_TTL=600;
 const DISCORD='https://discord.com/api/v10';
-const STRIPE='https://api.stripe.com/v1';
 const NITRADO_OAUTH='https://oauth.nitrado.net/oauth/v2';
 const NITRADO_API='https://api.nitrado.net';
 const enc=new TextEncoder(), dec=new TextDecoder();
@@ -39,13 +38,6 @@ function nitradoConfig(req,env){
   const uri=new URL(String(env.NITRADO_REDIRECT_URI)),origin=new URL(req.url).origin;
   if(uri.protocol!=='https:'||uri.origin!==origin||uri.pathname!=='/api/nitrado/callback'||uri.search||uri.hash)throw Error('Nitrado redirect URI is incorrect');
   return uri.toString();
-}
-function stripeConfig(env,webhook=false){
-  if(!String(env.STRIPE_SECRET_KEY||'').startsWith('sk_live_') ||
-     !String(env.STRIPE_PRICE_ID||'').startsWith('price_'))
-    throw Error('Production Stripe requires LIVE API key and LIVE Price ID');
-  if(webhook && !String(env.STRIPE_WEBHOOK_SECRET||'').startsWith('whsec_'))
-    throw Error('Missing production Stripe webhook secret');
 }
 async function currentUser(req,env){
   const token=cookieRead(req,SESSION);if(!/^[\w-]{43}$/.test(token))return null;
@@ -101,88 +93,6 @@ async function logout(req,env){const r=await requireForm(req,env);if(r.error)ret
   await env.DB.prepare('DELETE FROM sessions WHERE id=?').bind(r.user.session_id).run();
   return redirect('/account',[setCookie(SESSION,'',0)]);
 }
-async function stripeApi(env,path,opt={}){
-  stripeConfig(env);const h={Authorization:'Bearer '+env.STRIPE_SECRET_KEY,Accept:'application/json'};
-  if(opt.form)h['Content-Type']='application/x-www-form-urlencoded';
-  const r=await fetch(STRIPE+path,{method:opt.form?'POST':'GET',headers:h,body:opt.form?opt.form.toString():undefined});
-  const data=await r.json().catch(()=>({}));if(!r.ok)throw Error('Stripe API '+r.status+': '+String(data?.error?.message||'unknown').slice(0,150));
-  return data;
-}
-const objId=x=>typeof x==='string'?x:(typeof x?.id==='string'?x.id:'');
-const billRow=(env,id)=>env.DB.prepare('SELECT * FROM subscriptions WHERE user_id=?').bind(id).first();
-function billView(row,user){const status=row?.status||'none',end=Number(row?.period_end||0);
-  return {status,active:user?.role==='admin'||(status==='active'&&end>now()),periodEnd:end||null,cancelAtPeriodEnd:!!row?.cancel_at_period_end,admin:user?.role==='admin'};
-}
-function premium(sub,price){return !!(sub?.id&&Array.isArray(sub.items?.data)&&sub.items.data.some(x=>objId(x.price)===price));}
-function periodEnd(sub,price){const item=(sub.items?.data||[]).find(x=>objId(x.price)===price);return Number(item?.current_period_end||sub.current_period_end||0);}
-async function ensureCustomer(env,user){
-  let row=await billRow(env,user.id);if(row?.stripe_customer_id)return row.stripe_customer_id;
-  const result=await stripeApi(env,'/customers',{form:new URLSearchParams({name:user.username,'metadata[buildit_user_id]':user.id})});
-  if(!/^cus_/.test(result.id||''))throw Error('Stripe customer could not be created');
-  await env.DB.prepare(`INSERT INTO subscriptions(user_id,stripe_customer_id,status,period_end,cancel_at_period_end,updated_at)
-    VALUES(?,?,'none',0,0,?) ON CONFLICT(user_id) DO NOTHING`).bind(user.id,result.id,now()).run();
-  row=await billRow(env,user.id);return row.stripe_customer_id;
-}
-async function customerSubs(env,customer){const x=await stripeApi(env,'/subscriptions?'+new URLSearchParams({customer,status:'all',limit:'100'}));return (x.data||[]).filter(s=>premium(s,env.STRIPE_PRICE_ID));}
-async function checkout(req,env){
-  const r=await requireForm(req,env);if(r.error)return r.error;stripeConfig(env);if(r.user.role==='admin')return redirect('/account');
-  // Fail closed if the selected Stripe LIVE price does not match the public offer.
-  const price=await stripeApi(env,'/prices/'+encodeURIComponent(String(env.STRIPE_PRICE_ID)));
-  if(price.active!==true||price.currency!=='eur'||Number(price.unit_amount)!==499||
-     price.recurring?.interval!=='month'||Number(price.recurring?.interval_count)!==1)
-    throw Error('Live Stripe Price must be active EUR 4.99/month. Checkout disabled.');
-  const customer=await ensureCustomer(env,r.user),subs=await customerSubs(env,customer);
-  if(subs.some(s=>!['canceled','incomplete_expired'].includes(s.status)))return redirect('/account?message=existing');
-  const origin=new URL(req.url).origin;
-  const form=new URLSearchParams({mode:'subscription',customer,client_reference_id:r.user.id,'line_items[0][price]':env.STRIPE_PRICE_ID,
-    'line_items[0][quantity]':'1','subscription_data[metadata][buildit_user_id]':r.user.id,
-    'metadata[buildit_user_id]':r.user.id,success_url:origin+'/account?checkout=success',cancel_url:origin+'/account?checkout=cancel'});
-  const session=await stripeApi(env,'/checkout/sessions',{form});
-  if(!/^https:\/\/checkout\.stripe\.com\//.test(session.url||''))throw Error('Invalid Stripe checkout URL');
-  return redirect(session.url);
-}
-async function portal(req,env){
-  const r=await requireForm(req,env);if(r.error)return r.error;
-  const row=await billRow(env,r.user.id);if(!row?.stripe_customer_id)return redirect('/account');
-  const result=await stripeApi(env,'/billing_portal/sessions',{form:new URLSearchParams({customer:row.stripe_customer_id,return_url:new URL(req.url).origin+'/account'})});
-  if(!/^https:\/\/billing\.stripe\.com\//.test(result.url||''))throw Error('Invalid Stripe portal URL');
-  return redirect(result.url);
-}
-function hexBytes(h){return /^[0-9a-f]{64}$/i.test(h)?Uint8Array.from(h.match(/../g),x=>parseInt(x,16)):null;}
-async function verifyStripe(req,env){
-  stripeConfig(env,true);const raw=await req.text();if(raw.length>1000000)throw Error('Webhook too large');
-  const parts=(req.headers.get('Stripe-Signature')||'').split(',').map(s=>s.trim());
-  const t=parts.find(s=>s.startsWith('t='))?.slice(2),sig=parts.filter(s=>s.startsWith('v1=')).map(s=>s.slice(3));
-  if(!t||!Number.isSafeInteger(Number(t))||Math.abs(now()-Number(t))>300||!sig.length)throw Error('Missing or stale signature');
-  const key=await crypto.subtle.importKey('raw',enc.encode(env.STRIPE_WEBHOOK_SECRET),{name:'HMAC',hash:'SHA-256'},false,['verify']);
-  let valid=false;for(const s of sig){const b=hexBytes(s);if(b&&await crypto.subtle.verify('HMAC',key,b,enc.encode(t+'.'+raw))){valid=true;break;}}
-  if(!valid)throw Error('Invalid Stripe signature');
-  const event=JSON.parse(raw);if(!/^evt_/.test(event?.id||'')||event.livemode!==true)throw Error('Not a live-mode Stripe event');return event;
-}
-async function syncSubscription(env,sub,hint=''){
-  if(!premium(sub,env.STRIPE_PRICE_ID))return;
-  const customer=objId(sub.customer),row=await env.DB.prepare('SELECT * FROM subscriptions WHERE stripe_customer_id=?').bind(customer).first();
-  if(!row||(hint&&row.user_id!==hint))return;
-  if(row.stripe_subscription_id&&row.stripe_subscription_id!==sub.id&&row.status==='active'&&Number(row.period_end)>now())return;
-  await env.DB.prepare(`UPDATE subscriptions SET stripe_subscription_id=?,status=?,period_end=?,cancel_at_period_end=?,updated_at=? WHERE user_id=? AND stripe_customer_id=?`)
-    .bind(sub.id,String(sub.status||'unknown'),Math.max(0,periodEnd(sub,env.STRIPE_PRICE_ID)),sub.cancel_at_period_end?1:0,now(),row.user_id,customer).run();
-}
-async function stripeWebhook(req,env){
-  let event;try{event=await verifyStripe(req,env);}catch(e){console.error('Stripe signature rejected');return reply({error:'Invalid Stripe webhook signature'},400);}
-  const old=await env.DB.prepare('SELECT id FROM stripe_events WHERE id=?').bind(event.id).first();if(old)return reply({received:true,duplicate:true});
-  const obj=event.data?.object||{},type=event.type||'';
-  if(type==='checkout.session.completed'&&obj.mode==='subscription'&&obj.subscription){
-    const sub=await stripeApi(env,'/subscriptions/'+encodeURIComponent(objId(obj.subscription)));
-    await syncSubscription(env,sub,String(obj.client_reference_id||''));
-  }else if(type.startsWith('customer.subscription.')&&obj.id){
-    const sub=await stripeApi(env,'/subscriptions/'+encodeURIComponent(obj.id));await syncSubscription(env,sub,String(sub.metadata?.buildit_user_id||''));
-  }else if(['invoice.paid','invoice.payment_failed'].includes(type)&&obj.customer){
-    const subs=await customerSubs(env,objId(obj.customer));for(const sub of subs)await syncSubscription(env,sub,String(sub.metadata?.buildit_user_id||''));
-  }
-  await env.DB.prepare('INSERT OR IGNORE INTO stripe_events(id,event_type,created_at) VALUES(?,?,?)').bind(event.id,type,now()).run();
-  return reply({received:true});
-}
-
 // Nitrado OAuth, encrypted token storage and strict per-Discord-account separation.
 async function cryptoKey(env){
   const raw=unb64(String(env.NITRADO_ENCRYPTION_KEY||''));
