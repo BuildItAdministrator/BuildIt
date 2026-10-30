@@ -1549,7 +1549,7 @@ async function createLootSpawnerFile(
  
 // Stage 4: per-user authenticated API. Original file editing / logs helpers
 // are retained unchanged and supplied only a request-scoped, user-specific token.
-const STAGE4_UPSTREAM='https://buildit-plus-web.pages.dev';
+// Stage 4 website assets are bundled with this isolated test Worker (ASSETS binding).
 const STAGE4_STATIC=/^\/(?:[a-zA-Z0-9_.-]+\/)*[a-zA-Z0-9_.-]+\.(?:js|css|json|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|webmanifest)$/;
 const STAGE4_BRIDGE="/* Build It!++ Stage 4 staging bridge. Same-origin, session cookie only.\n * This file is served exclusively through the authenticated /app test view.\n * Never store real credentials, secret keys, or OAuth tokens in the browser.\n */\n(() => {\n  'use strict';\n  const boot = window.BUILD_IT_STAGE4_BOOT;\n  if (!boot || !/^\\d{1,20}$/.test(String(boot.serviceId || ''))) return;\n  if (typeof nitradoRequest !== 'function') return;\n  const selected = String(boot.serviceId);\n\n  // Replace the shared request function. Existing tools keep their current\n  // data formats and write verification. The backend verifies every request.\n  nitradoRequest = async function(path, {method='GET', body=null} = {}) {\n    if (typeof path !== 'string' || !/^\\/api\\//.test(path)) throw Error('Invalid API route');\n    const target = new URL(path, location.origin);\n    if (target.origin !== location.origin) throw Error('Cross-origin API request blocked');\n    if (target.searchParams.has('server') && target.searchParams.get('server') !== selected)\n      throw Error('Selected server mismatch');\n    target.searchParams.set('server', selected);\n    const opts = { method, credentials: 'same-origin', cache: 'no-store', headers: {Accept:'application/json'} };\n    if (body !== null) {\n      opts.headers['Content-Type'] = 'application/json';\n      opts.body = typeof body === 'string' ? body : JSON.stringify(body);\n    }\n    const response = await fetch(target.toString(), opts);\n    const data = await response.json().catch(() => ({}));\n    if (!response.ok) throw Error(data.error || `Build It!++ API: HTTP ${response.status}`);\n    return data;\n  };\n\n  // These are inert UI compatibility values. They are NOT authentication keys.\n  // Authentication is supplied by the HttpOnly Discord session cookie only.\n  const urlField = document.getElementById('nitradoWorkerUrl');\n  const accessField = document.getElementById('nitradoAccessKey');\n  const writeField = document.getElementById('nitradoWriteKey');\n  if (urlField) urlField.value = location.origin;\n  if (accessField) accessField.value = 'oauth-session-managed';\n  if (writeField) writeField.value = 'oauth-session-managed';\n  try {\n    nitradoWorkerMode = 'multi';\n    window.BUILD_IT_NITRADO_WORKER_MODE = 'multi';\n    window.BUILD_IT_NITRADO_EXPECTED_USERNAME = String(boot.username || '');\n    if (typeof populateNitradoServers === 'function') {\n      populateNitradoServers([{id:selected,name:String(boot.serverName || ('Server '+selected))}]);\n    }\n  } catch (error) {\n    console.warn('Stage4 compatibility setup:',error.message);\n  }\n\n  // Do not offer the obsolete manual Worker/secret-key setup to customers.\n  const style=document.createElement('style');\n  style.textContent = `\n   #nitradoWorkerUrl, #nitradoAccessKey, #nitradoWriteKey,\n   label[for=\"nitradoWorkerUrl\"], label[for=\"nitradoAccessKey\"], label[for=\"nitradoWriteKey\"],\n   #nitradoKeyReveal, #nitradoKeyCopy, #nitradoKeyRecoveryStatus,\n   #biServerProfileManage, #biServerProfileDock {display:none !important}\n   #biStage4TopBar{position:fixed;left:50%;transform:translateX(-50%);top:6px;z-index:99999;\n     background:#162932;color:#ecf7ff;border:1px solid #466673;border-radius:10px;\n     padding:7px 14px;font:13px system-ui;box-shadow:0 4px 22px #0006}\n   #biStage4TopBar a{color:#9ac8ff}\n  `;\n  document.head.appendChild(style);\n  const bar=document.createElement('div');\n  bar.id='biStage4TopBar';\n  bar.textContent='TEST • '+String(boot.serverName || 'Nitrado server')+'  ·  ';\n  const back=document.createElement('a');\n  back.href='/account'; back.textContent='Account / server wijzigen';\n  bar.appendChild(back);\n  document.body.appendChild(bar);\n\n  window.BUILD_IT_STAGE4_READY = true;\n  // Populate status and secure username without manual setup.\n  Promise.resolve().then(async () => {\n    try {\n      const server = await nitradoRequest('/api/status',{withServer:true});\n      window.BUILD_IT_NITRADO_EXPECTED_USERNAME = String(server.username || '');\n      if (typeof setNitradoStatus === 'function')\n        setNitradoStatus('Connected: '+(server.serverName||boot.serverName||selected),'ok');\n      window.dispatchEvent(new Event('buildit:stage4-connected'));\n    } catch (error) {\n      if (typeof setNitradoStatus === 'function') setNitradoStatus(error.message,'err');\n    }\n  });\n})();\n";
 function stage4Error(error, req){
@@ -1650,8 +1650,9 @@ async function stage4App(req,env){
   const service=c.services.find(s=>s.id===c.selected);
   const origin=new URL(req.url).origin;
   const profile=stage4ProfileHtml({id:c.selected,name:status.serverName||service.name},status.username,origin);
-  const upstream=await fetch(STAGE4_UPSTREAM+'/index.html',{headers:{Accept:'text/html'},redirect:'manual'});
-  if(!upstream.ok)throw Object.assign(Error('Unable to load current Build It!++ website'),{httpStatus:502});
+  if(!env.ASSETS)throw Object.assign(Error('Website assets binding not configured'),{httpStatus:502});
+  const upstream=await env.ASSETS.fetch(new URL('/index.html',req.url));
+  if(!upstream.ok)throw Object.assign(Error('Bundled Build It!++ index.html unavailable (HTTP '+upstream.status+')'),{httpStatus:502});
   let html=await upstream.text();
   if(!html.includes('</head>')||!html.includes('</body>')||!html.includes('nitradoRequest'))
     throw Object.assign(Error('Website template changed; staging integration needs review'),{httpStatus:502});
@@ -1673,12 +1674,13 @@ async function stage4App(req,env){
 async function stage4Static(req,env,url){
   const p=url.pathname;
   if(p==='/stage4-bridge.js')return new Response(STAGE4_BRIDGE,{headers:headers({'Content-Type':'application/javascript; charset=utf-8'})});
-  if(!STAGE4_STATIC.test(p))return reply({error:'Not found'},404);
+  if(!STAGE4_STATIC.test(p)||/^\/(?:cloudflare|\.github|tests?|node_modules)\//i.test(p))return reply({error:'Not found'},404);
   const u=await currentUser(req,env);
   if(!u||!billView(await billRow(env,u.id),u).active)return reply({error:'Subscription required'},403);
   // No redirects or untrusted origin can be requested. No client cookies are sent upstream.
-  const response=await fetch(STAGE4_UPSTREAM+p,{redirect:'manual'});
-  if(!response.ok)return reply({error:'Website resource unavailable'},502);
+  if(!env.ASSETS)return reply({error:'Website assets binding not configured'},502);
+  const response=await env.ASSETS.fetch(new URL(p,req.url));
+  if(!response.ok)return reply({error:'Bundled website resource unavailable: '+p},502);
   const ct=response.headers.get('Content-Type')||'application/octet-stream';
   return new Response(response.body,{headers:headers({'Content-Type':ct,'X-Robots-Tag':'noindex'})});
 }
