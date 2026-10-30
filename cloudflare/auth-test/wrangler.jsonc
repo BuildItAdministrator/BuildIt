@@ -9,7 +9,7 @@
     {
       "binding": "DB",
       "database_name": "buildit-auth-test",
-      "database_id": "REPLACE_WITH_EXISTING_BUILD_IT_AUTH_TEST_D1_DATABASE_ID"
+      "database_id": "b379e7a1-288d-454a-af9c-a3ec2bfa4941"
     }
   ]
 }
