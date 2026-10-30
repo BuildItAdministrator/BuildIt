@@ -1,0 +1,25 @@
+name: Build It!++ launch security checks
+
+on:
+  push:
+    branches: [launch-prep]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check production Worker syntax
+        run: node --check cloudflare/production/worker.js
+      - name: Check regression tests
+        run: node --test cloudflare/production/security.test.cjs
