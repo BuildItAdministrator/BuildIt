@@ -77,6 +77,16 @@ ROOT.innerHTML=`
  </div>
 </section>`;
 document.body.appendChild(ROOT);
+if(window.BUILD_IT_STAGE4_BOOT){
+  // No customer-managed write-key UI in the OAuth version.
+  // Retain its hidden input for older editor event handlers.
+  const legacySettings=ROOT.querySelector('.st-settings');
+  const legacyInput=legacySettings?.querySelector('#stWriteKey');
+  if(legacySettings&&legacyInput){
+    legacyInput.type='hidden';
+    legacySettings.replaceWith(legacyInput);
+  }
+}
 const $=id=>ROOT.querySelector('#'+id);
 const panel=$('toolHubPanel'),cards=$('stCards'),workspace=$('stWorkspace');
 let selected=null,snapshot=null,preview=null,busy=false,remoteList=[],heatLayer=null,gearPresets=[],spawnableInfo=null;
