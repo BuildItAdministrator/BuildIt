@@ -50,7 +50,7 @@ for(const item of items){
  rail.appendChild(button);
 }
 const foot=document.createElement('div');foot.className='bw-bottom';
-foot.innerHTML='<div class="bw-hint">Edits are previewed and validated before upload.</div>';
+foot.innerHTML='<div class="bw-hint">Review changes before uploading.</div>';
 rail.appendChild(foot);
 const dialog=document.createElement('div');dialog.id='biCommandDialog';dialog.hidden=true;
 dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');dialog.setAttribute('aria-label','Find tools and actions');
@@ -90,7 +90,7 @@ updateTime();
 const search=$('placeSearchBox'),profiles=$('biServerProfileDock'),actions=$('bwHeaderActions');
 if(profiles)header.insertBefore(profiles,actions);
 if(search)header.insertBefore(search,actions);
-let preferred='map',paletteOpen=false,results=[],selectedIndex=0,previousFocus=null;
+let preferred='map',paletteOpen=false,results=[],selectedIndex=0,previousFocus=null,focusMap=false;
 const gated=()=>!!$('accessGate')&&!$('accessGate').classList.contains('hidden');
 const openPanel=id=>{const p=$(id);return !!p&&!p.hidden&&!p.classList.contains('hidden');};
 const click=id=>{const e=$(id);if(e&&typeof e.click==='function'){e.click();return true;}return false;};
@@ -106,6 +106,7 @@ function hidePanels(){
 }
 function navigate(target){
  if(!items.some(item=>item.id===target)||gated())return;
+ if(focusMap&&target!=='map')setFocusMap(false);
  if(window.BUILD_IT_UI_VISIBILITY?.isPicking?.())return;
  hidePanels();
  preferred=target;
@@ -217,12 +218,22 @@ document.addEventListener('keydown',e=>{
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();}
  else if(e.key==='/'&&!typing&&!paletteOpen&&!e.ctrlKey&&!e.metaKey){e.preventDefault();openPalette();}
  else if(e.key==='Escape'&&paletteOpen){e.preventDefault();e.stopImmediatePropagation();closePalette();}
+ else if(e.key==='Escape'&&focusMap){e.preventDefault();setFocusMap(false);}
 },true);
+function setFocusMap(enabled){
+ focusMap=Boolean(enabled);
+ root.dataset.builditFocus=String(focusMap);
+ const button=$('bwFocusMap');
+ button.setAttribute('aria-pressed',String(focusMap));
+ button.setAttribute('aria-label',focusMap?'Restore workspace':'Focus on map');
+ button.title=focusMap?'Restore workspace':'Focus on map';
+ if(focusMap){hidePanels();closePalette();}
+ if(window.map&&typeof window.map.invalidateSize==='function')window.map.invalidateSize();
+ syncActive();
+}
 $('bwFocusMap').addEventListener('click',()=>{
  if(gated()||window.BUILD_IT_UI_VISIBILITY?.isPicking?.())return;
- hidePanels();
- window.BUILD_IT_UI_VISIBILITY?.toggleMenus?.();
- syncActive();
+ setFocusMap(!focusMap);
 });
 // Keep the old UI if initialization is interrupted; only activate new positioning after setup.
 root.dataset.builditUi='v2';
