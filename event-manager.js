@@ -150,8 +150,10 @@
     '<div id="biServerPreview" class="biMessage" role="status" aria-live="polite">Vehicle events publish as XML. Use the JSON loot tools below for loose items.</div>',
     '<label class="biConfirm" id="biRepairConfirm" hidden><input type="checkbox" id="biRepairAcknowledge"> I approve removing the duplicate XML declarations detected in the server files.</label>',
     '<label class="biConfirm"><input type="checkbox" id="biServerStopped"> My DayZ server is stopped and I have reviewed the changes.</label>',
-    '<button type="button" id="biUploadServer" class="biPrimary biFull" disabled>Back up &amp; upload</button>',
-    '<p class="biSmall">An upload requires your file-write key. Existing files are checked and backed up before replacement.</p></section>',
+    '<button type="button" id="biUploadServer" class="biPrimary biFull" disabled>'+ (window.BUILD_IT_STAGE4_BOOT?'Upload gecontroleerde bestanden':'Back up &amp; upload')+'</button>',
+    (window.BUILD_IT_STAGE4_BOOT
+      ? '<p class="biSmall">Je Nitrado-account geeft automatisch toegang. Wijzigingen worden gecontroleerd en na het opslaan geverifieerd. Bewaar je eigen back-up.</p></section>'
+      : '<p class="biSmall">An upload requires your file-write key. Existing files are checked and backed up before replacement.</p></section>'),
     '<section class="biSection" id="biJsonLootPublish"><div class="biSectionTitle"><h4>JSON loot spawner</h4></div>',
     '<p class="biSmall">Non-persistent loot, generated with the vanilla DayZ Object Spawner. After each restart the locations are populated again.</p>',
     '<button type="button" id="biExportLootJson" class="biPrimary biFull">Download loot JSON</button>',
@@ -159,7 +161,7 @@
     '<button type="button" id="biPrepareLoot" class="biFull">Review live loot JSON upload</button>',
     '<div id="biLootReview" class="biMessage" role="status" aria-live="polite">Review your loot before publishing. New JSON files require the Worker create-file endpoint.</div>',
     '<label class="biConfirm"><input type="checkbox" id="biLootServerStopped"> My server is stopped and I reviewed the JSON.</label>',
-    '<button type="button" id="biDeployLoot" class="biPrimary biFull" disabled>Back up &amp; upload loot JSON</button>',
+    '<button type="button" id="biDeployLoot" class="biPrimary biFull" disabled>'+ (window.BUILD_IT_STAGE4_BOOT?'Upload loot JSON':'Back up &amp; upload loot JSON')+'</button>',
     '<p class="biSmall">Use Review live loot JSON upload to publish both files through Nitrado once the Worker create-file handler is active. Manual download remains available. Existing cfgGameplay settings are preserved; ensure cfgGameplay is enabled before restarting.</p></section>',
     '<details class="biAdvanced" id="biAdvanced"><summary>Advanced · Manual XML / JSON tools</summary>',
     '<button type="button" id="biLoadServer" class="biFull">Reload live server XML</button>',
@@ -912,7 +914,9 @@
       lootMessage('UPLOAD FAILED: '+error.message+'\n'+
         (uploaded.length?'Uploaded before failure: '+uploaded.map(r=>r.name+(r.created?' (new file)':backupNote(r.backup))).join(', ')+
           '. Restore updated files from your own backups; review newly created files before retrying.':
-          'No upload was verified. Confirm the MAP_WRITE_KEY and server file permissions.')+
+          (window.BUILD_IT_STAGE4_BOOT
+            ? 'Geen upload geverifieerd. Controleer je Nitrado-verbinding en serverrechten.'
+            : 'No upload was verified. Confirm the MAP_WRITE_KEY and server file permissions.'))+
         '\nNo automatic rollback was attempted.',true);
       lootStaged=null;
     }finally{lootBusy=false;$('biPrepareLoot').disabled=false;}
