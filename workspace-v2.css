@@ -236,3 +236,38 @@ html[data-buildit-map-picking="true"][data-buildit-ui="v2"] #builditMapPickToolb
  #biWorkspaceHeader .bw-brand .bw-name{display:none}
 }
 @media(prefers-reduced-motion:reduce){#biWorkspaceRail .bw-nav{transition:none}}
+
+/* Read-only server time planner */
+html[data-buildit-ui="v2"] #bwTimePanel{
+ position:fixed;z-index:1210;top:calc(var(--bw-header) + 16px);
+ right:16px;bottom:16px;width:min(660px,calc(100vw - var(--bw-rail) - 32px));
+ box-sizing:border-box;overflow-y:auto;background:var(--bw-surface);color:var(--bw-fg);
+ border:1px solid var(--bw-edge);border-radius:17px;padding:25px;
+ box-shadow:0 18px 80px rgba(0,0,0,.44)
+}
+html[data-buildit-ui="v2"] #bwTimePanel[hidden]{display:none!important}
+#bwTimePanel .bw-time-head{display:flex;justify-content:space-between;align-items:start;gap:16px;border-bottom:1px solid var(--bw-edge);padding-bottom:20px}
+#bwTimePanel .bw-time-head strong{font-size:21px;letter-spacing:-.03em}
+#bwTimePanel .bw-time-head p{color:var(--bw-muted);font-size:12px;line-height:1.5}
+#bwTimePanel button{padding:8px 13px;border-radius:9px;border:1px solid var(--bw-edge);background:var(--bw-raised);color:var(--bw-fg);cursor:pointer}
+#bwTimePanel button:hover{border-color:var(--bw-accent)}
+#bwTimePanel .bw-time-fields{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin:25px 0}
+#bwTimePanel .bw-time-fields label{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:750}
+#bwTimePanel .bw-time-fields small{font-size:10px;color:var(--bw-muted);font-weight:500}
+#bwTimePanel .bw-time-fields input{height:44px;box-sizing:border-box;padding:10px 12px;border:1px solid var(--bw-edge);border-radius:9px;background:var(--bw-raised);color:var(--bw-fg);font-size:15px}
+#bwTimePanel .bw-time-results{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+#bwTimePanel .bw-time-results>div{padding:18px 12px;border:1px solid var(--bw-edge);border-radius:12px;background:var(--bw-raised)}
+#bwTimePanel .bw-time-results small{color:var(--bw-muted);display:block;font-size:10px;margin-bottom:10px}
+#bwTimePanel .bw-time-results strong{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+#bwTimePanel .bw-time-file{margin-top:23px;padding:15px;border:1px solid var(--bw-edge);border-radius:12px}
+#bwTimePanel .bw-time-file>div{font-size:12px;font-weight:750}
+#bwTimePanel .bw-time-file pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.8;color:var(--bw-fg)}
+#bwTimePanel .bw-time-file button{background:var(--bi-accent-deep,#15858f);color:#fff}
+#bwTimePanel .bw-time-note{font-size:11px;line-height:1.6;color:var(--bw-muted);margin:18px 0}
+@media(max-width:690px){
+ html[data-buildit-ui="v2"] #bwTimePanel{top:calc(var(--bw-header) + 5px);right:5px;bottom:5px;width:calc(100vw - var(--bw-rail) - 10px);padding:15px}
+ #bwTimePanel .bw-time-fields{grid-template-columns:1fr}
+ #bwTimePanel .bw-time-results{grid-template-columns:1fr}
+ #bwTimePanel .bw-time-results>div{padding:10px 12px}
+}
+@media(max-width:370px){html[data-buildit-ui="v2"] #placeSearchBox{display:none!important}}
