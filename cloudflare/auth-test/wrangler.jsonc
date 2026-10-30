@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/wrangler.json",
+  "name": "buildit-auth-test",
+  "main": "./worker.js",
+  "compatibility_date": "2026-10-30",
+  "workers_dev": true,
+  "keep_vars": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "buildit-auth-test",
+      "database_id": "REPLACE_WITH_EXISTING_BUILD_IT_AUTH_TEST_D1_DATABASE_ID"
+    }
+  ]
+}
