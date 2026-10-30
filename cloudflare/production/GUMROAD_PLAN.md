@@ -71,9 +71,9 @@ commercial business can separately trigger Dutch KvK/tax obligations.
 - [ ] Gumroad Membership tier enabled and license-key block saved
 - [ ] Get public Gumroad product ID and purchase link
 - [ ] Finish production D1 setup independent of sandbox
-- [ ] Implement real Gumroad membership verification and unique Discord binding
-- [ ] Implement server-side renewal/cancel/end/failed payment/refund enforcement
-- [ ] Build account UI: redeem, active status, manage/cancel membership
+- [x] Implement real Gumroad membership verification and unique Discord binding
+- [x] Implement 5-minute revalidation for renewal/cancel/end/failed payment/refund enforcement
+- [x] Build account UI for redemption and membership status; provide Gumroad receipt instructions for cancellation
 - [ ] Add tests for two users, stale verification, replayed/reassigned
       licenses, cancellations within paid period and failed renewals
 - [ ] Real purchase + cancellation flow tested; no self-purchases for testing,
@@ -91,3 +91,12 @@ commercial business can separately trigger Dutch KvK/tax obligations.
 **Deployment discipline:** Changes are only on `launch-prep`.
 Do not modify the live `main` website, the production Nitrado logs Worker,
 or the working `auth-test-deploy` Stripe sandbox.
+
+## Current implementation status
+
+Gumroad production integration is implemented on `launch-prep`, with
+`cloudflare/production/worker.js`, `gumroad-schema.sql` and
+`security.test.cjs`. No Worker has been deployed, no genuine membership
+has been redeemed, and neither the live site nor the Stripe sandbox
+has been modified. The separate Cloudflare production Worker, D1, public
+Gumroad product link and exact product ID still need configuration.
