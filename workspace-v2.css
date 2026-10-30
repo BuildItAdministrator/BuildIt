@@ -1,0 +1,238 @@
+/* BuildItPlus workspace v2: presentation only. Enabled after ui-shell.js initializes.
+   Changes no credentials, API calls, map geometry or Nitrado write logic. */
+html[data-buildit-ui="v2"]{
+ --bw-rail:210px;--bw-header:66px;
+ --bw-backdrop:rgba(6,15,22,.94);--bw-edge:var(--bi-line-soft,#28414e);
+ --bw-surface:var(--bi-panel,#10202c);--bw-raised:var(--bi-panel-raised,#192d38);
+ --bw-fg:var(--bi-text,#ecf6f8);--bw-muted:var(--bi-muted,#9db5c0);
+ --bw-accent:var(--bi-accent,#55c9c9);
+}
+html[data-buildit-ui="v2"] #builditBrand,
+html[data-buildit-ui="v2"] #filterToggle,
+html[data-buildit-ui="v2"] #logToggle,
+html[data-buildit-ui="v2"] #biToggle,
+html[data-buildit-ui="v2"] #toolHubToggle{display:none!important}
+html[data-buildit-ui="v2"] body{background:var(--bw-surface)}
+html[data-buildit-ui="v2"] #map{position:fixed!important;inset:0!important}
+html[data-buildit-ui="v2"] #biWorkspaceHeader{
+ position:fixed;z-index:1200;top:0;left:0;right:0;height:var(--bw-header);
+ display:flex;align-items:center;gap:18px;box-sizing:border-box;
+ padding:0 20px;border-bottom:1px solid var(--bw-edge);
+ background:var(--bw-backdrop);color:var(--bw-fg);
+ box-shadow:0 5px 25px rgba(0,0,0,.13);backdrop-filter:blur(20px)
+}
+html[data-buildit-theme="light"][data-buildit-ui="v2"] #biWorkspaceHeader{--bw-backdrop:rgba(252,254,255,.97)}
+#biWorkspaceHeader .bw-brand{
+ display:flex;align-items:center;gap:11px;min-width:calc(var(--bw-rail) - 20px);
+ font-size:16px;font-weight:830;letter-spacing:-.035em;white-space:nowrap
+}
+#biWorkspaceHeader .bw-logo{
+ display:grid;place-items:center;flex:0 0 auto;width:35px;height:35px;border-radius:10px;
+ color:#06242b;background:linear-gradient(145deg,#67e0d5,#26a5be);
+ box-shadow:0 0 0 1px rgba(255,255,255,.1) inset
+}
+#biWorkspaceHeader .bw-logo svg{width:22px;height:22px}
+#biWorkspaceHeader .bw-brand small{display:block;margin-top:2px;color:var(--bw-muted);font-size:10px;font-weight:630;letter-spacing:.025em}
+#biWorkspaceHeader .bw-title{min-width:0;display:flex;flex-direction:column;gap:2px}
+#biWorkspaceHeader .bw-title strong{font-size:15px;font-weight:760;letter-spacing:-.02em}
+#biWorkspaceHeader .bw-title span{color:var(--bw-muted);font-size:11px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#biWorkspaceHeader .bw-grow{flex:1;min-width:8px}
+#biWorkspaceHeader .bw-head-actions{display:flex;align-items:center;gap:8px;min-width:0}
+#biWorkspaceHeader .bw-icon-button{
+ display:inline-flex;gap:9px;align-items:center;justify-content:center;
+ border:1px solid var(--bw-edge);border-radius:10px;
+ background:var(--bw-raised);color:var(--bw-fg);padding:9px 11px;
+ min-height:39px;cursor:pointer;font-size:12px;font-weight:680;white-space:nowrap
+}
+#biWorkspaceHeader .bw-icon-button:hover{border-color:var(--bw-accent);color:var(--bw-accent)}
+#biWorkspaceHeader button svg,#biWorkspaceRail button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+#biWorkspaceRail{
+ position:fixed;z-index:1190;left:0;top:var(--bw-header);bottom:0;
+ display:flex;flex-direction:column;gap:4px;box-sizing:border-box;width:var(--bw-rail);
+ padding:17px 11px 16px;background:var(--bw-backdrop);color:var(--bw-fg);
+ border-right:1px solid var(--bw-edge);backdrop-filter:blur(20px);overflow-y:auto
+}
+html[data-buildit-theme="light"][data-buildit-ui="v2"] #biWorkspaceRail{--bw-backdrop:rgba(252,254,255,.97)}
+#biWorkspaceRail .bw-section{color:var(--bw-muted);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;padding:14px 12px 7px}
+#biWorkspaceRail .bw-nav{
+ width:100%;min-height:43px;display:flex;align-items:center;gap:11px;
+ box-sizing:border-box;border:1px solid transparent;border-radius:10px;
+ padding:10px 12px;background:transparent;color:var(--bw-muted);
+ cursor:pointer;text-align:left;font-size:12px;font-weight:700;
+ transition:background .15s ease,color .15s ease,border-color .15s ease
+}
+#biWorkspaceRail .bw-nav:hover{background:var(--bw-raised);color:var(--bw-fg)}
+#biWorkspaceRail .bw-nav[aria-current="page"]{
+ color:var(--bw-accent);background:rgba(56,175,174,.13);
+ border-color:rgba(74,189,193,.25)
+}
+#biWorkspaceRail .bw-nav svg{flex:0 0 auto}
+#biWorkspaceRail .bw-bottom{margin-top:auto;padding-top:14px}
+#biWorkspaceRail .bw-hint{padding:9px 12px;color:var(--bw-muted);font-size:10px;line-height:1.5}
+html[data-buildit-ui="v2"] #placeSearchBox{
+ position:relative!important;top:auto!important;right:auto!important;left:auto!important;
+ width:clamp(190px,23vw,310px)!important;flex:0 1 310px;
+ z-index:1!important;filter:none!important;box-shadow:none!important
+}
+html[data-buildit-ui="v2"] #placeSearchInput{
+ width:calc(100% - 42px)!important;height:40px!important;min-height:40px!important;
+ box-shadow:none!important
+}
+html[data-buildit-ui="v2"] #placeSearchResults{top:45px!important}
+html[data-buildit-ui="v2"] #builditThemeToggle{top:3px!important;right:0!important}
+html[data-buildit-ui="v2"] #builditMenusToggle{display:none!important}
+html[data-buildit-ui="v2"] #biServerProfileDock{
+ position:static!important;top:auto!important;right:auto!important;
+ display:flex!important;align-items:center!important;gap:7px!important;
+ width:auto!important;min-width:0!important;padding:0!important;
+ border:0!important;background:transparent!important;box-shadow:none!important
+}
+html[data-buildit-ui="v2"] #biServerProfileDock label{display:none!important}
+html[data-buildit-ui="v2"] #biServerProfileSelect{
+ width:clamp(104px,13vw,190px)!important;max-width:190px!important;
+ height:39px!important;min-width:0!important;box-sizing:border-box!important;
+ border-radius:9px!important;background:var(--bw-raised)!important;
+ color:var(--bw-fg)!important;border:1px solid var(--bw-edge)!important;
+ font:650 12px system-ui,sans-serif!important;padding:0 8px!important
+}
+html[data-buildit-ui="v2"] #biServerProfileManage{
+ min-height:39px!important;border-radius:9px!important;
+ background:var(--bw-raised)!important;color:var(--bw-fg)!important;
+ border:1px solid var(--bw-edge)!important;padding:8px 10px!important;font-size:11px!important
+}
+html[data-buildit-ui="v2"] #filterPanel,
+html[data-buildit-ui="v2"] #logPanel,
+html[data-buildit-ui="v2"] #biPanel,
+html[data-buildit-ui="v2"] #toolHubPanel,
+html[data-buildit-ui="v2"] #biServerProfilePanel{
+ position:fixed!important;z-index:1210!important;
+ top:calc(var(--bw-header) + 16px)!important;bottom:16px!important;
+ left:auto!important;right:16px!important;
+ width:min(760px,calc(100vw - var(--bw-rail) - 32px))!important;
+ height:auto!important;max-height:none!important;min-width:0!important;
+ overflow-y:auto!important;box-sizing:border-box!important;
+ border:1px solid var(--bw-edge)!important;border-radius:17px!important;
+ padding:22px!important;background:var(--bw-surface)!important;color:var(--bw-fg)!important;
+ box-shadow:0 18px 80px rgba(0,0,0,.44)!important;
+ scrollbar-gutter:stable
+}
+html[data-buildit-ui="v2"] #filterPanel{width:min(480px,calc(100vw - var(--bw-rail) - 32px))!important}
+html[data-buildit-ui="v2"] #biServerProfilePanel{width:min(470px,calc(100vw - var(--bw-rail) - 32px))!important}
+html[data-buildit-ui="v2"] #toolHubPanel{width:min(850px,calc(100vw - var(--bw-rail) - 32px))!important}
+html[data-buildit-ui="v2"] #filterPanel.hidden,
+html[data-buildit-ui="v2"] #logPanel.hidden,
+html[data-buildit-ui="v2"] #biPanel[hidden],
+html[data-buildit-ui="v2"] #toolHubPanel[hidden],
+html[data-buildit-ui="v2"] #biServerProfilePanel[hidden]{display:none!important}
+html[data-buildit-ui="v2"] #toolHubPanel .st-summary{display:none!important}
+html[data-buildit-ui="v2"] #toolHubPanel .st-card small{display:none!important}
+html[data-buildit-ui="v2"] #toolHubPanel .st-header strong{font-size:21px;letter-spacing:-.035em}
+html[data-buildit-ui="v2"] #toolHubPanel .st-header small{color:var(--bw-muted);font-size:11px}
+html[data-buildit-ui="v2"] #toolHubPanel .st-toolbar{margin:18px 0}
+html[data-buildit-ui="v2"] #toolHubPanel .st-cards{gap:11px}
+html[data-buildit-ui="v2"] #toolHubPanel .st-card{
+ padding:16px!important;border-radius:13px!important;
+ background:var(--bw-raised)!important;border:1px solid var(--bw-edge)!important
+}
+html[data-buildit-ui="v2"] #toolHubPanel .st-card strong{font-size:13px;letter-spacing:-.01em}
+html[data-buildit-ui="v2"] #toolHubPanel .st-card button{margin-top:10px}
+html[data-buildit-ui="v2"] #toolHubPanel input,
+html[data-buildit-ui="v2"] #toolHubPanel select,
+html[data-buildit-ui="v2"] #toolHubPanel textarea{
+ background:var(--bw-raised)!important;color:var(--bw-fg)!important;
+ border:1px solid var(--bw-edge)!important;border-radius:9px!important
+}
+html[data-buildit-ui="v2"] #toolHubPanel .st-workspace{padding-top:10px}
+html[data-buildit-ui="v2"] #toolHubPanel .st-result{
+ background:var(--bw-raised)!important;border-radius:11px;
+ white-space:pre-wrap;overflow-wrap:anywhere
+}
+html[data-buildit-ui="v2"] #logPanel .log-head-note,
+html[data-buildit-ui="v2"] #logPanel .log-filter-hint{display:none!important}
+html[data-buildit-ui="v2"] #logPanel .log-overview{margin-bottom:14px!important}
+html[data-buildit-ui="v2"] #logPanel #logActivity{max-height:45vh!important}
+html[data-buildit-ui="v2"] #logPanel #fileManager{border-radius:12px!important}
+html[data-buildit-ui="v2"] #biPanel .biHeader h3{font-size:20px!important}
+html[data-buildit-ui="v2"] #biPanel .biSection{border-radius:12px!important}
+html[data-buildit-ui="v2"] #coords{
+ left:calc(50% + var(--bw-rail)/2)!important;bottom:14px!important;
+ font-size:11px!important;padding:8px 12px!important
+}
+html[data-buildit-ui="v2"] #status{
+ left:calc(50% + var(--bw-rail)/2)!important;top:calc(var(--bw-header) + 15px)!important;
+ transform:translateX(-50%)!important
+}
+html[data-buildit-ui="v2"] .leaflet-top.leaflet-left{
+ top:calc(var(--bw-header) + 12px)!important;left:calc(var(--bw-rail) + 10px)!important
+}
+html[data-buildit-ui="v2"] #biCommandDialog{
+ position:fixed;inset:0;z-index:1600;display:grid;place-items:start center;
+ padding:clamp(90px,17vh,150px) 14px 20px;box-sizing:border-box;
+ background:rgba(2,10,16,.72);backdrop-filter:blur(8px)
+}
+html[data-buildit-ui="v2"] #biCommandDialog[hidden]{display:none!important}
+#biCommandDialog .bw-palette{
+ width:min(600px,100%);max-height:min(70vh,660px);overflow:hidden;
+ display:flex;flex-direction:column;border:1px solid var(--bw-edge);border-radius:17px;
+ color:var(--bw-fg);background:var(--bw-surface);box-shadow:0 28px 100px rgba(0,0,0,.55)
+}
+#biCommandDialog .bw-palette-head{display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--bw-edge)}
+#biCommandDialog .bw-palette-head input{
+ flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--bw-fg);
+ font-size:15px;font-weight:600;padding:8px
+}
+#biCommandDialog .bw-palette-head button{
+ border:1px solid var(--bw-edge);border-radius:7px;background:var(--bw-raised);
+ color:var(--bw-muted);font-size:11px;padding:5px 9px;cursor:pointer
+}
+#biCommandDialog .bw-palette-list{overflow-y:auto;padding:9px}
+#biCommandDialog .bw-palette-item{
+ display:flex;width:100%;align-items:center;justify-content:space-between;
+ gap:12px;padding:12px;border:0;border-radius:9px;color:var(--bw-fg);
+ background:transparent;cursor:pointer;text-align:left
+}
+#biCommandDialog .bw-palette-item:hover,
+#biCommandDialog .bw-palette-item[aria-selected="true"]{background:var(--bw-raised)}
+#biCommandDialog .bw-palette-item small{color:var(--bw-muted);font-size:10px}
+#biCommandDialog .bw-empty{padding:18px;color:var(--bw-muted);font-size:12px}
+html[data-buildit-ui="v2"] #biWorkspaceRail button:focus-visible,
+html[data-buildit-ui="v2"] #biWorkspaceHeader button:focus-visible{outline:2px solid var(--bw-accent)!important;outline-offset:2px}
+html[data-buildit-map-picking="true"][data-buildit-ui="v2"] #biWorkspaceRail{display:none}
+html[data-buildit-map-picking="true"][data-buildit-ui="v2"] #biWorkspaceHeader{opacity:.55;pointer-events:none}
+html[data-buildit-map-picking="true"][data-buildit-ui="v2"] #builditMapPickToolbar{z-index:1500!important}
+@media(max-width:1000px){
+ html[data-buildit-ui="v2"]{--bw-rail:72px}
+ #biWorkspaceRail .bw-nav{justify-content:center;padding:10px}
+ #biWorkspaceRail .bw-nav span,#biWorkspaceRail .bw-section,#biWorkspaceRail .bw-hint{display:none}
+ #biWorkspaceHeader .bw-brand{min-width:auto}
+ #biWorkspaceHeader .bw-title span{max-width:180px}
+}
+@media(max-width:690px){
+ html[data-buildit-ui="v2"]{--bw-rail:56px;--bw-header:60px}
+ html[data-buildit-ui="v2"] #biWorkspaceHeader{gap:8px;padding:0 9px}
+ #biWorkspaceHeader .bw-brand{gap:5px;font-size:12px}
+ #biWorkspaceHeader .bw-logo{width:31px;height:31px}
+ #biWorkspaceHeader .bw-brand small,#biWorkspaceHeader .bw-title{display:none}
+ #biWorkspaceHeader .bw-icon-button{padding:8px;min-width:36px}
+ #biWorkspaceHeader .bw-icon-button .bw-label{display:none}
+ html[data-buildit-ui="v2"] #placeSearchBox{width:min(35vw,180px)!important;flex:0 1 180px}
+ html[data-buildit-ui="v2"] #biServerProfileSelect{width:100px!important}
+ html[data-buildit-ui="v2"] #biServerProfileManage{display:none!important}
+ html[data-buildit-ui="v2"] #filterPanel,
+ html[data-buildit-ui="v2"] #logPanel,
+ html[data-buildit-ui="v2"] #biPanel,
+ html[data-buildit-ui="v2"] #toolHubPanel,
+ html[data-buildit-ui="v2"] #biServerProfilePanel{
+  top:calc(var(--bw-header) + 5px)!important;right:5px!important;bottom:5px!important;
+  width:calc(100vw - var(--bw-rail) - 10px)!important;padding:14px!important;border-radius:12px!important
+ }
+ #biWorkspaceRail{padding:9px 5px}
+ #biWorkspaceRail .bw-nav{min-height:45px;padding:9px 4px}
+ html[data-buildit-ui="v2"] .leaflet-top.leaflet-left{left:calc(var(--bw-rail) + 3px)!important}
+}
+@media(max-width:420px){
+ html[data-buildit-ui="v2"] #placeSearchBox{width:130px!important;flex:0 1 130px}
+ html[data-buildit-ui="v2"] #biServerProfileSelect{width:87px!important}
+ #biWorkspaceHeader .bw-brand .bw-name{display:none}
+}
+@media(prefers-reduced-motion:reduce){#biWorkspaceRail .bw-nav{transition:none}}
