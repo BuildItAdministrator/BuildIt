@@ -36,6 +36,16 @@ root.innerHTML=`
  <button id="qsAdvanced" type="button">Advanced Event Manager</button>
 `;
 document.body.appendChild(root);
+if(window.BUILD_IT_STAGE4_BOOT){
+  // OAuth mode: keep a hidden internal field for compatibility but never
+  // present the obsolete one-time Cloudflare key setup to customers.
+  const legacySettings=root.querySelector('.qs-settings');
+  const legacyInput=legacySettings?.querySelector('#qsWriteKey');
+  if(legacySettings&&legacyInput){
+    legacyInput.type='hidden';
+    legacySettings.replaceWith(legacyInput);
+  }
+}
 const $=id=>root.querySelector('#'+id);
 let mode='vehicle',chosen='',coordinates=null,picking=false,busy=false,pin=null;
 function setStatus(message,err=false){$('qsStatus').textContent=message;$('qsStatus').dataset.error=err?'true':'false';}
@@ -146,8 +156,11 @@ $('qsPublish').addEventListener('click',async()=>{
   const existing=document.getElementById('nitradoWriteKey');
   if(manualKey.length>=8&&existing)existing.value=manualKey;
   if(!existing||existing.value.trim().length<8){
-    root.querySelector('.qs-settings').open=true;
-    setStatus('Enter your MAP_WRITE_KEY in One-time connection setup, or in Logs → Server files & uploads.',true);
+    const legacySettings=root.querySelector('.qs-settings');
+    if(legacySettings)legacySettings.open=true;
+    setStatus(window.BUILD_IT_STAGE4_BOOT
+      ? 'De beveiligde Nitrado-verbinding is niet gereed. Vernieuw de pagina.'
+      : 'Enter your MAP_WRITE_KEY in One-time connection setup, or in Logs → Server files & uploads.',true);
     return;
   }
   // The only confirmation in the workflow. No file export or queue step.
