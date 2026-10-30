@@ -35,6 +35,8 @@ test('workspace navigation opens core panels without server writes', async ({ pa
 test('tool finder filters registered tools and supports keyboard navigation', async ({ page }) => {
   await page.locator('.bw-nav[data-view="tools"]').click();
   await expect(page.locator('#stCards .st-card')).not.toHaveCount(0);
+  await page.locator('#stCategory').selectOption({ label: 'Config & gameplay' });
+  await expect(page.locator('#stCards')).not.toContainText('Horde Generator');
   await page.keyboard.press('ControlOrMeta+k');
   await expect(page.locator('#biCommandDialog')).toBeVisible();
   await page.locator('#bwCommandInput').fill('Horde Generator');
@@ -69,7 +71,7 @@ test('server doctor is read only when no server is connected', async ({ page }) 
   await page.locator('.bw-nav[data-view="doctor"]').click();
   await expect(page.locator('#bwDoctorPanel')).toBeVisible();
   await page.locator('#bwDoctorRun').click();
-  await expect(page.locator('#bwDoctorState')).not.toHaveText(/reading mission file listing/i);
+  await expect(page.locator('#bwDoctorState')).toContainText(/scan stopped|connection is unavailable|scan complete/i);
   expect(writeAttempt).toBe(false);
 });
 
