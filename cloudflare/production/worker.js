@@ -276,13 +276,14 @@ async function gumroadRedeem(req,env){
   if(existing&&existing.user_id!==r.user.id)return redirect('/account?license=already_used');
   const encrypted=await gumroadEncrypt(env,r.user.id,key);
   try{
-    await env.DB.prepare(
+    const saved=await env.DB.prepare(
       'INSERT INTO gumroad_memberships(sale_id,user_id,product_id,subscription_id,key_hash,encrypted_license,active,ends_at,checked_at,status,created_at) '+
       'VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(sale_id) DO UPDATE SET '+
       'active=excluded.active,ends_at=excluded.ends_at,checked_at=excluded.checked_at,status=excluded.status, key_hash=excluded.key_hash, '+
       'encrypted_license=excluded.encrypted_license WHERE user_id=excluded.user_id')
       .bind(verified.saleId,r.user.id,verified.productId,verified.subscriptionId,hash,encrypted,
         1,verified.endsAt,stamp,verified.status,stamp).run();
+    if(Number(saved.meta?.changes||0)!==1)return redirect('/account?license=already_used');
   }catch(e){
     if(/UNIQUE|constraint/i.test(String(e.message)))return redirect('/account?license=already_used');
     throw e;
