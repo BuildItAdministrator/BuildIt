@@ -276,7 +276,7 @@
   async function reload({manual=false}={}){
     if(busy)return;
     if(!hasConnection()){
-      display('Saved base preview. Enter the Worker URL and Map Access Key in Logs → Automatic Nitrado Sync.',manual);
+      display(window.BUILD_IT_STAGE4_BOOT?'Geen actieve Nitrado-verbinding. Controleer de koppeling op je accountpagina.':'Saved base preview. Enter the Worker URL and Map Access Key in Logs → Automatic Nitrado Sync.',manual);
       return;
     }
     busy=true;button.disabled=true;
