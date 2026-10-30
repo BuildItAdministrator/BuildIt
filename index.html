@@ -1302,7 +1302,12 @@ window.BUILD_IT_NITRADO_ADMIN=Object.freeze({
     nitradoServer.dataset.savedId=profile.serverId||'';
     nitradoAutoSync.checked=profile.autoSync!==false;
     const writeField=document.getElementById('nitradoWriteKey');
-    if(writeField){writeField.value='';writeField.dispatchEvent(new Event('input',{bubbles:true}));}
+    if(writeField){
+      // OAuth test uses a server-authenticated session, not a manually entered key.
+      // Keep its compatibility field during automatic profile initialization.
+      if(!window.BUILD_IT_STAGE4_BOOT) writeField.value='';
+      writeField.dispatchEvent(new Event('input',{bubbles:true}));
+    }
     resetLogDataOnly();
     renderLogSummary();renderLogPlayers();renderLogMap();renderLogActivity();
     setNitradoStatus('Verifying the selected server…');
