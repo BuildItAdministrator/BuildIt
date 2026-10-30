@@ -216,7 +216,7 @@ document.addEventListener('keydown',e=>{
  const typing=e.target?.matches?.('input,textarea,select,[contenteditable="true"]');
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();}
  else if(e.key==='/'&&!typing&&!paletteOpen&&!e.ctrlKey&&!e.metaKey){e.preventDefault();openPalette();}
- else if(e.key==='Escape'&&paletteOpen){e.preventDefault();closePalette();}
+ else if(e.key==='Escape'&&paletteOpen){e.preventDefault();e.stopImmediatePropagation();closePalette();}
 },true);
 $('bwFocusMap').addEventListener('click',()=>{
  if(gated()||window.BUILD_IT_UI_VISIBILITY?.isPicking?.())return;
