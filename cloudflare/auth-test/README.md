@@ -19,9 +19,8 @@ and not **buildit-nitrado-logs**.
 5. In Cloudflare build settings for the existing `buildit-auth-test` Worker:
    - Production branch: `auth-test-deploy`
    - Build command: *(empty)*
-   - Deploy command:
-     `npx wrangler deploy --config cloudflare/auth-test/wrangler.jsonc`
-   - Keep **Disable builds ON** until the above checks pass.
+   - Deploy command: `npx wrangler deploy` (uses the root `wrangler.jsonc` on this isolated branch).
+   - Turn **Disable builds OFF** once the build settings and D1 binding are verified.
 6. After updating settings, enable builds and trigger a test deployment
    by pushing a new commit to this branch.
 7. Test Discord login, subscription status, Nitrado account connection,
@@ -29,3 +28,11 @@ and not **buildit-nitrado-logs**.
 
 The Worker contains the Stage 4 test implementation. It has **not** yet been
 validated end to end against live Cloudflare and Nitrado services.
+
+## First connected Git build
+
+- Branch: `auth-test-deploy` (NOT `main`).
+- Deploy target: `buildit-auth-test`.
+- Staging D1 database ID is configured in the branch-root `wrangler.jsonc`.
+- First build was triggered by this documentation-only change; runtime code was unchanged.
+- The Cloudflare build result must be checked in the Cloudflare dashboard.
