@@ -4,7 +4,7 @@ on:
   push:
     branches: [launch-prep]
   pull_request:
-    branches: [main]
+    branches: [main, launch-prep]
 
 permissions:
   contents: read
@@ -22,4 +22,5 @@ jobs:
       - name: Check production Worker syntax
         run: node --check cloudflare/production/worker.js
       - name: Check regression tests
-        run: node --test cloudflare/production/security.test.cjs
+        run: node --test cloudflare/production/*.test.cjs
+

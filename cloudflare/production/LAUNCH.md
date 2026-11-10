@@ -1,3 +1,5 @@
+> Patreon integration is available as an opt-in billing provider. For Patreon setup, use [PATREON_SETUP.md](PATREON_SETUP.md); the Gumroad checklist below applies only when BILLING_PROVIDER=gumroad. Nothing has been deployed.
+
 # Build It!++ — Gumroad Membership launch checklist
 
 **Status:** code is implemented on GitHub branch `launch-prep`, **NOT DEPLOYED**.
@@ -96,3 +98,4 @@ CI: `node --test cloudflare/production/security.test.cjs`
   network errors deny new verification access.
 - For privacy, no Gumroad buyer email is stored or logged by the entitlement
   Worker; the seller keeps financial obligations through Gumroad.
+

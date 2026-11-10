@@ -95,7 +95,7 @@ test('server write requires same-origin browser context',()=>{
   assert.throws(()=>api.stage4GuardWrite(req(null,null)),/Cross-site/);
 });
 test('all production tool accesses enforce user selection and Gumroad status',()=>{
-  assert.match(source,/const sub=await gumroadMembership\(env,user\)/);
+  assert.match(source,/const sub=await membership\(env,user\)/);
   assert.match(source,/async function selectedContext\(/);
   assert.match(source,/services\.some\(s=>s\.id===selected\)/);
   assert.match(source,/query!==selected/);
@@ -103,3 +103,4 @@ test('all production tool accesses enforce user selection and Gumroad status',()
   assert.doesNotMatch(source,/if\(p==='\/api\/stripe\/webhook'\)/);
   assert.match(source,/if\(p==='\/api\/gumroad\/redeem'\)/);
 });
+

@@ -1,5 +1,5 @@
 /**
- * Build It!++ — PRODUCTION: Discord + Gumroad Membership + personal Nitrado OAuth.
+ * Build It!++ — PRODUCTION: Discord + Patreon / Gumroad Membership + personal Nitrado OAuth.
  * Production build: ONLY deploy to buildit-app. Never to buildit-auth-test or buildit-nitrado-logs.
  * D1 binding: DB
  * Discord: DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_REDIRECT_URI
@@ -291,10 +291,147 @@ async function gumroadRedeem(req,env){
   return redirect('/account?license=activated');
 }
 
+// Patreon API v2. Tokens stay server-side; membership is revalidated at most every 5 minutes.
+const PATREON_TTL=300;
+function billingProvider(env){
+  const provider=String(env.BILLING_PROVIDER||'gumroad');
+  if(!['gumroad','patreon'].includes(provider))throw Error('Invalid BILLING_PROVIDER');
+  return provider;
+}
+function patreonSettings(env){
+  const campaign=String(env.PATREON_CAMPAIGN_ID||'');
+  const tiers=String(env.PATREON_TIER_IDS||'').split(',').map(s=>s.trim()).filter(Boolean);
+  if(!/^\d+$/.test(campaign)||!tiers.length||tiers.some(t=>!/^\d+$/.test(t)))throw Error('Configure Patreon campaign and paid tier IDs');
+  return {campaign,tiers,policy:campaign+':'+[...new Set(tiers)].sort().join(',')};
+}
+function patreonCallbackUrl(req,env){
+  patreonSettings(env);
+  if(!env.PATREON_CLIENT_ID||!env.PATREON_CLIENT_SECRET)throw Error('Configure Patreon OAuth client');
+  const u=new URL(String(env.PATREON_REDIRECT_URI||''));
+  if(u.protocol!=='https:'||u.origin!==new URL(req.url).origin||u.pathname!=='/api/patreon/callback'||u.search||u.hash)throw Error('Invalid Patreon callback URL');
+  return u.toString();
+}
+function patreonState(payload,env){
+  const {campaign,tiers}=patreonSettings(env);
+  if(payload?.data?.type!=='user'||!/^\d+$/.test(String(payload.data.id)))throw Error('Invalid Patreon identity');
+  const memberships=payload.data.relationships?.memberships?.data;
+  if(!Array.isArray(memberships))throw Error('Missing Patreon membership relationship');
+  const ids=new Set(memberships.filter(m=>m.type==='member').map(m=>m.id));
+  const members=(payload.included||[]).filter(m=>m.type==='member'&&ids.has(m.id)&&m.relationships?.campaign?.data?.id===campaign);
+  const active=members.some(m=>{
+    const a=m.attributes||{},entitled=m.relationships?.currently_entitled_tiers?.data;
+    // Entitled tiers preserve access after cancellation until Patreon removes entitlement.
+    // Trials/gifts with no successful charge are intentionally not enabled in this first version.
+    return ['active_patron','former_patron'].includes(a.patron_status)&&a.last_charge_status==='Paid'&&
+      Number(a.currently_entitled_amount_cents)>0&&Array.isArray(entitled)&&
+      entitled.some(t=>t.type==='tier'&&tiers.includes(t.id));
+  });
+  return {patreonUserId:String(payload.data.id),active,status:active?'active':'not_entitled'};
+}
+async function patreonRequest(url,options={}){
+  const response=await fetch(url,{...options,headers:{'User-Agent':'BuildItPlus - Membership',...options.headers},signal:AbortSignal.timeout(15000),redirect:'error'});
+  if(!response.ok)throw Error('Patreon verification unavailable');
+  return response.json();
+}
+async function patreonToken(env,params){
+  const t=await patreonRequest('https://www.patreon.com/api/oauth2/token',{
+    method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({...params,client_id:env.PATREON_CLIENT_ID,client_secret:env.PATREON_CLIENT_SECRET})
+  });
+  if(!t.access_token||!Number.isFinite(Number(t.expires_in))||Number(t.expires_in)<=0)throw Error('Invalid Patreon token response');
+  return t;
+}
+async function patreonIdentity(token,env){
+  const u=new URL('https://www.patreon.com/api/oauth2/v2/identity');
+  u.searchParams.set('include','memberships,memberships.campaign,memberships.currently_entitled_tiers');
+  u.searchParams.set('fields[member]','patron_status,last_charge_status,currently_entitled_amount_cents');
+  return patreonState(await patreonRequest(u.toString(),{headers:{Authorization:'Bearer '+token}}),env);
+}
+async function patreonBegin(req,env){
+  const r=await requireForm(req,env);if(r.error)return r.error;
+  const callback=patreonCallbackUrl(req,env),state=random();
+  await env.DB.prepare('DELETE FROM patreon_oauth_states WHERE expires_at<=? OR user_id=?').bind(now(),r.user.id).run();
+  await env.DB.prepare('INSERT INTO patreon_oauth_states(state_hash,user_id,session_hash,expires_at) VALUES(?,?,?,?)')
+    .bind(await sha(state),r.user.id,await sha(cookieRead(req,SESSION)),now()+OAUTH_TTL).run();
+  const u=new URL('https://www.patreon.com/oauth2/authorize');
+  for(const [k,v] of Object.entries({response_type:'code',client_id:env.PATREON_CLIENT_ID,redirect_uri:callback,scope:'identity identity.memberships',state}))u.searchParams.set(k,v);
+  return redirect(u.toString());
+}
+async function patreonCallback(req,env,url){
+  const user=await currentUser(req,env);if(!user)return reply({error:'Discord login required'},401);
+  const callback=patreonCallbackUrl(req,env),state=url.searchParams.get('state')||'';
+  if(!/^[\w-]{43}$/.test(state))return reply({error:'Invalid Patreon authorization'},400);
+  const consumed=await env.DB.prepare('DELETE FROM patreon_oauth_states WHERE state_hash=? AND user_id=? AND session_hash=? AND expires_at>?')
+    .bind(await sha(state),user.id,await sha(cookieRead(req,SESSION)),now()).run();
+  if(consumed.meta.changes!==1)return reply({error:'Patreon authorization expired or belongs to another session'},403);
+  if(url.searchParams.has('error'))return redirect('/account?patreon=cancelled');
+  const code=url.searchParams.get('code');
+  if(!code||code.length>2048)return reply({error:'Missing Patreon authorization code'},400);
+  const token=await patreonToken(env,{grant_type:'authorization_code',code,redirect_uri:callback});
+  const stateResult=await patreonIdentity(token.access_token,env);
+  const bound=await env.DB.prepare('SELECT user_id FROM patreon_connections WHERE patreon_user_id=?').bind(stateResult.patreonUserId).first();
+  if(bound&&bound.user_id!==user.id)return reply({error:'This Patreon account is already linked to another Discord account'},409);
+  // UNIQUE(patreon_user_id) also enforces ownership under concurrent callbacks.
+  const access=await seal(env,'patreon:'+user.id,token.access_token),refresh=await seal(env,'patreon:'+user.id,token.refresh_token||'');
+  try{
+    await env.DB.prepare(`INSERT INTO patreon_connections(user_id,patreon_user_id,access_encrypted,refresh_encrypted,expires_at,active,status,checked_at,policy_key,refresh_lock_until)
+      VALUES(?,?,?,?,?,?,?,?,?,0) ON CONFLICT(user_id) DO UPDATE SET patreon_user_id=excluded.patreon_user_id,
+      access_encrypted=excluded.access_encrypted,refresh_encrypted=excluded.refresh_encrypted,expires_at=excluded.expires_at,
+      active=excluded.active,status=excluded.status,checked_at=excluded.checked_at,policy_key=excluded.policy_key,refresh_lock_until=0`)
+      .bind(user.id,stateResult.patreonUserId,access,refresh,now()+Number(token.expires_in),stateResult.active?1:0,stateResult.status,now(),patreonSettings(env).policy).run();
+  }catch(e){if(/UNIQUE constraint/i.test(e.message))return reply({error:'Patreon account already linked'},409);throw e;}
+  return redirect('/account?patreon=connected');
+}
+async function patreonMembership(env,user){
+  const inactive=status=>({...gumroadInactive(status),provider:'patreon'});
+  const settings=patreonSettings(env);
+  const row=await env.DB.prepare('SELECT * FROM patreon_connections WHERE user_id=?').bind(user.id).first();
+  if(!row)return inactive('not_connected');
+  const result=(active,status)=>({...inactive(status),active,connected:true});
+  if(row.policy_key===settings.policy&&row.checked_at>now()-PATREON_TTL&&row.checked_at<=now()&&row.expires_at>now())return result(row.active===1,row.status);
+  try{
+    let access=await unseal(env,'patreon:'+user.id,row.access_encrypted);
+    if(row.expires_at<=now()+60){
+      if(!row.refresh_encrypted)return result(false,'reconnect_required');
+      const lock=now()+30;
+      const claim=await env.DB.prepare('UPDATE patreon_connections SET refresh_lock_until=? WHERE user_id=? AND refresh_lock_until<=? AND access_encrypted=?')
+        .bind(lock,user.id,now(),row.access_encrypted).run();
+      if(claim.meta.changes!==1)return result(false,'verification_in_progress');
+      try{
+        const t=await patreonToken(env,{grant_type:'refresh_token',refresh_token:await unseal(env,'patreon:'+user.id,row.refresh_encrypted)});
+        access=t.access_token;
+        const saved=await env.DB.prepare('UPDATE patreon_connections SET access_encrypted=?,refresh_encrypted=?,expires_at=? WHERE user_id=? AND access_encrypted=? AND refresh_lock_until=?')
+          .bind(await seal(env,'patreon:'+user.id,access),await seal(env,'patreon:'+user.id,t.refresh_token||await unseal(env,'patreon:'+user.id,row.refresh_encrypted)),now()+Number(t.expires_in),user.id,row.access_encrypted,lock).run();
+        if(saved.meta.changes!==1)return result(false,'reconnect_required');
+      }finally{
+        await env.DB.prepare('UPDATE patreon_connections SET refresh_lock_until=0 WHERE user_id=? AND refresh_lock_until=?').bind(user.id,lock).run();
+      }
+    }
+    const checked=await patreonIdentity(access,env);
+    const active=checked.patreonUserId===row.patreon_user_id&&checked.active;
+    const saved=await env.DB.prepare('UPDATE patreon_connections SET active=?,status=?,checked_at=?,policy_key=? WHERE user_id=? AND patreon_user_id=?')
+      .bind(active?1:0,active?'active':'not_entitled',now(),settings.policy,user.id,row.patreon_user_id).run();
+    return result(saved.meta.changes===1&&active,active?'active':'not_entitled');
+  }catch(e){return result(false,'verification_unavailable');}
+}
+async function membership(env,user){
+  if(!user)return gumroadInactive();
+  if(user.role==='admin')return {status:'admin',active:true,admin:true};
+  return billingProvider(env)==='patreon'?patreonMembership(env,user):gumroadMembership(env,user);
+}
+function patreonOffer(env,form,billing){
+  let href='';
+  try{const u=new URL(env.PATREON_PAGE_URL);if(u.protocol==='https:'&&['patreon.com','www.patreon.com'].includes(u.hostname)&&!u.username&&!u.password)href=u.toString();}catch{}
+  return '<h2>Build It!++ Premium</h2><p>Join the Build It!++ membership on Patreon, then connect your account.</p>'+
+    (href?'<p><a class="button" href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">Membership on Patreon</a></p>':'')+
+    form('/api/patreon/connect',billing.connected?'Reconnect Patreon':'Connect Patreon')+
+    '<p class="note">Manage payments and cancellation on Patreon. Access follows your eligible paid tier. Your Nitrado server is purchased separately.</p>';
+}
+
 async function requirePremium(req,env){
   const user=await currentUser(req,env);if(!user)return {error:reply({error:'Discord login required'},401)};
-  const sub=await gumroadMembership(env,user);
-  if(!sub.active)return {error:reply({error:'An active Gumroad Build It!++ Premium Membership is required'},403)};
+  const sub=await membership(env,user);
+  if(!sub.active)return {error:reply({error:'An active Build It!++ Premium membership is required'},403)};
   return {user,sub};
 }
 async function nitradoBegin(req,env){
@@ -337,7 +474,7 @@ async function nitradoList(req,env){
 }
 async function nitradoSelect(req,env){
   const r=await requireForm(req,env);if(r.error)return r.error;
-  if(!(await gumroadMembership(env,r.user)).active)return reply({error:'Active Gumroad Premium Membership required'},403);
+  if(!(await membership(env,r.user)).active)return reply({error:'Active Premium membership required'},403);
   const id=String(r.form.get('service_id')||'');
   if(!/^\d{1,20}$/.test(id))return reply({error:'Invalid server ID'},400);
   const services=await linkedServices(env,r.user);
@@ -353,7 +490,7 @@ async function nitradoDisconnect(req,env){
 }
 async function account(req,env,url){
   const user=await currentUser(req,env),token=user?await csrf(req):'';
-  const billing=await gumroadMembership(env,user),conn=user?await connectionRow(env,user):null;
+  const billing=await membership(env,user),conn=user?await connectionRow(env,user):null;
   const form=(action,label,extra='')=>`<form method="POST" action="${action}"><input type="hidden" name="csrf" value="${esc(token)}">${extra}<button>${esc(label)}</button></form>`;
   let serverHtml='';
   if(user&&billing.active&&conn){
@@ -369,22 +506,25 @@ async function account(req,env,url){
     '<p>Already purchased? Enter the license key from your Gumroad receipt.</p>'+
     form('/api/gumroad/redeem','Activate Gumroad Membership','<label>Gumroad license key <input name="license_key" type="text" autocomplete="off" spellcheck="false" required minlength="12" maxlength="180" placeholder="License key from receipt"></label>')+
     '<p class="note">Cancel or change recurring payments using Subscription settings on your Gumroad receipt or in your Gumroad Library. Access continues until the membership end date.</p>';
+  const patreonNotice={connected:'Patreon account connected. Your membership status is shown below.',cancelled:'Patreon connection cancelled.'}[url.searchParams.get('patreon')]||'';
   const licenseStatus=url.searchParams.get('license');
   const licenseNotice=licenseStatus==='activated'?'Gumroad Membership successfully activated.':licenseStatus==='invalid'?'License invalid, expired or revoked.':licenseStatus==='already_used'?'License is already linked to another Discord account.':'';
+  const banner=url.searchParams.get('nitrado');
   const notice=banner==='connected'?'Nitrado account connected and permission verified.':banner==='selected'?'Server selected.':banner==='disconnected'?'Nitrado connection removed from Build It!++.':banner==='cancel'?'Nitrado authorization cancelled.':'';
   const content=!user?'<p>Sign in to connect your own DayZ server.</p><a class="button" href="/api/auth/discord">Continue with Discord</a>':`
     <p>Signed in as <strong>${esc(user.username)}</strong></p>
-    <p>Gumroad Membership: <strong>${esc(billing.status)}</strong> · Premium: <strong>${billing.active?'ACTIVE':'INACTIVE'}</strong></p>
+    <p>Membership: <strong>${esc(billing.status)}</strong> · Premium: <strong>${billing.active?'ACTIVE':'INACTIVE'}</strong></p>
     ${billing.periodEnd?`<p class="note">Paid until: ${esc(new Date(billing.periodEnd*1000).toLocaleDateString('nl-NL'))}</p>`:''}
     ${notice?`<p class="notice">${esc(notice)}</p>`:''}
+    ${patreonNotice?`<p class="notice">${esc(patreonNotice)}</p>`:''}
     ${licenseNotice?`<p class="notice">${esc(licenseNotice)}</p>`:''}
-    ${!billing.admin?gumroadOffer:''}
+    ${!billing.admin?(billingProvider(env)==='patreon'?patreonOffer(env,form,billing):gumroadOffer):''}
     ${billing.active?`<h2>Connect your Nitrado server</h2>${conn?`<p class="green">Nitrado connected</p>${serverHtml}${form('/api/nitrado/disconnect','Disconnect Nitrado')}`:'<p>Authorize Build It!++ to see the Nitrado services available to your account.</p><a class="button" href="/api/nitrado/connect">Connect Nitrado</a>'}`:'<p class="note">Activate Premium before connecting Nitrado.</p>'}
     <hr>
     ${user&&conn?'<p class="note">Your tokens are encrypted in D1. The existing production Nitrado Worker is unaffected.</p>':''}
-    <p class="note">Membership payments, cancellations and payment method changes are managed in your Gumroad account.</p>
+    <p class="note">Membership payments and cancellation are managed with your billing provider.</p>
     ${form('/api/auth/logout','Sign out')}
-    <p class="note">Recurring billing is handled by Gumroad. Premium grants access to Build It!++ tools, not a Nitrado server.</p>`;
+    <p class="note">Premium grants access to Build It!++ tools, not a Nitrado server.</p>`;
   const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Build It!++ — Account</title><style>
     :root{color-scheme:dark}*{box-sizing:border-box}body{font:16px system-ui,sans-serif;background:#101c23;color:#edf6fa;display:grid;place-items:center;min-height:100vh;margin:0;padding:25px}
     main{background:#19303a;border:1px solid #395663;border-radius:18px;width:min(96vw,590px);padding:32px}h1{margin:0}h2{margin-top:26px}p{line-height:1.5}.note,small{font-size:13px;color:#b0c9d4}.green{color:#8edbb3}
@@ -392,7 +532,7 @@ async function account(req,env,url){
     .notice,.server{border:1px solid #47616a;background:#213940;border-radius:10px;padding:13px;margin-top:12px}.server small{display:block;margin:6px 0}hr{border:0;border-top:1px solid #47616a;margin:23px 0}
     </style></head><body><main><h1>Build It!++</h1><p class="note">Build It!++ — Account & Billing</p>${content}</main></body></html>`;
   return new Response(html,{headers:headers({'Content-Type':'text/html; charset=utf-8',
-    'Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"})});
+    'Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://www.patreon.com; base-uri 'none'; frame-ancestors 'none'"})});
 }
 
 /**
@@ -1735,7 +1875,7 @@ async function stage4Static(req,env,url){
   if(p==='/stage4-bridge.js')return new Response(STAGE4_BRIDGE,{headers:headers({'Content-Type':'application/javascript; charset=utf-8'})});
   if(!STAGE4_STATIC.test(p)||/^\/(?:cloudflare|\.github|tests?|node_modules)\//i.test(p))return reply({error:'Not found'},404);
   const u=await currentUser(req,env);
-  if(!u||!(await gumroadMembership(env,u)).active)return reply({error:'Gumroad Membership required'},403);
+  if(!u||!(await membership(env,u)).active)return reply({error:'Premium membership required'},403);
   // No redirects or untrusted origin can be requested. No client cookies are sent upstream.
   if(!env.ASSETS)return reply({error:'Website assets binding not configured'},502);
   const response=await env.ASSETS.fetch(new URL(p,req.url));
@@ -1752,6 +1892,13 @@ export default {
       if(p==='/api/auth/discord')return req.method==='GET'?await discordBegin(req,env):reply({error:'Method not allowed'},405);
       if(p==='/api/auth/callback')return req.method==='GET'?await discordCallback(req,env,url):reply({error:'Method not allowed'},405);
       if(p==='/api/auth/logout')return req.method==='POST'?await logout(req,env):reply({error:'Method not allowed'},405);
+      if(p.startsWith('/api/patreon/')){
+        if(billingProvider(env)!=='patreon')return reply({error:'Patreon is not enabled'},404);
+        if(p==='/api/patreon/connect')return req.method==='POST'?await patreonBegin(req,env):reply({error:'Method not allowed'},405);
+        if(p==='/api/patreon/callback')return req.method==='GET'?await patreonCallback(req,env,url):reply({error:'Method not allowed'},405);
+        return reply({error:'Not found'},404);
+      }
+      if(p==='/api/gumroad/redeem'&&billingProvider(env)!=='gumroad')return reply({error:'Gumroad is not enabled'},404);
       if(p==='/api/gumroad/redeem')return req.method==='POST'?await gumroadRedeem(req,env):reply({error:'Method not allowed'},405);
       if(p==='/api/nitrado/connect')return req.method==='GET'?await nitradoBegin(req,env):reply({error:'Method not allowed'},405);
       if(p==='/api/nitrado/callback')return req.method==='GET'?await nitradoCallback(req,env,url):reply({error:'Method not allowed'},405);
@@ -1761,7 +1908,7 @@ export default {
       if(p==='/api/me'){
         if(req.method!=='GET')return reply({error:'Method not allowed'},405);
         const user=await currentUser(req,env);if(!user)return reply({authenticated:false},401);
-        const subscription=await gumroadMembership(env,user),connection=await connectionRow(env,user);
+        const subscription=await membership(env,user),connection=await connectionRow(env,user);
         return reply({authenticated:true,user:{id:user.id,username:user.username,role:user.role},subscription,
           nitrado:{connected:!!connection,selectedServiceId:subscription.active?connection?.selected_service_id:null},
           toolsEnabled:subscription.active&&!!connection?.selected_service_id});
@@ -1771,7 +1918,7 @@ export default {
         const response=await account(req,env,url);
         const user=await currentUser(req,env);
         if(!user)return response;
-        const subscription=await gumroadMembership(env,user),connection=await connectionRow(env,user);
+        const subscription=await membership(env,user),connection=await connectionRow(env,user);
         if(!subscription.active||!connection?.selected_service_id)return response;
         let html=await response.text();
         const launch='<p><a class="button" href="/app">Open Build It!++ Server Tools</a></p>';
@@ -1789,3 +1936,4 @@ export default {
     }catch(e){return stage4Error(e,req);}
   }
 };
+
