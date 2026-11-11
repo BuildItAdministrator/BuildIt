@@ -9,7 +9,7 @@
     {
       "binding": "DB",
       "database_name": "buildit-production",
-      "database_id": "REPLACE_WITH_NEW_PRODUCTION_D1_DATABASE_ID"
+      "database_id": "dde00818-be16-45f0-bcaa-6744f1a70cb6"
     }
   ],
   "assets": {
