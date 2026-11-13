@@ -14,8 +14,8 @@ function jsonWrite(src,o){const indent=src.match(/\n([ \t]+)"/)?.[1]||'  ',nl=sr
  return JSON.stringify(o,null,indent).replace(/\n/g,nl)+(src.endsWith(nl)?nl:'');
 }
 function location(x,z){let a=Number(x),b=Number(z);
- if(x===''||z===''||!Number.isFinite(a)||!Number.isFinite(b)||a<0||a>15360||b<0||b>15360)
-  throw Error('Chernarus X and Z must be between 0 and 15360.');
+ if(x===''||z===''||!Number.isFinite(a)||!Number.isFinite(b)||a<0||a>window.BUILD_IT_MAPS.current.size||b<0||b>window.BUILD_IT_MAPS.current.size)
+  throw Error('Selected map X and Z must be within the selected map bounds.');
  return [Number(a.toFixed(2)),Number(b.toFixed(2))];
 }
 function moveBuild(src,x,z){
@@ -34,7 +34,7 @@ function moveBuild(src,x,z){
  const dx=targetX-centerX,dz=targetZ-centerZ;
  for(const o of list){
   const xx=Number((o.pos[0]+dx).toFixed(2)),zz=Number((o.pos[2]+dz).toFixed(2));
-  if(xx<0||xx>15360||zz<0||zz>15360)throw Error('One or more moved objects would fall outside the Chernarus map.');
+  if(xx<0||xx>window.BUILD_IT_MAPS.current.size||zz<0||zz>window.BUILD_IT_MAPS.current.size)throw Error('One or more moved objects would fall outside the selected map map.');
   o.pos=[xx,o.pos[1],zz];
  }
  return {content:jsonWrite(src,data),changed:Number(Math.abs(dx)>1e-5||Math.abs(dz)>1e-5),
@@ -172,3 +172,4 @@ function addHorde(src,type,x,z,radius,minCount,maxCount){
 
 root.BUILD_IT_SERVER_ADDONS=Object.freeze({moveBuild,staticZones,addGasZone,appendEquipment,economyStats,territoryTypes,addHorde});
 })(window);
+

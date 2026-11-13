@@ -1,4 +1,4 @@
-/* Render active Nitrado server event positions in existing Chernarus spawn layers. */
+/* Render active Nitrado server event positions in existing selected map spawn layers. */
 (function(){
 'use strict';
 if(typeof window.BUILD_IT_replaceSpawnGroups!=='function')return;
@@ -24,7 +24,7 @@ function groupsFromXml(source){
   for(const pos of item.children){
    if(pos.nodeName!=='pos')continue;
    const x=Number(pos.getAttribute('x')),z=Number(pos.getAttribute('z'));
-   if(!Number.isFinite(x)||!Number.isFinite(z)||x<0||z<0||x>15360||z>15360)continue;
+   if(!Number.isFinite(x)||!Number.isFinite(z)||x<0||z<0||x>window.BUILD_IT_MAPS.current.size||z>window.BUILD_IT_MAPS.current.size)continue;
    const a=pos.hasAttribute('a')?Number(pos.getAttribute('a')):null;
    const y=pos.hasAttribute('y')?Number(pos.getAttribute('y')):null;
    positions.push([x,z,Number.isFinite(a)?a:null,Number.isFinite(y)?y:null]);
@@ -65,3 +65,4 @@ window.BUILD_IT_SERVER_SPAWNS=Object.freeze({
  parse:groupsFromXml
 });
 })();
+

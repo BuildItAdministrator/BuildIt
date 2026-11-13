@@ -2,9 +2,9 @@ name: Build It!++ launch security checks
 
 on:
   push:
-    branches: [launch-prep]
+    branches: [launch-prep, patreon-integration, multi-map-support]
   pull_request:
-    branches: [main, launch-prep]
+    branches: [main, launch-prep, patreon-integration]
 
 permissions:
   contents: read
@@ -24,3 +24,6 @@ jobs:
       - name: Check regression tests
         run: node --test cloudflare/production/*.test.cjs
 
+
+      - name: Check map boundaries and isolation
+        run: npm run test:maps

@@ -28,8 +28,10 @@
     const original=MAP_STYLES[currentMapStyle];
     const replacement=MAP_STYLES[style];
     // Map center, zoom and game-coordinate mapping do not change.
-    if(map.hasLayer(original)) map.removeLayer(original);
-    replacement.addTo(map);
+    if(window.BUILD_IT_MAPS.current.id==='chernarus'){
+      if(map.hasLayer(original)) map.removeLayer(original);
+      replacement.addTo(map);
+    }
     currentMapStyle=style;
     if(style==='topographic'){
       topoErrors=0;
@@ -79,3 +81,4 @@
   });
   new control().addTo(map);
 })();
+

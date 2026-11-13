@@ -5,9 +5,9 @@
   // The Worker may explicitly verify uploads without creating another file on Nitrado.
   const verifiedFileWrite = result => !!result?.verified && (!!result.backupPath || result.backupSkipped === true);
   const backupNote = backup => backup ? ' (server backup: '+backup+')' : ' (no Nitrado backup; use your own copy)';
-  const BASE = 'https://raw.githubusercontent.com/BohemiaInteractive/DayZ-Central-Economy/master/dayzOffline.chernarusplus/';
+  const BASE = 'https://raw.githubusercontent.com/BohemiaInteractive/DayZ-Central-Economy/master/'+window.BUILD_IT_MAPS.current.mission+'/';
   const STORE = 'buildit_events_drafts_v1';
-  let activeDraftStore=STORE;
+  let activeDraftStore=window.BUILD_IT_MAPS.current.id==='chernarus'?STORE:window.BUILD_IT_MAPS.draftKey(STORE,'offline');
   const $ = id => document.getElementById(id);
   const safe = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const valid = v => /^[A-Za-z0-9_]{1,90}$/.test(v);
@@ -49,8 +49,8 @@
   const files = {};
   let chosen = null, placing = false, editingIndex = -1, itemList = [], drafts = [];
   try {
-    const stored = JSON.parse(localStorage.getItem(STORE) || '[]');
-    if (Array.isArray(stored)) drafts = stored.filter(d => d && valid(d.name) && numbers(d.x,0,15360) && numbers(d.z,0,15360)).slice(0,150);
+    const stored = JSON.parse(localStorage.getItem(activeDraftStore) || '[]');
+    if (Array.isArray(stored)) drafts = stored.filter(d => d && valid(d.name) && numbers(d.x,0,window.BUILD_IT_MAPS.current.size) && numbers(d.z,0,window.BUILD_IT_MAPS.current.size)).slice(0,150);
   } catch (e) { console.warn('Could not read event drafts', e); }
   const layer = L.layerGroup().addTo(map);
   const style = document.createElement('style');
@@ -201,7 +201,7 @@
   map.on('click', e => {
     if (!placing) return;
     const p = leafletToGame(e.latlng);
-    if (!numbers(p.x, 0, 15360) || !numbers(p.z, 0, 15360)) return message('This location is outside Chernarus.', true);
+    if (!numbers(p.x, 0, window.BUILD_IT_MAPS.current.size) || !numbers(p.z, 0, window.BUILD_IT_MAPS.current.size)) return message('This location is outside selected map.', true);
     chosen = {x:Number(p.x.toFixed(2)), z:Number(p.z.toFixed(2))};
     placing = false; window.BUILD_IT_UI_VISIBILITY?.finishPick('advanced-spawn');
     $('biPick').textContent = 'Pick on map';
@@ -233,7 +233,7 @@
   function catalogStatus() {
     $('biCatalog').textContent = itemNames.size + ' items, ' + vehicleNames.size + ' vehicles. Official catalog plus any imported server classnames.';
   }
-  const ECONOMY_MISSIONS=['dayzOffline.chernarusplus','dayzOffline.enoch','dayzOffline.sakhal'];
+  const ECONOMY_MISSIONS=['dayzOffline.chernarusplus','dayzOffline.enoch','dayzOffline.sakhal','dayzOffline.nasdara'];
   Promise.allSettled([
     fetch(BASE + 'db/types.xml').then(r => { if (!r.ok) throw new Error('types.xml HTTP ' + r.status); return r.text(); }).then(s => addCatalog(parseXML(s, 'types'),'types')),
     ...ECONOMY_MISSIONS.map(mission=>fetch('https://raw.githubusercontent.com/BohemiaInteractive/DayZ-Central-Economy/master/'+mission+'/db/events.xml').then(r=>{if(!r.ok)throw new Error(mission+' events.xml HTTP '+r.status);return r.text();}).then(s=>addCatalog(parseXML(s,'events'),'events')))
@@ -574,7 +574,7 @@
     if(!match)throw new Error('Unexpected Nitrado file root. Check Logs → Nitrado File Manager.');
     const base='/games/'+match[1];
     for(const root of [base+'/ftproot',base+'/noftp']){
-      for(const mission of ['dayzps_missions/dayzOffline.chernarusplus','mpmissions/dayzOffline.chernarusplus']){
+      for(const mission of window.BUILD_IT_MAPS.missionPaths()){
         const path=root+'/'+mission;
         try {
           const list=await nitradoRequest('/api/files/list?dir='+encodeURIComponent(path));
@@ -585,7 +585,7 @@
         } catch(_){}
       }
     }
-    throw new Error('Chernarus mission directory not found. Verify the FTP/NoFTP root in the File Manager.');
+    throw new Error('Selected map mission directory not found. Verify the FTP/NoFTP root in the File Manager.');
   }
   function vehicleDrafts(){
     if(!drafts.length)throw new Error('Save an event draft before attempting to deploy.');
@@ -931,8 +931,8 @@
     return set.has(value);
   }
   function quickCoordinates(input){
-    if(!input||!numbers(input.x,0,15360)||!numbers(input.z,0,15360))
-      throw new Error('Select a valid Chernarus position on the map.');
+    if(!input||!numbers(input.x,0,window.BUILD_IT_MAPS.current.size)||!numbers(input.z,0,window.BUILD_IT_MAPS.current.size))
+      throw new Error('Select a valid position inside the selected map.');
     return {x:Number(Number(input.x).toFixed(2)),z:Number(Number(input.z).toFixed(2))};
   }
   async function quickPublish(kind,input,onProgress=()=>{}){
@@ -947,7 +947,7 @@
     let changedPaths=[];
     const update=message=>{if(typeof onProgress==='function')onProgress(message);};
     try{
-      update('Finding the active Chernarus mission…');
+      update('Finding the selected map mission…');
       const mission=await discoverServerMission();
       if(kind==='vehicle'){
         const name='Vehicle_BuildItQuick_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);
@@ -1073,15 +1073,19 @@
   const loadDraftProfile=key=>{
     try{
       const raw=JSON.parse(localStorage.getItem(key)||'[]');
-      return Array.isArray(raw)?raw.filter(d=>d&&valid(d.name)&&numbers(d.x,0,15360)&&numbers(d.z,0,15360)).slice(0,150):[];
+      return Array.isArray(raw)?raw.filter(d=>d&&valid(d.name)&&numbers(d.x,0,window.BUILD_IT_MAPS.current.size)&&numbers(d.z,0,window.BUILD_IT_MAPS.current.size)).slice(0,150):[];
     }catch{return[];}
   };
   function bindDraftProfile(profileId,{migrateLegacy=false}={}){
-    const key=STORE+':'+String(profileId);
+    const key=window.BUILD_IT_MAPS.draftKey(STORE,String(profileId));
+    try{if(window.BUILD_IT_MAPS.current.id==='chernarus'&&!localStorage.getItem(key)){
+      const legacy=localStorage.getItem(STORE+':'+String(profileId));
+      if(legacy)localStorage.setItem(key,legacy);
+    }}catch(e){console.warn('Could not migrate map drafts:',e.message);}
     if(key===activeDraftStore)return;
     try{
       localStorage.setItem(activeDraftStore,JSON.stringify(drafts));
-      if(activeDraftStore===STORE&&migrateLegacy&&!localStorage.getItem(key))
+      if(window.BUILD_IT_MAPS.current.id==='chernarus'&&activeDraftStore===STORE&&migrateLegacy&&!localStorage.getItem(key))
         localStorage.setItem(key,JSON.stringify(drafts));
     }catch(e){console.warn('Could not preserve server drafts:',e.message);}
     activeDraftStore=key;
@@ -1112,3 +1116,4 @@
     });
   });
 })();
+

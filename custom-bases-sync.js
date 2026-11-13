@@ -141,7 +141,7 @@
       x=Number(raw.x);z=Number(raw.z);
     }else return null;
     if(!Number.isFinite(x)||!Number.isFinite(z)||
-       x<0||z<0||x>15360||z>15360)return null;
+       x<0||z<0||x>window.BUILD_IT_MAPS.current.size||z>window.BUILD_IT_MAPS.current.size)return null;
     return [x,z];
   }
 
@@ -173,7 +173,7 @@
   }
 
   // Group a file's objects by connected 100-metre map cells. A file may
-  // contain multiple POIs across Chernarus; never draw one enormous polygon.
+  // contain multiple POIs across selected map; never draw one enormous polygon.
   function splitClusters(points){
     const CELL=100;
     const cells=new Map();
@@ -234,7 +234,7 @@
     const roots=normalizeRoot(initial.root);
     // Both roots, then both known console mission locations. No arbitrary filesystem crawl.
     for(const root of roots){
-      for(const mission of ['dayzps_missions/dayzOffline.chernarusplus','mpmissions/dayzOffline.chernarusplus']){
+      for(const mission of window.BUILD_IT_MAPS.missionPaths()){
         const candidate=root+'/'+mission+'/custom';
         try{
           const response=await readFolder(candidate);
@@ -243,7 +243,7 @@
         }catch(_){}
       }
     }
-    throw new Error('Custom folder not found in the Chernarus mission. Check FTP root → dayzps_missions → dayzOffline.chernarusplus → custom.');
+    throw new Error('Custom folder not found in the selected map mission. Check FTP root → dayzps_missions → the selected mission → custom.');
   }
 
   async function listCustomJson(base,roots,initial){
@@ -282,7 +282,7 @@
     busy=true;button.disabled=true;
     let folder='',scan;
     try{
-      display('Locating live Chernarus custom folder…');
+      display('Locating live selected map custom folder…');
       const found=await locateCustomFolder();
       folder=found.candidate;
       scan=await listCustomJson(folder,found.roots,found.initial);
@@ -358,3 +358,4 @@
     summary:()=>({count:liveCount,mappedFiles:liveFiles,failedFiles:[...failedFiles],lastLoaded})
   };
 })();
+

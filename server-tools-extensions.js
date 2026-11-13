@@ -167,7 +167,7 @@ function changeObjectPosition(src,index,x,z){
  if(!Number.isInteger(i)||i<0||i>=d.Objects.length)throw Error('Select one existing object.');
  const xx=Number(x),zz=Number(z);
  if(x===''||z===''||!Number.isFinite(xx)||!Number.isFinite(zz)||
-    xx<0||xx>15360||zz<0||zz>15360)throw Error('Chernarus X and Z must be 0 to 15360.');
+    xx<0||xx>window.BUILD_IT_MAPS.current.size||zz<0||zz>window.BUILD_IT_MAPS.current.size)throw Error('Selected map X and Z must be within the selected map bounds.');
  const o=d.Objects[i],previous=o.pos.slice();
  o.pos=[Number(xx.toFixed(2)),o.pos[1],Number(zz.toFixed(2))];
  return{content:stringify(d,src),changed:Number(previous[0]!==o.pos[0]||previous[2]!==o.pos[2]),
@@ -196,8 +196,8 @@ function addSpawnPoint(src,x,z,groupName=''){
  if(!container)throw Error('Fresh generator_posbubbles was not found.');
  const xx=Number(x),zz=Number(z);
  if(x===''||z===''||!Number.isFinite(xx)||!Number.isFinite(zz)||
-    xx<0||xx>15360||zz<0||zz>15360)
-   throw Error('X/Z must be inside Chernarus (0–15360).');
+    xx<0||xx>window.BUILD_IT_MAPS.current.size||zz<0||zz>window.BUILD_IT_MAPS.current.size)
+   throw Error('X/Z must be inside selected map (selected map bounds).');
  const X=Number(xx.toFixed(2)),Z=Number(zz.toFixed(2));
  for(const point of container.querySelectorAll('pos')){
    if(Math.abs(Number(point.getAttribute('x'))-X)<1&&Math.abs(Number(point.getAttribute('z'))-Z)<1)
@@ -259,8 +259,8 @@ function replaceSpawnPoints(src,x,z,groupName=''){
   if(!container)throw Error('Fresh generator_posbubbles was not found.');
   const xx=Number(x),zz=Number(z);
   if(x===''||z===''||!Number.isFinite(xx)||!Number.isFinite(zz)||
-     xx<0||xx>15360||zz<0||zz>15360)
-    throw Error('X/Z must be inside Chernarus (0–15360).');
+     xx<0||xx>window.BUILD_IT_MAPS.current.size||zz<0||zz>window.BUILD_IT_MAPS.current.size)
+    throw Error('X/Z must be inside selected map (selected map bounds).');
   const X=Number(xx.toFixed(2)),Z=Number(zz.toFixed(2));
   const groups=[...container.children].filter(el=>el.nodeName==='group');
   const oldPoints=container.querySelectorAll('pos').length;
@@ -323,3 +323,4 @@ root.BUILD_IT_SERVER_EXTENSIONS=Object.freeze({
  objectList,changeObjectPosition,organizeObjects,spawnGroups,addSpawnPoint,replaceSpawnPoints
 });
 })(window);
+

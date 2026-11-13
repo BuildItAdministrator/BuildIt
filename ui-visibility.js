@@ -52,7 +52,7 @@ function finishPick(owner){
  refresh();
  return true;
 }
-function beginPick(owner,{onCancel=null,hintText='Click one position on the Chernarus map'}={}){
+function beginPick(owner,{onCancel=null,hintText='Click one position on the selected map'}={}){
  if(typeof owner!=='string'||!owner)throw new Error('Invalid map picker.');
  // Cancel any previous picker (and detach its map listener) before switching.
  if(active)cancelPick();

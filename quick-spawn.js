@@ -107,7 +107,7 @@ $('qsPick').addEventListener('click',()=>{
   }
   picking=true;
   $('qsPick').textContent='Click the map to set the spawn position';
-  setStatus('Click anywhere on the Chernarus map.');
+  setStatus('Click anywhere on the selected map map.');
   window.BUILD_IT_UI_VISIBILITY?.beginPick('quick-spawn',{
     hintText:'Choose a vehicle or loot spawn location on the map',
     onCancel:cancelMapPicking
@@ -116,8 +116,8 @@ $('qsPick').addEventListener('click',()=>{
 map.on('click',e=>{
   if(!picking||busy)return;
   const p=leafletToGame(e.latlng);
-  if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.z)||p.x<0||p.z<0||p.x>15360||p.z>15360){
-    setStatus('Choose a position inside Chernarus.',true);return;
+  if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.z)||p.x<0||p.z<0||p.x>window.BUILD_IT_MAPS.current.size||p.z>window.BUILD_IT_MAPS.current.size){
+    setStatus('Choose a position inside selected map.',true);return;
   }
   coordinates={x:Number(p.x.toFixed(2)),z:Number(p.z.toFixed(2))};
   picking=false;window.BUILD_IT_UI_VISIBILITY?.finishPick('quick-spawn');
@@ -194,3 +194,4 @@ window.addEventListener('buildit:nitrado-profile-changing',()=>{
 });
 window.BUILD_IT_QUICK_SPAWN=Object.freeze({open,close,toggle,hasDraft:()=>!!chosen||!!coordinates});
 })();
+

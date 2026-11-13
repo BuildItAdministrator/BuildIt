@@ -46,7 +46,7 @@
     const match=root.match(/^\/games\/([A-Za-z0-9_-]{1,100})\/(?:noftp|ftproot)$/);
     if(!match)throw new Error('Nitrado root was not recognized.');
     for(const place of ['ftproot','noftp']){
-      for(const mission of ['dayzps_missions/dayzOffline.chernarusplus','mpmissions/dayzOffline.chernarusplus']){
+      for(const mission of window.BUILD_IT_MAPS.missionPaths()){
         const path='/games/'+match[1]+'/'+place+'/'+mission;
         try{
           const found=await list(path);
@@ -54,7 +54,7 @@
         }catch(_){}
       }
     }
-    throw new Error('Active Chernarus mission not found. Confirm the mission and Nitrado server selection.');
+    throw new Error('Active selected map mission not found. Confirm the mission and Nitrado server selection.');
   }
   let missionPromise=null;
   let generation=0;

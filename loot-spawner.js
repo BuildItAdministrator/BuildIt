@@ -18,8 +18,8 @@
     if(!loot.length)throw new Error('Save a JSON loot drop first.');
     const objects=[];
     for(const d of loot){
-      const x=number(d.x,0,15360,'X coordinate');
-      const z=number(d.z,0,15360,'Z coordinate');
+      const x=number(d.x,0,window.BUILD_IT_MAPS.current.size,'X coordinate');
+      const z=number(d.z,0,window.BUILD_IT_MAPS.current.size,'Z coordinate');
       const y=number(d.y,-100,1000,'Terrain height (Y) for '+d.name);
       const a=number(d.a,0,359.99,'Rotation');
       const spacing=number(d.spacing??1.5,0.5,10,'Item spacing');
@@ -39,7 +39,7 @@
         const dz=(Math.floor(i/cols)-(rows-1)/2)*spacing;
         // Object Spawner coordinates use [X, elevation Y, Z].
         const ox=Number((x+dx).toFixed(3)),oz=Number((z+dz).toFixed(3));
-        if(ox<0||ox>15360||oz<0||oz>15360)
+        if(ox<0||ox>window.BUILD_IT_MAPS.current.size||oz<0||oz>window.BUILD_IT_MAPS.current.size)
           throw new Error('Items in '+d.name+' extend outside the map.');
         objects.push({name,pos:[ox,y,oz],ypr:[a,0,0],scale:1,enableCEPersistency:false});
       });

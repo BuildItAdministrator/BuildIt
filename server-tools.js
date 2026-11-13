@@ -60,13 +60,13 @@ ROOT.innerHTML=`
   </div>
    <div id="stGameplayControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing gameplay setting</span><select id="stGameplayPath"></select></label><label class="st-field st-wide"><span>New value</span><input id="stGameplayValue" type="text" placeholder="true, false or a number"></label></div>
    <div id="stWeatherControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing weather parameter</span><select id="stWeatherPath"></select></label><label class="st-field st-wide"><span>Value (0–1)</span><input id="stWeatherValue" type="number" min="0" max="1" step="0.05"></label></div>
-   <div id="stObjectMoveControls" class="st-params" hidden><label class="st-field st-wide"><span>Object from server file</span><select id="stObjectIndex"></select></label><label class="st-field"><span>X</span><input id="stObjectX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Z</span><input id="stObjectZ" type="number" min="0" max="15360" step="0.01"></label></div>
-   <div id="stPlayerSpawnControls" class="st-params" hidden><label class="st-field st-wide"><span>Fresh-spawn group to keep</span><select id="stPlayerGroup"></select></label><label class="st-field"><span>Spawn X</span><input id="stPlayerX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Spawn Z</span><input id="stPlayerZ" type="number" min="0" max="15360" step="0.01"></label></div>
+   <div id="stObjectMoveControls" class="st-params" hidden><label class="st-field st-wide"><span>Object from server file</span><select id="stObjectIndex"></select></label><label class="st-field"><span>X</span><input id="stObjectX" type="number" min="0" max="'+window.BUILD_IT_MAPS.current.size+'" step="0.01"></label><label class="st-field"><span>Z</span><input id="stObjectZ" type="number" min="0" max="'+window.BUILD_IT_MAPS.current.size+'" step="0.01"></label></div>
+   <div id="stPlayerSpawnControls" class="st-params" hidden><label class="st-field st-wide"><span>Fresh-spawn group to keep</span><select id="stPlayerGroup"></select></label><label class="st-field"><span>Spawn X</span><input id="stPlayerX" type="number" min="0" max="'+window.BUILD_IT_MAPS.current.size+'" step="0.01"></label><label class="st-field"><span>Spawn Z</span><input id="stPlayerZ" type="number" min="0" max="'+window.BUILD_IT_MAPS.current.size+'" step="0.01"></label></div>
    <div id="stMapControls" class="st-actions" hidden><button id="stPickMap" type="button">Pick on map</button><span class="st-help">Optional map selection for X/Z.</span></div>
    <div id="stHeatmapControls" class="st-actions" hidden><button id="stShowHeatmap" type="button">Show density on map</button><button id="stClearHeatmap" type="button">Clear heatmap</button></div>
-   <div id="stHordeControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing infected event type</span><select id="stHordeType"></select></label><label class="st-field"><span>X</span><input id="stHordeX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Z</span><input id="stHordeZ" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Radius (m)</span><input id="stHordeRadius" type="number" min="10" max="300" value="80"></label><label class="st-field"><span>Minimum infected</span><input id="stHordeMin" type="number" min="1" max="75" step="1" value="10"></label><label class="st-field"><span>Maximum infected</span><input id="stHordeMax" type="number" min="1" max="75" step="1" value="20"></label></div>
-   <div id="stGasControls" class="st-params" hidden><label class="st-field st-wide"><span>New zone name</span><input id="stGasName" type="text" placeholder="BuildIt_GasZone_1"></label><label class="st-field"><span>X</span><input id="stGasX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Z</span><input id="stGasZ" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>Ground height Y</span><input id="stGasY" type="number" min="-100" max="1200" step="0.01" placeholder="Real terrain elevation"></label><label class="st-field"><span>Radius (m)</span><input id="stGasRadius" type="number" min="10" max="300" step="1" value="50"></label></div>
-   <div id="stRelocatorControls" class="st-params" hidden><label class="st-field"><span>New center X</span><input id="stRelocX" type="number" min="0" max="15360" step="0.01"></label><label class="st-field"><span>New center Z</span><input id="stRelocZ" type="number" min="0" max="15360" step="0.01"></label><p class="st-help st-wide">Moves every object by the same offset. Terrain Y heights are unchanged; use flat ground to avoid floating or buried objects.</p></div>
+   <div id="stHordeControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing infected event type</span><select id="stHordeType"></select></label><label class="st-field"><span>X</span><input id="stHordeX" type="number" min="0" max="'+window.BUILD_IT_MAPS.current.size+'" step="0.01"></label><label class="st-field"><span>Z</span><input id="stHordeZ" type="number" min="0" max="'+window.BUILD_IT_MAPS.current.size+'" step="0.01"></label><label class="st-field"><span>Radius (m)</span><input id="stHordeRadius" type="number" min="10" max="300" value="80"></label><label class="st-field"><span>Minimum infected</span><input id="stHordeMin" type="number" min="1" max="75" step="1" value="10"></label><label class="st-field"><span>Maximum infected</span><input id="stHordeMax" type="number" min="1" max="75" step="1" value="20"></label></div>
+   <div id="stGasControls" class="st-params" hidden><label class="st-field st-wide"><span>New zone name</span><input id="stGasName" type="text" placeholder="BuildIt_GasZone_1"></label><label class="st-field"><span>X</span><input id="stGasX" type="number" min="0" max="'+window.BUILD_IT_MAPS.current.size+'" step="0.01"></label><label class="st-field"><span>Z</span><input id="stGasZ" type="number" min="0" max="'+window.BUILD_IT_MAPS.current.size+'" step="0.01"></label><label class="st-field"><span>Ground height Y</span><input id="stGasY" type="number" min="-100" max="1200" step="0.01" placeholder="Real terrain elevation"></label><label class="st-field"><span>Radius (m)</span><input id="stGasRadius" type="number" min="10" max="300" step="1" value="50"></label></div>
+   <div id="stRelocatorControls" class="st-params" hidden><label class="st-field"><span>New center X</span><input id="stRelocX" type="number" min="0" max="'+window.BUILD_IT_MAPS.current.size+'" step="0.01"></label><label class="st-field"><span>New center Z</span><input id="stRelocZ" type="number" min="0" max="'+window.BUILD_IT_MAPS.current.size+'" step="0.01"></label><p class="st-help st-wide">Moves every object by the same offset. Terrain Y heights are unchanged; use flat ground to avoid floating or buried objects.</p></div>
    <div id="stIgnoreControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing classname to exclude from Central Economy</span><input id="stIgnoreItem" type="text" placeholder="e.g. Apple"></label></div>
    <div id="stEventControls" class="st-params" hidden><label class="st-field st-wide"><span>Existing event</span><select id="stEventName"></select></label><label class="st-field"><span>Setting</span><select id="stEventField"><option value="nominal">Nominal</option><option value="min">Minimum</option><option value="max">Maximum</option><option value="lifetime">Lifetime</option><option value="restock">Restock</option><option value="saferadius">Safe radius</option><option value="distanceradius">Distance radius</option><option value="cleanupradius">Cleanup radius</option></select></label><label class="st-field"><span>New integer</span><input id="stEventValue" type="number" min="0" max="1000000" step="1"></label></div>
    <div id="stLoadoutControls" class="st-params" hidden><label class="st-field st-wide"><span>Add existing cargo item to a registered starting-gear preset</span><input id="stLoadoutItem" type="text" placeholder="e.g. BandageDressing"></label><p class="st-help st-wide">Adds one item to the first cargo set of an existing registered preset. Your server must already have spawnGearPresetFiles configured.</p></div>
@@ -445,7 +445,7 @@ $('stShowHeatmap').addEventListener('click',()=>{
    const objects=ext.objectList(snapshot.content),grid=new Map();
    for(const object of objects){
      const x=Number(object.pos[0]),z=Number(object.pos[2]);
-     if(!Number.isFinite(x)||!Number.isFinite(z)||x<0||z<0||x>15360||z>15360)continue;
+     if(!Number.isFinite(x)||!Number.isFinite(z)||x<0||z<0||x>window.BUILD_IT_MAPS.current.size||z>window.BUILD_IT_MAPS.current.size)continue;
      const key=Math.floor(x/100)+'_'+Math.floor(z/100);
      const bin=grid.get(key)||{count:0,x:Math.floor(x/100)*100+50,z:Math.floor(z/100)*100+50};
      bin.count++;grid.set(key,bin);
@@ -471,13 +471,13 @@ $('stPickMap').addEventListener('click',()=>{
  }
  cancelToolMapPick();
  const tool=selected;
- setStatus('Click a position on the Chernarus map. Escape or Cancel to go back.');
+ setStatus('Click a position on the selected map map. Escape or Cancel to go back.');
  activeToolMapListener=e=>{
    if(!selected||selected!==tool||panel.hidden){cancelToolMapPick();return;}
    const p=leafletToGame(e.latlng);
    if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.z)||
-      p.x<0||p.z<0||p.x>15360||p.z>15360){
-     setStatus('Please select a position inside Chernarus.',true);return;
+      p.x<0||p.z<0||p.x>window.BUILD_IT_MAPS.current.size||p.z>window.BUILD_IT_MAPS.current.size){
+     setStatus('Please select a position inside selected map.',true);return;
    }
    const X=Number(p.x.toFixed(2)),Z=Number(p.z.toFixed(2));
    if(tool==='SpawnObject Mover'){
@@ -749,3 +749,4 @@ window.addEventListener('buildit:nitrado-profile-changing',()=>{
 });
 
 })();
+

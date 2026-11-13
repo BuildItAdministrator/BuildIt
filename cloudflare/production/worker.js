@@ -1105,11 +1105,11 @@ async function streamCustomJson(
 ) {
   const path = checkedPath(rawPath, username, true);
   if (
-    !/\/(?:dayzps_missions|mpmissions)\/dayzOffline.chernarusplus\/custom\/[^?#]+\.json$/i
+    !/\/(?:dayzps_missions|mpmissions)\/dayzOffline\.(?:chernarusplus|enoch|sakhal|nasdara)\/custom\/[^?#]+\.json$/i
       .test(path)
   ) {
     fail(
-      "Large-file streaming is restricted to Chernarus custom JSON files.",
+      "Large-file streaming is restricted to supported DayZ mission custom JSON files.",
       403
     );
   }
@@ -1565,15 +1565,16 @@ async function createLootSpawnerFile(
     username,
     true
   );
-  const suffix =
-    "/dayzOffline.chernarusplus/custom/builditlootdrop.json";
-  const validPaths = gameRoots(username).flatMap(root => [
-    root + "/dayzps_missions" + suffix,
-    root + "/mpmissions" + suffix
-  ]);
+  const validPaths = gameRoots(username).flatMap(root =>
+    ["chernarusplus", "enoch", "sakhal", "nasdara"].flatMap(world =>
+      ["dayzps_missions", "mpmissions"].map(folder =>
+        root + "/" + folder + "/dayzOffline." + world + "/custom/builditlootdrop.json"
+      )
+    )
+  );
   if (!validPaths.includes(path)) {
     fail(
-      "Creating files is restricted to the BuildIt loot JSON in a Chernarus custom folder.",
+      "Creating files is restricted to the BuildIt loot JSON in a supported DayZ mission custom folder.",
       403
     );
   }
@@ -1936,4 +1937,5 @@ export default {
     }catch(e){return stage4Error(e,req);}
   }
 };
+
 

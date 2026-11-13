@@ -10,12 +10,12 @@
   panel.id='fileManager';
   panel.innerHTML=[
     '<div class="log-auto-title">Nitrado File Manager</div>',
-    '<p class="fm-note">DayZ PS5 mission files are usually in dayzps_missions/dayzOffline.chernarusplus, not dayzps/config. Search both Nitrado file roots below. Opening folders never changes your server.</p>',
+    '<p class="fm-note">DayZ PS5 mission files are usually in dayzps_missions/dayzOffline.&lt;world&gt;, not dayzps/config. Search both Nitrado file roots below. Opening folders never changes your server.</p>',
     '<p class="fm-note">Download or edit XML, JSON and TXT files up to 512 KB. Uploads use SHA checks and read-back verification. With the updated Worker, no additional Nitrado backup is created.</p>',
     '<label class="fm-label" for="nitradoWriteKey">Separate file-write key (MAP_WRITE_KEY)</label>',
     '<input id="nitradoWriteKey" type="password" autocomplete="off" placeholder="Enter Cloudflare file-write key">',
     '<p class="fm-note">Required for verified upload. This key stays in this tab only; it is not saved in browser storage.</p>',
-    '<div class="fm-row"><button id="fmFindMission" type="button" class="log-btn">Find Chernarus mission</button></div>',
+    '<div class="fm-row"><button id="fmFindMission" type="button" class="log-btn">Find map mission</button></div>',
     '<div class="fm-row"><button id="fmBrowse" type="button" class="log-btn">NoFTP root</button><button id="fmFtpRoot" type="button" class="log-btn">FTP root</button><button id="fmBack" type="button" class="log-btn" disabled>Parent</button></div>',
     '<div id="fmCurrentDir" class="fm-path" aria-label="Current directory"></div>',
     '<div id="fmEntries" class="fm-entries"></div>',
@@ -185,19 +185,16 @@
     if(!entries.childElementCount)entries.textContent='No supported files or subfolders in this directory.';
     const isSettings=dir.endsWith('/dayzps')||dir.endsWith('/dayzps/config');
     state(isSettings
-      ? 'This folder contains server settings, not Chernarus mission XMLs. Select Find Chernarus mission, or FTP root.'
+      ? 'This folder contains server settings, not selected map mission XMLs. Select Find map mission, or FTP root.'
       : 'Folder loaded. Select a file to open or download.');
   }
   async function findMission(){
-    state('Looking for dayzps_missions/dayzOffline.chernarusplus in both Nitrado roots…');
+    state('Looking for dayzps_missions/dayzOffline.&lt;world&gt; in both Nitrado roots…');
     if(!root){
       const response=await listDirectory();
       if(!response.target)throw new Error('Unable to identify the server file roots.');
     }
-    const suffixes=[
-      '/dayzps_missions/dayzOffline.chernarusplus',
-      '/mpmissions/dayzOffline.chernarusplus'
-    ];
+    const suffixes=window.BUILD_IT_MAPS.missionPaths().map(p=>'/'+p);
     const checked=[];
     for(const fileRoot of storageRoots){
       for(const suffix of suffixes){
@@ -211,7 +208,7 @@
           });
           if(isMission){
             await browse(candidate);
-            state('Chernarus mission found: '+candidate+'\nOpen db for events.xml, types.xml and messages.xml.');
+            state('selected map mission found: '+candidate+'\nOpen db for events.xml, types.xml and messages.xml.');
             return;
           }
           checked.push(candidate+' (mission files absent)');
@@ -219,7 +216,7 @@
       }
     }
     // Even when direct probing is blocked, the user can inspect each root by hand.
-    state('Chernarus mission not found automatically in NoFTP or FTP root. Try FTP root and look for dayzps_missions. If it is also missing there, compare with Nitrado Tools > Filebrowser. No files were changed.',true);
+    state('selected map mission not found automatically in NoFTP or FTP root. Try FTP root and look for dayzps_missions. If it is also missing there, compare with Nitrado Tools > Filebrowser. No files were changed.',true);
   }
   async function openFile(path){
     state('Downloading selected file…');
@@ -359,3 +356,4 @@
     refreshValidation();
   }));
 })();
+

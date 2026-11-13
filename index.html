@@ -488,9 +488,10 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
   </section>
 </div>
 
-<div id="status">Loading Chernarus location names…</div>
+<div id="status">Loading map locations…</div>
 <div id="coords">X: ---- &nbsp;&nbsp; Z: ----</div>
 
+<script src="./map-registry.js"></script>
 <script src="./locations-fallback.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -547,12 +548,13 @@ body{background:#111;font-family:Arial,Helvetica,sans-serif}
   });
 })();
 
-const MAP_SIZE=15360;
+const MAP_SIZE=window.BUILD_IT_MAPS.current.size;
 const XAM_SPACE=256;
 const SCALE=MAP_SIZE/XAM_SPACE;
 
 const map=L.map('map',{
-  crs:L.CRS.Simple,minZoom:0,maxZoom:7,
+  crs:L.CRS.Simple,minZoom:window.BUILD_IT_MAPS.current.id==='chernarus'?0:1,maxZoom:7,
+  zoomAnimation:false,
   zoomSnap:.25,zoomDelta:.5,wheelPxPerZoomLevel:80
 });
 
@@ -569,7 +571,7 @@ let currentMapStyle='satellite';
 try{
  if(localStorage.getItem(MAP_STYLE_STORE)==='topographic') currentMapStyle='topographic';
 }catch(_){}
-MAP_STYLES[currentMapStyle].addTo(map);
+if(window.BUILD_IT_MAPS.current.id==='chernarus') MAP_STYLES[currentMapStyle].addTo(map);
 
 const bounds=L.latLngBounds([[-256,0],[0,256]]);
 map.setMaxBounds(bounds.pad(.05));
@@ -706,7 +708,7 @@ function addCustomBases(bases=CUSTOM_BASES){
   syncBaseVisibility();
 }
 
-addCustomBases();
+if(window.BUILD_IT_MAPS.current.id==='chernarus') addCustomBases();
 // The live Nitrado sync swaps these cached example bases after a successful scan.
 window.BUILD_IT_renderCustomBases=addCustomBases;
 
@@ -792,7 +794,7 @@ function setupSpawnFilters(){
   }
 }
 
-let activeSpawnGroups=SPAWN_GROUPS;
+let activeSpawnGroups=window.BUILD_IT_MAPS.current.id==='chernarus'?SPAWN_GROUPS:[];
 function addAllSpawns(){
   let number=0;
   for(const group of activeSpawnGroups){
@@ -1779,7 +1781,8 @@ function applyLocationRecords(records){
 }
 
 try {
- applyLocationRecords(window.BUILD_IT_OFFLINE_PLACES||[]);
+ if(window.BUILD_IT_MAPS.current.id==='chernarus') applyLocationRecords(window.BUILD_IT_OFFLINE_PLACES||[]);
+ else {placeSearchInput.disabled=true;placeSearchInput.placeholder='Loading places…';}
  setTimeout(()=>status.style.display='none',3800);
 } catch(error) {
  console.error('Chernarus locations could not be loaded:',error);
@@ -1790,6 +1793,7 @@ try {
 }
 
 </script>
+<script src="./map-world.js"></script>
 <script src="./xml-integrity.js"></script>
 <script src="./format-validator.js"></script>
 <script src="./loot-spawner.js"></script>
